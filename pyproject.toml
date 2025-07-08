@@ -54,6 +54,7 @@ blue = "^0.9.1"
 isort = "^6.0.1"
 taskipy = "^1.14.1"
 ipykernel = "^6.29.5"
+twine = "^6.1.0"
 
 [tool.poetry.group.doc.dependencies]
 mkdocs-material = "^9.6.15"

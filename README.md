@@ -151,8 +151,44 @@ src/
 ## ❤️Contributing
 1. Fork this repository
 2. Create a new branch (feat/my-feature)
-3. Run pip install -e . to develop locally
-4. Submit a pull request 🚀  
+3. Run `poetry install` to set up the development environment
+4. Run `poetry run task test` to run tests
+5. Submit a pull request 🚀  
+
+## 🚀 Publishing
+
+### For Maintainers
+
+To publish a new version to PyPI:
+
+1. Update the version in `pyproject.toml` and `src/pyfabricops/_version.py`
+2. Commit and push changes
+3. Create a new release on GitHub with a tag (e.g., `v0.1.0`)
+4. The GitHub Action will automatically:
+   - Run tests
+   - Build the package
+   - Publish to PyPI
+
+### Testing with TestPyPI
+
+```bash
+# Configure TestPyPI
+poetry config repositories.testpypi https://test.pypi.org/legacy/
+poetry config pypi-token.testpypi <your-testpypi-token>
+
+# Build and publish to TestPyPI
+poetry build
+poetry publish -r testpypi
+
+# Install from TestPyPI
+pip install --index-url https://test.pypi.org/simple/ pyfabricops
+```
+
+### Prerequisites for Publishing
+
+- Set up a PyPI account at https://pypi.org/
+- Generate an API token at https://pypi.org/manage/account/token/
+- Add the token as `PYPI_TOKEN` secret in GitHub repository settings  
 
 ## 🐞 Issues  
 If you encounter any issues, please report them at [https://github.com/alisonpezzott/pyfabricops/issues](https://github.com/alisonpezzott/pyfabricops/issues)  
