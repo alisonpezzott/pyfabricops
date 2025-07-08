@@ -24,7 +24,6 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
     "Topic :: Software Development :: Testing",
     "Topic :: Software Development :: Build Tools",
-    "Topic :: Software Development :: Continuous Integration",
     "Topic :: Education",
     "Topic :: Scientific/Engineering :: Information Analysis",
 ]
