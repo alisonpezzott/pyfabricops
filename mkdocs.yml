@@ -1,0 +1,28 @@
+site_name: pyfabricops
+repo_url: https://github.com/alisonpezzott/pyfabricops
+repo_name: alisonpezzott/pyfabricops
+site_description: A modern Python wrapper for Microsoft Fabric and Power BI operations with official REST APIs.
+site_author: Alison Pezzott
+edit_uri: tree/main/docs
+
+theme:
+  name: material
+  palette:
+    scheme: default
+    primary: teal
+    accent: teal
+  logo: assets/logo.png
+  favicon: assets/logo.png
+
+markdown_extensions:
+  - attr_list
+
+extra_css:
+  - stylesheets/extra.css
+
+plugins:
+- mkdocstrings:
+    handlers:
+      python:
+        paths:
+          - src/pyfabricops

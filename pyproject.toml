@@ -1,0 +1,85 @@
+[project]
+name = "pyfabricops"
+version = "0.1.0"
+description = "A Python wrapper library for Microsoft Fabric (and Power BI) operations, providing a simple interface to the official Fabric REST APIs. Falls back to Power BI REST APIs where needed. Designed to run in Python notebooks, pure Python scripts or integrated into YAML-based workflows for CI/CD."
+authors = [
+    {name = "alisonpezzott",email = "alisonpezzott@gmail.com"}
+]
+license = "MIT"
+license-files = "LICENSE"
+readme = "README.md"
+requires-python = ">=3.10, <= 3.12.10"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+    "Environment :: Console",
+    "Framework :: Jupyter",
+    "Framework :: IPython",
+    "Intended Audience :: System Administrators",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Testing",
+    "Topic :: Software Development :: Build Tools",
+    "Topic :: Software Development :: Continuous Integration",
+    "Topic :: Education",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+]
+
+dependencies = [
+    "azure-storage-blob==12.25.1",
+    "azure-identity==1.16.0",
+    "azure-keyvault-secrets==4.9.0",
+    "cryptography==3.4.6",
+    "pandas==2.3.0",
+    "python-dotenv==1.1.1",
+    "requests==2.32.4"
+]
+
+[project.urls]
+Repository = "https://github.com/alisonpezzott/pyfabricops.git"
+Issues = "https://github.com/alisonpezzott/pyfabricops/issues"
+Examples = "https://github.com/alisonpezzott/pyfabricops-examples.git"
+
+[tool.poetry]
+packages = [{include = "pyfabricops", from = "src"}]
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.4.1"
+pytest-cov = "^6.2.1"
+blue = "^0.9.1"
+isort = "^6.0.1"
+taskipy = "^1.14.1"
+ipykernel = "^6.29.5"
+
+[tool.poetry.group.doc.dependencies]
+mkdocs-material = "^9.6.15"
+mkdocstrings = "^0.29.1"
+mkdocstrings-python = "^1.16.12"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini.options]
+python = "."
+addopts = "--doctest-modules"
+
+[tool.blue]
+line_length = 79
+quote_style = "single"
+
+[tool.isort]
+profile = "black"
+line_length = 79
+
+[tool.taskipy.tasks]
+lint = "blue --check --diff . && isort --check --diff ."
+docs = "poetry run mkdocs serve"
+pre_test = "task lint"
+test = "poetry run pytest -s -x --cov=pyfabricops -v"
+post_test = "poetry run coverage html && poetry run python -c \"import webbrowser, os; webbrowser.open('file://' + os.path.abspath('htmlcov/index.html'))\""
+generate_init = "poetry run python scripts/generate_init.py"
