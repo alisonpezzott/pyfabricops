@@ -6,7 +6,7 @@ site_author: Alison Pezzott
 edit_uri: tree/main/docs
 
 theme:
-  name: readthedocs
+  name: material
   palette:
     scheme: default
     primary: teal
