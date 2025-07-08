@@ -488,6 +488,8 @@ def export_semantic_model(
     if not definition:
         return None
 
+    semantic_model_name = semantic_model_['displayName']
+    
     if update_config:
 
         # Get branch
@@ -517,8 +519,6 @@ def export_semantic_model(
 
         config = existing_config[branch][workspace_name_without_suffix]
 
-        semantic_model_id = semantic_model_['id']
-        semantic_model_name = semantic_model_['displayName']
         semantic_model_descr = semantic_model_.get('description', '')
 
         # Find the key in the folders dict whose value matches folder_id
