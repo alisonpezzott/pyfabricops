@@ -1,1 +1,1 @@
-::: _notebooks
+::: pyfabricops._notebooks

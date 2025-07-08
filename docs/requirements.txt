@@ -1,0 +1,5 @@
+mkdocs-material==9.6.15
+mkdocstrings==0.29.1
+mkdocstrings-python==1.16.12
+griffe==1.7.3
+pymdown-extensions==10.16

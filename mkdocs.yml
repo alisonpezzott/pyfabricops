@@ -5,6 +5,32 @@ site_description: A modern Python wrapper for Microsoft Fabric and Power BI oper
 site_author: Alison Pezzott
 edit_uri: tree/main/docs
 
+nav:
+  - Home: index.md
+  - Functions:
+    - Authentication: functions/auth.md
+    - Capacities: functions/capacities.md
+    - Connections: functions/connections.md
+    - Core: functions/core.md
+    - Data Pipelines: functions/data_pipelines.md
+    - Dataflows Gen1: functions/dataflows_gen1.md
+    - Dataflows Gen2: functions/dataflows_gen2.md
+    - Folders: functions/folders.md
+    - Gateways: functions/gateways.md
+    - Git: functions/git.md
+    - Items: functions/items.md
+    - Lakehouses: functions/lakehouses.md
+    - Notebooks: functions/notebooks.md
+    - Reports: functions/reports.md
+    - Semantic Models: functions/semantic_models.md
+    - Warehouses: functions/warehouses.md
+    - Workspaces: functions/workspaces.md
+    - Auxiliary:
+      - Decorators: functions/auxiliary/decorators.md
+      - Exceptions: functions/auxiliary/exceptions.md
+      - Helpers: functions/auxiliary/helpers.md
+      - Utils: functions/auxiliary/utils.md
+
 theme:
   name: material
   palette:
@@ -16,13 +42,19 @@ theme:
 
 markdown_extensions:
   - attr_list
+  - pymdownx.highlight
+  - pymdownx.superfences
 
 extra_css:
   - stylesheets/extra.css
 
 plugins:
-- mkdocstrings:
-    handlers:
-      python:
-        paths:
-          - src/pyfabricops
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths:
+            - src
+          options:
+            show_source: true
+            docstring_style: google

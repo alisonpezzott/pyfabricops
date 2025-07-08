@@ -1,1 +1,1 @@
-::: _capacities
+::: pyfabricops._capacities

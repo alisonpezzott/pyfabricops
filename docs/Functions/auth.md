@@ -1,1 +1,1 @@
-::: _auth
+::: pyfabricops._auth

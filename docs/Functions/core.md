@@ -1,1 +1,1 @@
-::: _core
+::: pyfabricops._core

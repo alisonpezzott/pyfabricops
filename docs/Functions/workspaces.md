@@ -1,1 +1,1 @@
-::: _workspaces
+::: pyfabricops._workspaces

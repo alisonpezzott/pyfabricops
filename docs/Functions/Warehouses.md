@@ -1,1 +1,1 @@
-::: _warehouses
+::: pyfabricops._warehouses

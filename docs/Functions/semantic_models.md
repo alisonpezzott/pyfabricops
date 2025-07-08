@@ -1,1 +1,1 @@
-::: _semantic_models
+::: pyfabricops._semantic_models

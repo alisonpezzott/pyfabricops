@@ -1,1 +1,1 @@
-::: _data_pipelines
+::: pyfabricops._data_pipelines

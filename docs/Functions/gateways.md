@@ -1,1 +1,1 @@
-::: _gateways
+::: pyfabricops._gateways

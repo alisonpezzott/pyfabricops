@@ -1,1 +1,1 @@
-::: _lakehouses
+::: pyfabricops._lakehouses

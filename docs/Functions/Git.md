@@ -1,1 +1,1 @@
-::: _git
+::: pyfabricops._git

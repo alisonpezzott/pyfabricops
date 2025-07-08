@@ -1,1 +1,1 @@
-::: _reports
+::: pyfabricops._reports

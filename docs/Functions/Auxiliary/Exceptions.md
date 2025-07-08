@@ -1,1 +1,1 @@
-::: _exceptions
+::: pyfabricops._exceptions

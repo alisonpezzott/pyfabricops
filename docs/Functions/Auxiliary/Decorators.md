@@ -1,1 +1,1 @@
-::: _decorators
+::: pyfabricops._decorators
