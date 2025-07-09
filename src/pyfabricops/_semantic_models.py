@@ -592,7 +592,7 @@ def export_all_semantic_models(
     workspace: str,
     project_path: str,
     workspace_path: str = 'workspace',
-    update_config: bool = False,
+    update_config: bool = True,
     config_path: str = None,
     branch: str = None,
     workspace_suffix: str = None,
