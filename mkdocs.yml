@@ -25,6 +25,8 @@ nav:
     - Semantic Models: functions/semantic_models.md
     - Warehouses: functions/warehouses.md
     - Workspaces: functions/workspaces.md
+    - Orchestration:
+      - Workspaces: functions/orchestration/workspaces.md
     - Auxiliary:
       - Decorators: functions/auxiliary/decorators.md
       - Exceptions: functions/auxiliary/exceptions.md
