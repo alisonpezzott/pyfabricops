@@ -49,7 +49,7 @@ def list_items(
         return None
 
     response = api_core_request(
-        endpoint=f'/workspaces/{workspace_id}/warehouses'
+        endpoint=f'/workspaces/{workspace_id}/items'
     )
     if not response.success:
         logger.warning(f'{response.status_code}: {response.error}.')
@@ -626,7 +626,7 @@ def export_all_items(
         for item in items:
             export_item(
                 workspace=workspace,
-                item=item['displayName'],
+                item=item['displayName']+'.' + item['type'],
                 project_path=project_path,
                 workspace_path=workspace_path,
                 update_config=update_config,
