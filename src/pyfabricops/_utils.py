@@ -1,13 +1,14 @@
 import base64
 import fnmatch
 import json
-import json5
 import logging
 import os
 import re
 import shutil
 import subprocess
 import uuid
+
+import json5
 
 from ._exceptions import (
     ConfigurationError,

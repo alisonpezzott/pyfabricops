@@ -75,7 +75,7 @@ def github_connect(
         method='post',
         payload=payload,
         return_raw=True,
-        credential_type='user'
+        credential_type='user',
     )
     if not response.status_code == 200:
         logger.error(
@@ -386,7 +386,7 @@ def commit_to_git(
         method='post',
         endpoint=f'/workspaces/{workspace_id}/git/commitToGit',
         payload=payload,
-        credential_type='user'
+        credential_type='user',
     )
     if not response.status_code in [200, 202]:
         logger.error(

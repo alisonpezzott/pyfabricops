@@ -426,7 +426,11 @@ def export_folders(
         folder_id = folder['id']
         folder_name = folder['displayName']
         # Safely get parentFolderId - it may not exist if there are no subfolders
-        parent_id = folder.get('parentFolderId') if 'parentFolderId' in folder.index else None
+        parent_id = (
+            folder.get('parentFolderId')
+            if 'parentFolderId' in folder.index
+            else None
+        )
 
         # If no parent, it's the root folder
         if pandas.isna(parent_id) or parent_id is None:

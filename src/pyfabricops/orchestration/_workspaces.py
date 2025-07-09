@@ -52,7 +52,7 @@ def export_full_workspace(
         branches_path (str): The path where branch-specific configurations are stored.
         include (Optional[Sequence[str]]): A list of function names to include in the export. If None, all functions are included.
         exclude (Optional[Sequence[str]]): A list of function names to exclude from the export. If None, no functions are excluded.
-    
+
     Examples:
         ```python
         export_full_workspace(

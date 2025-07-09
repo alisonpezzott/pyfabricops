@@ -237,7 +237,10 @@ def deploy_dataflow_gen1(workspace: str, path: str) -> bool | None:
 
     content_type = f'multipart/form-data; boundary={boundary}'
 
-    params = {'datasetDisplayName': 'model.json', 'nameConflict': 'CreateOrOverwrite'}
+    params = {
+        'datasetDisplayName': 'model.json',
+        'nameConflict': 'CreateOrOverwrite',
+    }
 
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
@@ -471,4 +474,3 @@ def export_all_dataflows_gen1(
                 workspace_suffix=workspace_suffix,
                 branches_path=branches_path,
             )
-
