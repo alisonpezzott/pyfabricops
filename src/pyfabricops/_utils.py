@@ -1,6 +1,7 @@
 import base64
 import fnmatch
 import json
+import json5
 import logging
 import os
 import re
@@ -563,3 +564,58 @@ def find_and_replace(path: str, find_and_replace: dict) -> None:
                                 file_path, 'w', encoding='utf-8'
                             ) as file:
                                 file.write(text)
+
+
+def load_and_sanitize(path: str) -> dict:
+    """
+    Loads and sanitizes a JSON file, particularly useful for Power BI model.json files.
+    Tries json5 first for complex content, then falls back to standard json.
+
+    Args:
+        path (str): The file path to the JSON file.
+
+    Returns:
+        dict: The contents of the JSON file.
+
+    Examples:
+        ```python
+        load_and_sanitize('dataflow/model.json')
+        ```
+    """
+    try:
+        with open(path, 'r', encoding='utf-8-sig') as f:
+            data = json5.load(f)
+        logger.info(f'Loaded JSON file with json5: {path}')
+    except (ImportError, json5.JSONError, FileNotFoundError) as e:
+        try:
+            # Fallback to standard json
+            with open(path, 'r', encoding='utf-8-sig') as f:
+                data = json.load(f)
+            logger.info(f'Loaded JSON file with standard json: {path}')
+        except (json.JSONDecodeError, FileNotFoundError) as e:
+            logger.error(f'Error reading JSON file: {e}')
+            return {}
+    return data
+
+
+def write_single_line_json(data: dict, path: str) -> None:
+    """
+    Writes the given data to a JSON file at the specified path in single-line format.
+    This format matches what Power BI portal exports for dataflows.
+
+    Args:
+        data (dict): The data to be written to the JSON file.
+        path (str): The file path where the JSON should be saved.
+
+    Returns:
+        None
+
+    Examples:
+        ```python
+        write_single_line_json({'key': 'value'}, 'output.json')
+        ```
+    """
+    if not os.path.exists(os.path.dirname(path)):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, 'w', encoding='utf-8') as file:
+        json.dump(data, file, ensure_ascii=False, separators=(',', ':'))

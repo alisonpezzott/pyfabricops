@@ -10,8 +10,10 @@ from ._decorators import df
 from ._utils import (
     get_current_branch,
     is_valid_uuid,
+    load_and_sanitize,
     read_json,
     write_json,
+    write_single_line_json,
 )
 from ._workspaces import get_workspace, get_workspace_suffix, resolve_workspace
 
@@ -184,13 +186,10 @@ def _serialize_dataflow_gen1_model(path: str) -> tuple[bytes, str]:
         _serialize_dataflow_gen1_model('path/to/MyDataflowGen1.Dataflow')
         ```
     """
-    # Read and clean JSON
-    with open(
-        os.path.join(path, 'model.json'), 'r', encoding='utf-8-sig'
-    ) as f:
-        df_json = json.load(f)
+    # Read and clean JSON using load_and_sanitize function
+    df_json = load_and_sanitize(os.path.join(path, 'model.json'))
 
-    json_str = json.dumps(df_json, ensure_ascii=False)
+    json_str = json.dumps(df_json, ensure_ascii=False, separators=(',', ':'))
 
     # Boundary setup
     boundary = uuid.uuid4().hex
@@ -238,7 +237,7 @@ def deploy_dataflow_gen1(workspace: str, path: str) -> bool | None:
 
     content_type = f'multipart/form-data; boundary={boundary}'
 
-    params = {'datasetDisplayName': 'model.json', 'nameConflict': 'Abort'}
+    params = {'datasetDisplayName': 'model.json', 'nameConflict': 'CreateOrOverwrite'}
 
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
@@ -359,9 +358,9 @@ def export_dataflow_gen1(
     )
     os.makedirs(dataflow_path, exist_ok=True)
 
-    # Save the model as model.json inside the item folder
+    # Save the model as model.json inside the item folder in single-line format (Power BI portal format)
     model_json_path = os.path.join(dataflow_path, 'model.json')
-    write_json(definition_response, model_json_path)
+    write_single_line_json(definition_response, model_json_path)
 
     logger.info(f'Exported dataflow {dataflow_name} to {dataflow_path}.')
 
@@ -472,3 +471,4 @@ def export_all_dataflows_gen1(
                 workspace_suffix=workspace_suffix,
                 branches_path=branches_path,
             )
+
