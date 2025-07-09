@@ -75,6 +75,7 @@ def github_connect(
         method='post',
         payload=payload,
         return_raw=True,
+        credential_type='user'
     )
     if not response.status_code == 200:
         logger.error(
@@ -92,7 +93,7 @@ def github_connect(
 def git_init(
     workspace: str,
     initialize_strategy: Literal[
-        'PreferWorkspace', 'PrefereRemote', 'None'
+        'PreferWorkspace', 'PreferRemote', 'None'
     ] = 'PreferWorkspace',
     provider: Literal['GitHub', 'AzureDevOps'] = 'GitHub',
     *,
@@ -103,7 +104,7 @@ def git_init(
 
     Args:
         workspace (str): The name or ID of the Fabric workspace.
-        initialize_strategy (Literal["PreferWorkspace", "PrefereRemote", "None"], optional):
+        initialize_strategy (Literal["PreferWorkspace", "PreferRemote", "None"], optional):
             The strategy to use for initialization. Defaults to "PreferWorkspace".
         provider (Literal["GitHub", "AzureDevOps"], optional):
             The Git provider to use. Defaults to "GitHub".
@@ -135,7 +136,7 @@ def git_init(
         method='post',
         endpoint=f'/workspaces/{workspace_id}/git/initializeConnection',
         payload=payload,
-        credential_type='user' if provider == 'AzureDevOps' else 'spn',
+        credential_type='user',
     )
 
     if not response.status_code in [200, 202]:
@@ -196,7 +197,7 @@ def git_status(
     response = api_core_request(
         method='get',
         endpoint=f'/workspaces/{workspace_id}/git/status',
-        credential_type='user' if provider == 'AzureDevOps' else 'spn',
+        credential_type='user',
     )
 
     if not response.status_code in [200, 202]:
@@ -385,6 +386,7 @@ def commit_to_git(
         method='post',
         endpoint=f'/workspaces/{workspace_id}/git/commitToGit',
         payload=payload,
+        credential_type='user'
     )
     if not response.status_code in [200, 202]:
         logger.error(

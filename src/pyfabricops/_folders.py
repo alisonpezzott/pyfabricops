@@ -155,7 +155,6 @@ def create_folder(
         endpoint=f'/workspaces/{workspace_id}/folders',
         payload=payload,
         method='post',
-        reponse_raw=True,
     )
     if not response.success:
         logger.warning(f'{response.status_code}: {response.error}.')
@@ -411,9 +410,14 @@ def export_folders(
     folders_df = list_folders(workspace, df=True)
 
     # Sort by parentFolderId to ensure parent folders are created first
-    folders_sorted = folders_df.sort_values(
-        ['parentFolderId'], na_position='first'
-    )
+    # Only sort if parentFolderId column exists (i.e., there are subfolders)
+    if 'parentFolderId' in folders_df.columns:
+        folders_sorted = folders_df.sort_values(
+            ['parentFolderId'], na_position='first'
+        )
+    else:
+        # If no parentFolderId column, all folders are root level
+        folders_sorted = folders_df
 
     # Dictionary to map folder_id to full path
     folder_paths = {}
@@ -421,7 +425,8 @@ def export_folders(
     for _, folder in folders_sorted.iterrows():
         folder_id = folder['id']
         folder_name = folder['displayName']
-        parent_id = folder.get('parentFolderId')
+        # Safely get parentFolderId - it may not exist if there are no subfolders
+        parent_id = folder.get('parentFolderId') if 'parentFolderId' in folder.index else None
 
         # If no parent, it's the root folder
         if pandas.isna(parent_id) or parent_id is None:
