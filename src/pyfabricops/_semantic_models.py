@@ -489,7 +489,7 @@ def export_semantic_model(
         return None
 
     semantic_model_name = semantic_model_['displayName']
-    
+
     if update_config:
 
         # Get branch
