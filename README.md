@@ -119,6 +119,12 @@ Visit: [https://github.com/alisonpezzott/pyfabricops-examples](https://github.co
 ```bash
 src/
 └── pyfabricops/
+    ├── orchestration/
+    │   ├── __init__.py
+    │   └── _workspaces.py
+    ├── tests/
+    │   ├── __init__.py
+    │   └── test_basic.py
     ├── __init__.py
     ├── _auth.py
     ├── _capacities.py
@@ -142,6 +148,8 @@ src/
     ├── _reports.py
     ├── _scopes.py
     ├── _semantic_models.py
+    ├── _shortcuts_payloads.py
+    ├── _shortcuts.py
     ├── _utils.py
     ├── _version.py
     ├── _warehouses.py

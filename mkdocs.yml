@@ -23,6 +23,7 @@ nav:
     - Notebooks: functions/notebooks.md
     - Reports: functions/reports.md
     - Semantic Models: functions/semantic_models.md
+    - Shortcuts: functions/shortcuts.md
     - Warehouses: functions/warehouses.md
     - Workspaces: functions/workspaces.md
     - Orchestration:

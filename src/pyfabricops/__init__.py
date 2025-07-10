@@ -164,6 +164,12 @@ from ._semantic_models import (
     update_semantic_model,
     update_semantic_model_definition,
 )
+from ._shortcuts import (
+    create_shortcut,
+    delete_shortcut,
+    get_shortcut,
+    list_shortcuts,
+)
 from ._utils import (
     copy_to_staging,
     find_and_replace,
@@ -234,6 +240,7 @@ __all__ = [
     'create_notebook',
     'create_report',
     'create_semantic_model',
+    'create_shortcut',
     'create_sql_cloud_connection',
     'create_sql_on_premises_connection',
     'create_warehouse',
@@ -248,6 +255,7 @@ __all__ = [
     'delete_notebook',
     'delete_report',
     'delete_semantic_model',
+    'delete_shortcut',
     'delete_warehouse',
     'delete_workspace',
     'delete_workspace_role_assignment',
@@ -313,6 +321,7 @@ __all__ = [
     'get_root_path',
     'get_semantic_model',
     'get_semantic_model_definition',
+    'get_shortcut',
     'get_warehouse',
     'get_workspace',
     'get_workspace_role',
@@ -335,6 +344,7 @@ __all__ = [
     'list_notebooks',
     'list_reports',
     'list_semantic_models',
+    'list_shortcuts',
     'list_warehouses',
     'list_workspace_roles',
     'list_workspaces',
