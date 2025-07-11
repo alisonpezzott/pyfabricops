@@ -1,7 +1,3 @@
-"""
-PyFabricOps - A modern Python wrapper for Microsoft Fabric and Power BI operations.
-"""
-
 from ._auth import set_auth_provider
 from ._capacities import get_capacity, list_capacities
 from ._connections import (
@@ -213,6 +209,7 @@ from ._workspaces import (
     unassign_from_capacity,
     update_workspace,
 )
+from .orchestration._workspaces import export_full_workspace
 
 __all__ = [
     'ApiResult',
@@ -224,7 +221,6 @@ __all__ = [
     'PyFabricOpsError',
     'RequestError',
     'ResourceNotFoundError',
-    '__version__',
     'add_connection_role_assignment',
     'add_workspace_role_assignment',
     'ado_connect',
@@ -289,6 +285,7 @@ __all__ = [
     'export_dataflow',
     'export_dataflow_gen1',
     'export_folders',
+    'export_full_workspace',
     'export_item',
     'export_lakehouse',
     'export_notebook',
