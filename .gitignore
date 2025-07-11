@@ -206,6 +206,6 @@ PowerBI_001
 branches.json
 connections.json
 workspaces_roles.json 
-scripts
+# scripts Exposed on v0.1.8
 PUBLISHING.md
 .pypirc.example 
