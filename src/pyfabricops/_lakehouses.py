@@ -1,12 +1,16 @@
+import json
 import logging
 import os
 import time
+import uuid
 
 import pandas
 
 from ._core import api_core_request, pagination_handler
 from ._decorators import df
 from ._folders import resolve_folder
+from ._items import list_items
+from ._scopes import PLATFORM_SCHEMA, PLATFORM_VERSION
 from ._utils import (
     get_current_branch,
     get_workspace_suffix,
@@ -347,6 +351,7 @@ def export_lakehouse(
     branch: str = None,
     workspace_suffix: str = None,
     branches_path: str = None,
+    **kwargs,
 ) -> bool:
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
@@ -468,6 +473,111 @@ def export_lakehouse(
         definition_path_full = f'{project_path}/{workspace_path}/{lakehouse_display_name}.Lakehouse/.platform'
         write_json(platform, definition_path_full)
 
+    # Creating aditional fields in .platform
+    print(
+        f'platform path: {item_path}/{lakehouse_display_name}.Lakehouse/.platform'
+    )
+    with open(
+        f'{item_path}/{lakehouse_display_name}.Lakehouse/.platform', 'r'
+    ) as f:
+        platform_content = json.load(f)
+
+    if 'config' not in platform_content:
+        platform_content['config'] = {}
+
+        # Generate a unique ID
+        logical_id = str(uuid.uuid4())
+
+        platform_config = {
+            'version': PLATFORM_VERSION,
+            'logicalId': logical_id,
+        }
+        platform_content['config'] = platform_config
+
+    if '$schema' not in platform_content:
+        platform_content['$schema'] = ''
+        platform_content['$schema'] = PLATFORM_SCHEMA
+
+    with open(
+        f'{item_path}/{lakehouse_display_name}.Lakehouse/.platform', 'w'
+    ) as f:
+        json.dump(platform_content, f, indent=2)
+
+    # Check if lakehouse.metadata.json exists and create it if not
+    metadata_path = f'{item_path}/{lakehouse_display_name}.Lakehouse/lakehouse.metadata.json'
+    if not os.path.exists(metadata_path):
+        with open(metadata_path, 'w') as f:
+            json.dump({}, f, indent=2)
+
+    # Check if shortcuts.metadata.json exists and create it if not
+    shortcuts_path = f'{item_path}/{lakehouse_display_name}.Lakehouse/shortcuts.metadata.json'
+    if not os.path.exists(shortcuts_path):
+        from ._shortcuts import list_shortcuts
+
+        shortcuts_list = list_shortcuts(workspace_id, lakehouse_id)
+
+        # Init a empty list for shortcuts
+        shortcuts_list_new = []
+
+        if shortcuts_list:
+            for shortcut_dict in shortcuts_list:
+                shortcut_target = shortcut_dict['target']
+                print(shortcut_target)
+                shortcut_target_type = (
+                    shortcut_target['type'][0].lower()
+                    + shortcut_target['type'][1:]
+                )
+                print(shortcut_target_type)
+                shortcut_target_workspace_id = shortcut_target[
+                    shortcut_target_type
+                ]['workspaceId']
+                shortcut_target_item_id = shortcut_target[
+                    shortcut_target_type
+                ]['itemId']
+
+                if not kwargs.get('workspace_items'):
+                    workspace_items = list_items(shortcut_target_workspace_id)
+                    for item in workspace_items:
+                        if item['id'] == shortcut_target_item_id:
+                            shortcut_target_item_type = item['type']
+                            break
+
+            # Check if the workspace_id is equal shortcut_target_workspace_id then uuid zero
+            if shortcut_target_workspace_id == workspace_id:
+                shortcut_target_workspace_id = (
+                    '00000000-0000-0000-0000-000000000000'
+                )
+
+            # Create item type if not exists
+            if (
+                'artifactType'
+                not in shortcut_dict['target'][shortcut_target_type]
+            ):
+                shortcut_dict['target'][shortcut_target_type][
+                    'artifactType'
+                ] = ''
+            if (
+                'workspaceId'
+                not in shortcut_dict['target'][shortcut_target_type]
+            ):
+                shortcut_dict['target'][shortcut_target_type][
+                    'workspaceId'
+                ] = ''
+
+            # Update if exists
+            shortcut_dict['target']['oneLake'][
+                'artifactType'
+            ] = shortcut_target_item_type
+            shortcut_dict['target']['oneLake'][
+                'workspaceId'
+            ] = shortcut_target_workspace_id
+
+            shortcuts_list_new.append(shortcut_dict)
+
+        # Write the shortcuts to path
+        with open(shortcuts_path, 'w') as f:
+            json.dump(shortcuts_list_new, f, indent=2)
+
 
 def export_all_lakehouses(
     workspace: str,
@@ -479,6 +589,7 @@ def export_all_lakehouses(
     workspace_suffix: str = None,
     branches_path: str = None,
     excluded_starts: tuple = ('Staging',),
+    **kwargs,
 ) -> bool:
     """
     Exports all lakehouses in the specified workspace.
@@ -529,4 +640,5 @@ def export_all_lakehouses(
                 branch=branch,
                 workspace_suffix=workspace_suffix,
                 branches_path=branches_path,
+                **kwargs,
             )
