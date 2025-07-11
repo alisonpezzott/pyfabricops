@@ -9,6 +9,7 @@ import subprocess
 import uuid
 
 import json5
+import pandas
 
 from ._exceptions import (
     ConfigurationError,
@@ -620,3 +621,73 @@ def write_single_line_json(data: dict, path: str) -> None:
         os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, 'w', encoding='utf-8') as file:
         json.dump(data, file, ensure_ascii=False, separators=(',', ':'))
+
+
+def _flatten_json(data, parent_key='', sep='_'):
+    """
+    Helper function to flatten nested JSON.
+
+    Args:
+        data (dict): JSON to flatten.
+        parent_key (str): Parent key (used for recursion).
+        sep (str): Separator for flattened keys.
+
+    Returns:
+        list[dict]: List of flattened dictionaries.
+    """
+    items = []
+    for k, v in data.items():
+        new_key = f'{parent_key}{sep}{k}' if parent_key else k
+        if isinstance(v, dict):
+            items.extend(_flatten_json(v, new_key, sep=sep).items())
+        else:
+            items.append((new_key, v))
+    return dict(items)
+
+
+def json_to_df(data: dict | list) -> 'pandas.DataFrame':
+    """
+    Converts various types of JSON to a pandas.DataFrame.
+
+    Args:
+        data (dict | list): The JSON to be converted. Can be a simple dictionary,
+        a nested dictionary, or a list of dictionaries.
+
+    Returns:
+        pd.DataFrame: The resulting DataFrame.
+
+    Examples:
+        ```python
+        json_to_df({'key1': 'value1', 'key2': 'value2'})
+        json_to_df([{'key1': 'value1'}, {'key2': 'value2'}])
+        ```
+    """
+    if not data:
+        return None
+
+    if isinstance(data, dict):
+
+        # If it"s a simple dictionary
+        if all(not isinstance(v, (dict, list)) for v in data.values()):
+            return pandas.DataFrame([data])
+
+        # If it"s a dictionary with nested levels
+        else:
+            flattened_data = _flatten_json(data)
+            return pandas.DataFrame([flattened_data])
+
+    elif isinstance(data, list):
+
+        # If it"s a list of dictionaries
+        if all(isinstance(item, dict) for item in data):
+            flattened_list = [_flatten_json(item) for item in data]
+            return pandas.DataFrame(flattened_list)
+        else:
+            raise ValueError(
+                'The list contains items that are not dictionaries.'
+            )
+
+    else:
+        raise TypeError(
+            'Input type must be a dictionary or a list of dictionaries.'
+        )
