@@ -37,7 +37,7 @@ def list_shortcuts(
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return None
-    lakehouse_id = resolve_lakehouse(lakehouse)
+    lakehouse_id = resolve_lakehouse(workspace_id, lakehouse)
     if not lakehouse_id:
         return None
     response = api_core_request(
@@ -82,7 +82,7 @@ def get_shortcut(
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return None
-    lakehouse_id = resolve_lakehouse(lakehouse)
+    lakehouse_id = resolve_lakehouse(workspace_id, lakehouse)
     if not lakehouse_id:
         return None
     response = api_core_request(
@@ -119,7 +119,7 @@ def delete_shortcut(
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return False
-    lakehouse_id = resolve_lakehouse(lakehouse)
+    lakehouse_id = resolve_lakehouse(workspace_id, lakehouse)
     if not lakehouse_id:
         return False
     response = api_core_request(
@@ -221,7 +221,7 @@ def create_shortcut(
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return None
-    lakehouse_id = resolve_lakehouse(lakehouse)
+    lakehouse_id = resolve_lakehouse(workspace_id, lakehouse)
     if not lakehouse_id:
         return None
 
