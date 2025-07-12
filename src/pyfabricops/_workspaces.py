@@ -87,7 +87,9 @@ def resolve_workspace(workspace: str, *, silent: bool = False) -> str:
 
 
 @df
-def get_workspace(workspace: str, *, df=False) -> dict | pandas.DataFrame:
+def get_workspace(
+    workspace: str, *, df: bool = False
+) -> dict | pandas.DataFrame:
     """
     Returns the specified workspace.
 
@@ -333,11 +335,16 @@ def add_workspace_role_assignment(
         method='post',
         payload=payload,
     )
-    if not response.success:
+    if not response.status_code == 201:
         logger.warning(f'{response.status_code}: {response.error}.')
         return None
     else:
-        return response.data
+        logger.info(
+            f'User "{user_uuid}", type "{user_type}" with role "{role}" was added to workspace {workspace} successfully.'
+        )
+        return list_workspace_roles(
+            workspace_id, df=df
+        )   # Return the updated list of roles
 
 
 def delete_workspace_role_assignment(
@@ -510,6 +517,14 @@ def create_workspace(
         if not response.success:
             logger.warning(f'{response.status_code}: {response.error}.')
             return None
+        else:
+            _workspace = response.data
+            workspace_id = _workspace.get('id', None)
+            if not workspace_id:
+                logger.warning('Workspace ID not found in response.')
+                return None
+
+            logger.info(f'Workspace {workspace_name} created successfully.')
 
     # If exists
     else:
@@ -523,12 +538,12 @@ def create_workspace(
             update_workspace(workspace_id, new_description=description)
 
     if roles:
-        for role in roles:
-            role_id = role['user_uuid']
-            role_type = role['user_type']
-            role_name = role['role']
+        for role_assignment in roles:
+            user_uuid = role_assignment['user_uuid']
+            user_type = role_assignment['user_type']
+            role_name = role_assignment['role']
             add_workspace_role_assignment(
-                workspace_id, role_id, role_type, role_name
+                workspace_id, user_uuid, user_type=user_type, role=role_name
             )
 
     return get_workspace(workspace_id)
