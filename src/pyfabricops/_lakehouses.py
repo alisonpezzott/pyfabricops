@@ -3,6 +3,7 @@ import logging
 import os
 import time
 import uuid
+from collections import OrderedDict
 
 import pandas
 
@@ -474,9 +475,6 @@ def export_lakehouse(
         write_json(platform, definition_path_full)
 
     # Creating aditional fields in .platform
-    print(
-        f'platform path: {item_path}/{lakehouse_display_name}.Lakehouse/.platform'
-    )
     with open(
         f'{item_path}/{lakehouse_display_name}.Lakehouse/.platform', 'r'
     ) as f:
@@ -498,10 +496,15 @@ def export_lakehouse(
         platform_content['$schema'] = ''
         platform_content['$schema'] = PLATFORM_SCHEMA
 
+    sorted_platform = OrderedDict()
+    sorted_platform['$schema'] = platform_content['$schema']
+    sorted_platform['metadata'] = platform_content['metadata']
+    sorted_platform['config'] = platform_content['config']
+
     with open(
         f'{item_path}/{lakehouse_display_name}.Lakehouse/.platform', 'w'
     ) as f:
-        json.dump(platform_content, f, indent=2)
+        json.dump(sorted_platform, f, indent=2)
 
     # Check if lakehouse.metadata.json exists and create it if not
     metadata_path = f'{item_path}/{lakehouse_display_name}.Lakehouse/lakehouse.metadata.json'
@@ -522,12 +525,10 @@ def export_lakehouse(
         if shortcuts_list:
             for shortcut_dict in shortcuts_list:
                 shortcut_target = shortcut_dict['target']
-                print(shortcut_target)
                 shortcut_target_type = (
                     shortcut_target['type'][0].lower()
                     + shortcut_target['type'][1:]
                 )
-                print(shortcut_target_type)
                 shortcut_target_workspace_id = shortcut_target[
                     shortcut_target_type
                 ]['workspaceId']
