@@ -124,9 +124,6 @@ src/
     ├── orchestration/
     │   ├── __init__.py
     │   └── _workspaces.py
-    ├── tests/
-    │   ├── __init__.py
-    │   └── test_basic.py
     ├── __init__.py
     ├── _auth.py
     ├── _capacities.py
