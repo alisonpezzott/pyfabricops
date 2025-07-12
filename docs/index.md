@@ -29,7 +29,7 @@ Access: [https://pyfabricops.readthedocs.io/en/latest/](https://pyfabricops.read
 ## ⚒️ Installation
 
 ```bash
-pip install pyfabricops
+pip install -U pyfabricops
 ```
 
 ## ⚙️ Usage
