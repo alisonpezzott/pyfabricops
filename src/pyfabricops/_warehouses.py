@@ -1,18 +1,27 @@
+import json
 import logging
 import os
 import time
+import uuid
+from collections import OrderedDict
 
 import pandas
 
 from ._core import api_core_request, pagination_handler
 from ._decorators import df
 from ._folders import resolve_folder
+from ._scopes import PLATFORM_SCHEMA, PLATFORM_VERSION
 from ._utils import (
     get_current_branch,
     get_workspace_suffix,
     is_valid_uuid,
     read_json,
     write_json,
+)
+from ._warehouses_support import (
+    WAREHOUSE_DEFAULT_SEMANTIC_MODEL_TXT,
+    WAREHOUSE_SQL_PROJECT,
+    WAREHOUSE_XMLA_JSON,
 )
 from ._workspaces import get_workspace, resolve_workspace
 
@@ -388,7 +397,7 @@ def export_warehouse(
     warehouse_description = warehouse_['description']
     platform = {
         'metadata': {
-            'type': 'warehouse',
+            'type': 'Warehouse',
             'displayName': warehouse_display_name,
             'description': warehouse_description,
         }
@@ -477,6 +486,86 @@ def export_warehouse(
     else:
         definition_path_full = f'{project_path}/{workspace_path}/{warehouse_display_name}.Warehouse/.platform'
         write_json(platform, definition_path_full)
+
+    # Creating aditional fields in .platform
+    with open(
+        f'{item_path}/{warehouse_display_name}.Warehouse/.platform', 'r'
+    ) as f:
+        platform_content = json.load(f)
+
+    if 'config' not in platform_content:
+        platform_content['config'] = {}
+
+        # Generate a unique ID
+        logical_id = str(uuid.uuid4())
+
+        platform_config = {
+            'version': PLATFORM_VERSION,
+            'logicalId': logical_id,
+        }
+        platform_content['config'] = platform_config
+
+    if '$schema' not in platform_content:
+        platform_content['$schema'] = ''
+        platform_content['$schema'] = PLATFORM_SCHEMA
+
+    sorted_platform = OrderedDict()
+    sorted_platform['$schema'] = platform_content['$schema']
+    sorted_platform['metadata'] = platform_content['metadata']
+    sorted_platform['config'] = platform_content['config']
+
+    with open(
+        f'{item_path}/{warehouse_display_name}.Warehouse/.platform', 'w'
+    ) as f:
+        json.dump(sorted_platform, f, indent=2)
+
+    # Creating a dummy sqlproj if not exists
+    try:
+        with open(
+            f'{item_path}/{warehouse_display_name}.Warehouse/{warehouse_display_name}.sqlproj',
+            'r',
+        ) as f:
+            sql_project = f.read()
+    except:
+        sql_project = WAREHOUSE_SQL_PROJECT.format(
+            warehouse_display_name=warehouse_display_name
+        )
+
+    with open(
+        f'{item_path}/{warehouse_display_name}.Warehouse/{warehouse_display_name}.sqlproj',
+        'w',
+    ) as f:
+        f.write(sql_project)
+
+    # Creating a dummy DefaultSemanticModel.txt
+    try:
+        with open(
+            f'{item_path}/{warehouse_display_name}.Warehouse/DefaultSemanticModel.txt',
+            'r',
+        ) as f:
+            default_semantic_model_txt = f.read()
+    except:
+        default_semantic_model_txt = WAREHOUSE_DEFAULT_SEMANTIC_MODEL_TXT
+
+    with open(
+        f'{item_path}/{warehouse_display_name}.Warehouse/DefaultSemanticModel.txt',
+        'w',
+    ) as f:
+        f.write(default_semantic_model_txt)
+
+    # Creating a dummy xmla.json
+    try:
+        with open(
+            f'{item_path}/{warehouse_display_name}.Warehouse/xmla.json', 'r'
+        ) as f:
+            xmla_json = json.load(f)
+    except:
+        xmla_json = WAREHOUSE_XMLA_JSON
+
+    with open(
+        f'{item_path}/{warehouse_display_name}.Warehouse/xmla.json', 'w'
+    ) as f:
+        json.dump(xmla_json, f, indent=2)
 
 
 def export_all_warehouses(
