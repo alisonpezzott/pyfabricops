@@ -205,7 +205,10 @@ PowerBI_001
 # These directories are used to store specific configurations and data for the project.
 branches.json
 connections.json
+gateways.json
 workspaces_roles.json 
 # scripts Exposed on v0.1.8
 PUBLISHING.md
 .pypirc.example 
+
+
