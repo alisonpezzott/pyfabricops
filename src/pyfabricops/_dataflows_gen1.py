@@ -239,7 +239,7 @@ def deploy_dataflow_gen1(workspace: str, path: str) -> bool | None:
 
     params = {
         'datasetDisplayName': 'model.json',
-        'nameConflict': 'CreateOrOverwrite',
+        'nameConflict': 'Abort',
     }
 
     workspace_id = resolve_workspace(workspace)
