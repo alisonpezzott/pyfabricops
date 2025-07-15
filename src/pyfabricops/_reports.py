@@ -892,13 +892,13 @@ def deploy_all_reports(
 
 
 def deploy_all_reports_cicd(
-       project_path: str,
-       workspace_alias: str,
-       *,
-       config_path: str = None,
-       branch: str = None,
-       branches_path: str = None,
-       workspace_suffix: str = None,
+    project_path: str,
+    workspace_alias: str,
+    *,
+    config_path: str = None,
+    branch: str = None,
+    branches_path: str = None,
+    workspace_suffix: str = None,
 ):
     """
     Deploy all reports in a CI/CD pipeline.
@@ -926,8 +926,8 @@ def deploy_all_reports_cicd(
     repo_root = find_project_root_path()
 
     if not branch:
-        branch = get_current_branch()  
- 
+        branch = get_current_branch()
+
     if not config_path:
         config_path = f'{project_path}/config.json'
 
@@ -938,13 +938,17 @@ def deploy_all_reports_cicd(
         workspace_suffix = get_workspace_suffix(
             branch, workspace_suffix, branches_path
         )
-    
-    workspace_name = workspace_alias + workspace_suffix 
+
+    workspace_name = workspace_alias + workspace_suffix
 
     # For each report, we will define the report attached to the semantic model and deploy it.
-    for report_path in glob.glob(f'{project_path}/**/*.Report', recursive=True):
+    for report_path in glob.glob(
+        f'{project_path}/**/*.Report', recursive=True
+    ):
         print(f'Processing report: {report_path}')
-        report_name = report_path.replace('\\', '/').split('/')[-1].split('.Report')[0] 
+        report_name = (
+            report_path.replace('\\', '/').split('/')[-1].split('.Report')[0]
+        )
         print(f'Deploying report: {report_name}')
 
         with open(f'{report_path}/definition.pbir', 'r') as f:
@@ -953,47 +957,67 @@ def deploy_all_reports_cicd(
         dataset_reference = report_definition['datasetReference']
 
         if 'byPath' in dataset_reference:
-            dataset_path = dataset_reference['byPath']['path'] 
-            dataset_name = dataset_path.split('/')[-1].split('.SemanticModel')[0]
+            dataset_path = dataset_reference['byPath']['path']
+            dataset_name = dataset_path.split('/')[-1].split('.SemanticModel')[
+                0
+            ]
 
         elif 'byConnection' in dataset_reference:
-            text_to_search = dataset_reference['byConnection']['connectionString']
+            text_to_search = dataset_reference['byConnection'][
+                'connectionString'
+            ]
             # Capture the value after "initial catalog="
             match = re.search(r'initial catalog=([^;]+)', text_to_search)
             if match:
                 dataset_name = match.group(1)
 
         print(f'Semantic model: {dataset_name}')
-        
+
         # Search for the semantic model in the config.json
         with open(config_path, 'r') as f:
             config_content = json.load(f)
         config = config_content[branch]
-        semantic_model_id = config[workspace_alias]['semantic_models'][dataset_name]['id'] 
-        print(f'Semantic Model ID: {semantic_model_id}')  
-        
+        semantic_model_id = config[workspace_alias]['semantic_models'][
+            dataset_name
+        ]['id']
+        print(f'Semantic Model ID: {semantic_model_id}')
+
         # Replace the definition.pbir with the updated template
-        with open(os.path.join(repo_root, 'template_report_definition.pbir'), 'r', encoding='utf-8') as f:
+        with open(
+            os.path.join(repo_root, 'template_report_definition.pbir'),
+            'r',
+            encoding='utf-8',
+        ) as f:
             report_definition_template = f.read()
 
-        report_definition_updated = report_definition_template.replace('#{workspace_name}#', workspace_name)
-        report_definition_updated = report_definition_updated.replace('#{semantic_model_name}#', dataset_name)
-        report_definition_updated = report_definition_updated.replace('#{semantic_model_id}#', semantic_model_id)
-        
-        # Write the updated report definition to the definition.pbir    
-        with open(f'{report_path}/definition.pbir', 'w', encoding='utf-8') as f:
+        report_definition_updated = report_definition_template.replace(
+            '#{workspace_name}#', workspace_name
+        )
+        report_definition_updated = report_definition_updated.replace(
+            '#{semantic_model_name}#', dataset_name
+        )
+        report_definition_updated = report_definition_updated.replace(
+            '#{semantic_model_id}#', semantic_model_id
+        )
+
+        # Write the updated report definition to the definition.pbir
+        with open(
+            f'{report_path}/definition.pbir', 'w', encoding='utf-8'
+        ) as f:
             f.write(report_definition_updated)
-        
+
         # Deploy the report
         deploy_report(
-            workspace=workspace_name, 
+            workspace=workspace_name,
             display_name=report_name,
             project_path=project_path,
             branches_path=branches_path,
         )
-        
+
         # Write back the original report_definition for the definition.pbir
-        with open(f'{report_path}/definition.pbir', 'w', encoding='utf-8') as f:
+        with open(
+            f'{report_path}/definition.pbir', 'w', encoding='utf-8'
+        ) as f:
             json.dump(report_definition, f, indent=2)
 
 
@@ -1004,16 +1028,16 @@ def convert_reports_to_local_references(
 ):
     """
     Convert report definition.pbir files from byConnection to byPath references.
-    
-    This function scans all reports in the project, extracts the semantic model name 
+
+    This function scans all reports in the project, extracts the semantic model name
     from the connection string, finds the relative path to the semantic model directory,
     and updates the datasetReference to use local byPath instead of byConnection.
-    
+
     Args:
         project_path (str): The path to the project directory.
         workspace_alias (str, optional): The alias of the workspace (workspace without suffix).
         branch (str, optional): The branch name. Defaults to current branch.
-    
+
     Examples:
         ```python
         convert_reports_to_local_references(
@@ -1026,20 +1050,24 @@ def convert_reports_to_local_references(
         branch = get_current_branch()
 
     converted_reports = []
-    
+
     # Process all reports in the project
-    for report_path in glob.glob(f'{project_path}/**/*.Report', recursive=True):
+    for report_path in glob.glob(
+        f'{project_path}/**/*.Report', recursive=True
+    ):
         logger.info(f'Processing report: {report_path}')
-        report_name = report_path.replace('\\', '/').split('/')[-1].split('.Report')[0] 
+        report_name = (
+            report_path.replace('\\', '/').split('/')[-1].split('.Report')[0]
+        )
         logger.info(f'Converting report: {report_name}')
 
         # Read the current definition.pbir
         definition_path = f'{report_path}/definition.pbir'
-        
+
         if not os.path.exists(definition_path):
             logger.warning(f'definition.pbir not found: {definition_path}')
             continue
-            
+
         try:
             with open(definition_path, 'r', encoding='utf-8') as f:
                 report_definition = json.load(f)
@@ -1049,78 +1077,95 @@ def convert_reports_to_local_references(
 
         # Check if it already uses byPath
         dataset_reference = report_definition.get('datasetReference', {})
-        
+
         if 'byPath' in dataset_reference:
-            logger.info(f'Report {report_name} already uses byPath reference - skipping')
+            logger.info(
+                f'Report {report_name} already uses byPath reference - skipping'
+            )
             continue
-            
+
         if 'byConnection' not in dataset_reference:
-            logger.warning(f'Report {report_name} has no byConnection reference - skipping')
+            logger.warning(
+                f'Report {report_name} has no byConnection reference - skipping'
+            )
             continue
 
         # Extract semantic model name from connection string
-        connection_string = dataset_reference['byConnection'].get('connectionString', '')
-        
+        connection_string = dataset_reference['byConnection'].get(
+            'connectionString', ''
+        )
+
         # Capture the value after "initial catalog="
         match = re.search(r'initial catalog=([^;]+)', connection_string)
         if not match:
-            logger.warning(f'Could not extract semantic model name from connection string in {report_name}')
+            logger.warning(
+                f'Could not extract semantic model name from connection string in {report_name}'
+            )
             continue
-            
+
         dataset_name = match.group(1)
         logger.info(f'Found semantic model: {dataset_name}')
-        
+
         # Find the semantic model directory relative to the report
         # Look for *.SemanticModel directories in the project
-        semantic_model_pattern = f'{project_path}/**/{dataset_name}.SemanticModel'
-        semantic_model_paths = glob.glob(semantic_model_pattern, recursive=True)
-        
+        semantic_model_pattern = (
+            f'{project_path}/**/{dataset_name}.SemanticModel'
+        )
+        semantic_model_paths = glob.glob(
+            semantic_model_pattern, recursive=True
+        )
+
         if not semantic_model_paths:
-            logger.error(f'Semantic model directory not found: {dataset_name}.SemanticModel')
+            logger.error(
+                f'Semantic model directory not found: {dataset_name}.SemanticModel'
+            )
             continue
-            
+
         if len(semantic_model_paths) > 1:
-            logger.warning(f'Multiple semantic model directories found for {dataset_name}, using first one')
-            
+            logger.warning(
+                f'Multiple semantic model directories found for {dataset_name}, using first one'
+            )
+
         semantic_model_path = semantic_model_paths[0]
         logger.info(f'Found semantic model at: {semantic_model_path}')
-        
+
         # Calculate relative path from definition.pbir to semantic model
         # The definition.pbir is inside the Report directory, so we need to go up one level first
         definition_dir = report_path  # This is the .Report directory
         relative_path = os.path.relpath(semantic_model_path, definition_dir)
-        
+
         # Convert backslashes to forward slashes for consistency
         relative_path = relative_path.replace('\\', '/')
-        
+
         logger.info(f'Relative path from definition.pbir: {relative_path}')
-        
+
         # Update the dataset reference
-        new_dataset_reference = {
-            "byPath": {
-                "path": relative_path
-            }
-        }
-        
+        new_dataset_reference = {'byPath': {'path': relative_path}}
+
         # Create updated definition
         updated_definition = report_definition.copy()
         updated_definition['datasetReference'] = new_dataset_reference
-        
+
         # Write the updated definition back to file
         try:
             with open(definition_path, 'w', encoding='utf-8') as f:
                 json.dump(updated_definition, f, indent=2)
-            
-            logger.info(f'✅ Successfully converted {report_name} to use byPath reference')
-            converted_reports.append({
-                'report_name': report_name,
-                'semantic_model': dataset_name,
-                'relative_path': relative_path
-            })
-            
+
+            logger.info(
+                f'✅ Successfully converted {report_name} to use byPath reference'
+            )
+            converted_reports.append(
+                {
+                    'report_name': report_name,
+                    'semantic_model': dataset_name,
+                    'relative_path': relative_path,
+                }
+            )
+
         except Exception as e:
             logger.error(f'Error writing updated definition.pbir: {e}')
-            
-    logger.info(f'Conversion completed. Successfully converted {len(converted_reports)} reports.')
+
+    logger.info(
+        f'Conversion completed. Successfully converted {len(converted_reports)} reports.'
+    )
     return converted_reports
-            

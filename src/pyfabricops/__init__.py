@@ -242,6 +242,7 @@ __all__ = [
     'api_core_request',
     'assign_to_capacity',
     'commit_to_git',
+    'convert_reports_to_local_references',
     'copy_to_staging',
     'create_data_pipeline',
     'create_dataflow',
