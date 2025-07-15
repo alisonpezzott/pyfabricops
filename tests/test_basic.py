@@ -48,7 +48,7 @@ def test_list_workspaces_with_credentials():
 
 def __basic_test():
     """Manual test function for development."""
-    pf.enable_notebook_logging(level=logging.INFO)
+    pf.setup_logging()
     pf.set_auth_provider('env')
     workspaces = pf.list_workspaces(df=True)
     print(workspaces)

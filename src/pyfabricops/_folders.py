@@ -1,6 +1,5 @@
 import logging
 import os
-from logging import config
 from re import sub
 from typing import Literal
 
@@ -8,6 +7,7 @@ import pandas
 
 from ._core import api_core_request, pagination_handler
 from ._decorators import df
+from ._logging import get_logger
 from ._utils import (
     get_current_branch,
     get_workspace_suffix,
@@ -15,10 +15,13 @@ from ._utils import (
     read_json,
     write_json,
 )
-from ._workspaces import get_workspace, resolve_workspace
+from ._workspaces import (
+    _resolve_workspace_path,
+    get_workspace,
+    resolve_workspace,
+)
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
+logger = get_logger(__name__)
 
 
 @df
@@ -118,7 +121,7 @@ def get_folder(
 
 @df
 def create_folder(
-    workspace: str, folder: str, parent_folder: str = None, *, df: bool = False
+    workspace: str, folder: str, *, parent_folder: str = None, df: bool = False
 ) -> dict | pandas.DataFrame | None:
     """
     Create a new folder in the specified workspace.
@@ -284,6 +287,7 @@ def move_folder(
 
 def _get_folders_config(
     workspace: str,
+    *,
     branch: str = None,
     workspace_suffix: str = None,
     branches_path: str = None,
@@ -371,7 +375,8 @@ def _get_folders_config(
 def export_folders(
     workspace: str,
     project_path: str,
-    workspace_path: str = 'workspace',
+    *,
+    workspace_path: str = None,
     update_config: bool = True,
     config_path: str = None,
     merge_mode: Literal['update', 'replace', 'preserve'] = 'update',
@@ -402,6 +407,33 @@ def export_folders(
         export_folders('123e4567-e89b-12d3-a456-426614174000', '/path/to/project')
         ```
     """
+    # # Resolve workspace_name for export_folders
+    # workspace_name = get_workspace(workspace).get('displayName', '')
+    # if not workspace_name:
+    #     logger.warning(f"Workspace '{workspace}' not found.")
+    #     return None
+    # else:
+    #     workspace_alias = workspace_name.split(workspace_suffix)[0]
+
+    # # Add the workspace path
+    # if not workspace_path:
+    #     workspace_path = workspace_alias
+    # path = os.path.join(project_path, workspace_path)
+    workspace_path = _resolve_workspace_path(
+        workspace=workspace,
+        workspace_suffix=workspace_suffix,
+        project_path=project_path,
+        workspace_path=workspace_path,
+    )
+    new_config = _get_folders_config(
+        workspace,
+        branch=branch,
+        workspace_suffix=workspace_suffix,
+        branches_path=branches_path,
+    )
+    if not new_config:
+        return None
+
     path = os.path.join(project_path, workspace_path)
 
     os.makedirs(path, exist_ok=True)
@@ -459,14 +491,17 @@ def export_folders(
 
     if update_config:
         # Get the new config for this workspace
-        new_config = _get_folders_config(
-            workspace, branch, workspace_suffix, branches_path
-        )
-        if not new_config:
-            logger.warning(
-                f'No configuration found for workspace {workspace}.'
-            )
-            return None
+        # new_config = _get_folders_config(
+        #     workspace,
+        #     branch=branch,
+        #     workspace_suffix=workspace_suffix,
+        #     branches_path=branches_path,
+        # )
+        # if not new_config:
+        #     logger.warning(
+        #         f'No configuration found for workspace {workspace}.'
+        #     )
+        #     return None
 
         if not config_path:
             config_path = os.path.join(project_path, 'config.json')
@@ -533,6 +568,7 @@ def export_folders(
 def deploy_folders(
     workspace: str,
     project_path: str,
+    *,
     workspace_path: str = 'workspace',
     update_config: bool = True,
     config_path: str = None,
@@ -680,7 +716,9 @@ def deploy_folders(
 
         # Create folder in Fabric
         if parent_folder_id:
-            create_folder(workspace, folder_name, parent_folder_id)
+            create_folder(
+                workspace, folder_name, parent_folder=parent_folder_id
+            )
         elif parent_name:
             create_folder(workspace, folder_name, parent_name)
         else:
@@ -691,7 +729,10 @@ def deploy_folders(
     if update_config:
         # Get the new config for this workspace
         new_config = _get_folders_config(
-            workspace, branch, workspace_suffix, branches_path
+            workspace,
+            branch=branch,
+            workspace_suffix=workspace_suffix,
+            branches_path=branches_path,
         )
         if not new_config:
             logger.warning(

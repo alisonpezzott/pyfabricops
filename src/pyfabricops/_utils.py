@@ -1,12 +1,12 @@
 import base64
 import fnmatch
 import json
-import logging
 import os
 import re
 import shutil
 import subprocess
 import uuid
+from pathlib import Path
 
 import json5
 import pandas
@@ -16,9 +16,9 @@ from ._exceptions import (
     FileNotFoundError,
     ResourceNotFoundError,
 )
+from ._logging import get_logger
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
+logger = get_logger(__name__)
 
 
 def copy_to_staging(path: str) -> str:
@@ -108,22 +108,36 @@ def write_json(data: dict, path: str) -> None:
         json.dump(data, file, ensure_ascii=False, indent=4)
 
 
-def get_root_path() -> str:
+def find_project_root_path(
+    start: Path = None,
+    marker_files: tuple = ('.gitignore',),
+) -> Path:
     """
-    Get the root path
+    Traverse up the directory tree from `start` (or the current file's directory)
+    until it finds a directory containing one of the `marker_files`.
 
     Args:
-        None
+        start (Path): The starting directory. Defaults to the directory of the current file.
+        marker_files (tuple): A tuple of filenames to look for as markers of the project root.
 
     Returns:
-        str: The root path
+        Path: The path to the project root directory.
 
     Examples:
         ```python
-        get_root_path()
+        find_project_root()
         ```
     """
-    return os.getcwd()
+    current = (start or Path(__file__).resolve()).parent
+
+    for folder in (current, *current.parents):
+        if any((folder / marker).exists() for marker in marker_files):
+            return folder
+
+    raise FileNotFoundError(
+        f'Not found any of the markers {marker_files!r} '
+        f'starting from {current}'
+    )
 
 
 def get_current_branch(branch: str = None) -> str:
@@ -191,7 +205,7 @@ def get_workspace_suffix(
 
     if not path:
         try:
-            path = os.path.join(get_root_path(), 'branches.json')
+            path = os.path.join(find_project_root_path(), 'branches.json')
         except:
             raise ResourceNotFoundError(
                 'branches.json not configured in the root path.'
@@ -449,7 +463,8 @@ def parse_tmdl_parameters(path: str) -> dict:
                     )
                     continue
 
-            params[name] = {'Value': value, **meta_items}
+            # params[name] = {'Value': value, **meta_items}
+            params[name] = value
 
         except Exception as e:
             logger.warning(f'Error parsing parameter from match: {str(e)}')

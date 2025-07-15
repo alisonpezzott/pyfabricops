@@ -1,5 +1,4 @@
 import json
-import logging
 import os
 import time
 import uuid
@@ -10,6 +9,7 @@ import pandas
 from ._core import api_core_request, pagination_handler
 from ._decorators import df
 from ._folders import resolve_folder
+from ._logging import get_logger
 from ._scopes import PLATFORM_SCHEMA, PLATFORM_VERSION
 from ._utils import (
     get_current_branch,
@@ -23,10 +23,13 @@ from ._warehouses_support import (
     WAREHOUSE_SQL_PROJECT,
     WAREHOUSE_XMLA_JSON,
 )
-from ._workspaces import get_workspace, resolve_workspace
+from ._workspaces import (
+    _resolve_workspace_path,
+    get_workspace,
+    resolve_workspace,
+)
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
+logger = get_logger(__name__)
 
 
 @df
@@ -347,8 +350,9 @@ def delete_warehouse(workspace: str, warehouse: str) -> None:
 def export_warehouse(
     workspace: str,
     warehouse: str,
-    project_path: str = None,
-    workspace_path: str = 'workspace',
+    project_path: str,
+    *,
+    workspace_path: str = None,
     update_config: bool = True,
     config_path: str = None,
     branch: str = None,
@@ -378,6 +382,12 @@ def export_warehouse(
         export_warehouse('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000')
         ```
     """
+    workspace_path = _resolve_workspace_path(
+        workspace=workspace,
+        workspace_suffix=workspace_suffix,
+        project_path=project_path,
+        workspace_path=workspace_path,
+    )
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return None
@@ -571,7 +581,8 @@ def export_warehouse(
 def export_all_warehouses(
     workspace: str,
     project_path: str,
-    workspace_path: str = 'workspace',
+    *,
+    workspace_path: str = None,
     update_config: bool = True,
     config_path: str = None,
     branch: str = None,

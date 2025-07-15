@@ -6,6 +6,7 @@ import pandas
 from ._core import api_core_request, lro_handler, pagination_handler
 from ._decorators import df
 from ._folders import resolve_folder
+from ._logging import get_logger
 from ._utils import (
     get_current_branch,
     get_workspace_suffix,
@@ -15,10 +16,13 @@ from ._utils import (
     unpack_item_definition,
     write_json,
 )
-from ._workspaces import get_workspace, resolve_workspace
+from ._workspaces import (
+    _resolve_workspace_path,
+    get_workspace,
+    resolve_workspace,
+)
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
+logger = get_logger(__name__)
 
 
 @df
@@ -132,9 +136,9 @@ def get_dataflow(
 def update_dataflow(
     workspace: str,
     dataflow: str,
+    *,
     display_name: str = None,
     description: str = None,
-    *,
     df: bool = False,
 ) -> dict | pandas.DataFrame:
     """
@@ -263,25 +267,24 @@ def get_dataflow_definition(workspace: str, dataflow: str) -> dict:
         endpoint=f'/workspaces/{workspace_id}/dataflows/{dataflow_id}/getDefinition',
         method='post',
     )
+
     if not response.success:
         logger.warning(f'{response.status_code}: {response.error}.')
         return None
-    elif response.status_code == 202:
-        # If the response is a long-running operation, handle it
+
+    # Check if it's a long-running operation (status 202)
+    if response.status_code == 202:
+        logger.debug('Long-running operation detected, handling LRO...')
         lro_response = lro_handler(response)
         if not lro_response.success:
             logger.warning(
                 f'{lro_response.status_code}: {lro_response.error}.'
             )
             return None
-        else:
-            return lro_response.data
-    elif response.status_code == 200:
-        # If the response is successful, we can process it
-        return response.data
-    else:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
+        return lro_response.data
+
+    # For immediate success (status 200)
+    return response.data
 
 
 def update_dataflow_definition(
@@ -323,31 +326,31 @@ def update_dataflow_definition(
         payload={'definition': definition},
         params=params,
     )
+
     if not response.success:
         logger.warning(f'{response.status_code}: {response.error}.')
         return None
-    elif response.status_code == 202:
-        # If the response is a long-running operation, handle it
+
+    # Check if it's a long-running operation (status 202)
+    if response.status_code == 202:
+        logger.debug('Long-running operation detected, handling LRO...')
         lro_response = lro_handler(response)
         if not lro_response.success:
             logger.warning(
                 f'{lro_response.status_code}: {lro_response.error}.'
             )
             return None
-        else:
-            return lro_response.data
-    elif response.status_code == 200:
-        # If the response is successful, we can process it
-        return response.data
-    else:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
+        return lro_response.data
+
+    # For immediate success (status 200)
+    return response.data
 
 
 def create_dataflow(
     workspace: str,
     display_name: str,
     path: str,
+    *,
     description: str = None,
     folder: str = None,
 ) -> dict | None:
@@ -419,7 +422,8 @@ def export_dataflow(
     workspace: str,
     dataflow: str,
     project_path: str,
-    workspace_path: str = 'workspace',
+    *,
+    workspace_path: str = None,
     update_config: bool = True,
     config_path: str = None,
     branch: str = None,
@@ -449,6 +453,12 @@ def export_dataflow(
         export_dataflow('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', 'path/to/project', branch='feature-branch')
         ```
     """
+    workspace_path = _resolve_workspace_path(
+        workspace=workspace,
+        workspace_suffix=workspace_suffix,
+        project_path=project_path,
+        workspace_path=workspace_path,
+    )
     workspace_id = resolve_workspace(workspace)
     workspace_name = get_workspace(workspace_id).get('displayName')
     if not workspace_id:
@@ -545,7 +555,8 @@ def export_dataflow(
 def export_all_dataflows(
     workspace: str,
     project_path: str,
-    workspace_path: str = 'workspace',
+    *,
+    workspace_path: str = None,
     update_config: bool = True,
     config_path: str = None,
     branch: str = None,
@@ -596,7 +607,8 @@ def deploy_dataflow(
     workspace: str,
     display_name: str,
     project_path: str,
-    workspace_path: str = 'workspace',
+    *,
+    workspace_path: str = None,
     config_path: str = None,
     description: str = None,
     branch: str = None,
@@ -627,6 +639,12 @@ def deploy_dataflow(
         ```
 
     """
+    workspace_path = _resolve_workspace_path(
+        workspace=workspace,
+        workspace_suffix=workspace_suffix,
+        project_path=project_path,
+        workspace_path=workspace_path,
+    )
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return None
@@ -778,7 +796,8 @@ def deploy_dataflow(
 def deploy_all_dataflows(
     workspace: str,
     project_path: str,
-    workspace_path: str = 'workspace',
+    *,
+    workspace_path: str = None,
     config_path: str = None,
     branch: str = None,
     workspace_suffix: str = None,
@@ -806,6 +825,12 @@ def deploy_all_dataflows(
         deploy_all_dataflows('MyProjectWorkspace', 'path/to/project', branch='feature-branch')
         ```
     """
+    workspace_path = _resolve_workspace_path(
+        workspace=workspace,
+        workspace_suffix=workspace_suffix,
+        project_path=project_path,
+        workspace_path=workspace_path,
+    )
     base_path = f'{project_path}/{workspace_path}'
 
     if not os.path.exists(base_path):

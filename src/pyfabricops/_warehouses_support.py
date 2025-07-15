@@ -30,7 +30,7 @@ WAREHOUSE_XMLA_JSON = {
 
 WAREHOUSE_DEFAULT_SEMANTIC_MODEL_TXT = 'Has default semantic model'
 
-WAREHOUSE_SQL_PROJECT = """<Project DefaultTargets="Build">
+WAREHOUSE_SQL_PROJECT = r"""<Project DefaultTargets="Build">
   <Sdk Name="Microsoft.Build.Sql" Version="0.1.19-preview" />
   <PropertyGroup>
     <Name>{warehouse_display_name}</Name>

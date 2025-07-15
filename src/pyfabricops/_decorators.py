@@ -1,10 +1,10 @@
-import logging
 from functools import wraps
 
 import pandas as pd
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
+from ._logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def df(func):

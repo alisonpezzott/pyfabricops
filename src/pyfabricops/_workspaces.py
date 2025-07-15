@@ -1,4 +1,3 @@
-import logging
 import os
 from typing import Dict, List, Literal
 
@@ -8,19 +7,19 @@ from ._capacities import get_capacity
 from ._core import api_core_request, pagination_handler
 from ._decorators import df
 from ._exceptions import OptionNotAvailableError, ResourceNotFoundError
+from ._logging import get_logger
 from ._utils import (
+    find_project_root_path,
     get_current_branch,
-    get_root_path,
     get_workspace_suffix,
     is_valid_uuid,
     read_json,
     write_json,
 )
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
+logger = get_logger(__name__)
 
-root_path = get_root_path()
+root_path = find_project_root_path()
 
 
 @df
@@ -74,7 +73,7 @@ def resolve_workspace(workspace: str, *, silent: bool = False) -> str:
 
     workspaces = list_workspaces(df=False)
     if not workspaces:
-        return None
+        raise ResourceNotFoundError(f'No workspaces found.')
 
     for _workspace in workspaces:
         if _workspace['displayName'] == workspace:
@@ -106,9 +105,15 @@ def get_workspace(
         ```
     """
     workspace_id = resolve_workspace(workspace)
+
+    if not workspace_id:
+        raise ResourceNotFoundError(f'Workspace {workspace} not found.')
+
     if not workspace_id:
         return None
+
     response = api_core_request(endpoint=f'/workspaces/{workspace_id}')
+
     if not response.success:
         logger.warning(f'{response.status_code}: {response.error}.')
         return None
@@ -119,9 +124,9 @@ def get_workspace(
 @df
 def update_workspace(
     workspace: str,
+    *,
     display_name: str = None,
     description: str = None,
-    *,
     df=False,
 ) -> dict | pandas.DataFrame:
     """
@@ -456,10 +461,10 @@ def unassign_from_capacity(workspace: str) -> None:
 @df
 def create_workspace(
     workspace_name: str,
+    *,
     capacity: str = None,
     description: str = None,
     roles: List[Dict[str, str]] = None,
-    *,
     df=False,
 ) -> Dict | None:
     """
@@ -551,6 +556,7 @@ def create_workspace(
 
 def _get_workspace_config(
     workspace: str,
+    *,
     branch: str = None,
     workspace_suffix: str = None,
     branches_path: str = None,
@@ -576,13 +582,13 @@ def _get_workspace_config(
     # Retrieving details from the workspace
     workspace_details = get_workspace(workspace)
     if not workspace_details:
-        return None
+        raise ResourceNotFoundError(f'Workspace {workspace} not found.')
 
     workspace_name = workspace_details.get('displayName', '')
     workspace_id = workspace_details.get('id', '')
     workspace_description = workspace_details.get('description', '')
     capacity_id = workspace_details.get('capacityId', '')
-    capacity_region = workspace_details.get('capacityRegion')
+    capacity_region = workspace_details.get('capacityRegion', '')
 
     # Retrieving workspace roles
     # Retrieve details
@@ -655,6 +661,7 @@ def _get_workspace_config(
 def export_workspace_config(
     workspace: str,
     project_path: str,
+    *,
     config_path: str = None,
     merge_mode: Literal['update', 'replace', 'preserve'] = 'update',
     branch: str = None,
@@ -693,11 +700,11 @@ def export_workspace_config(
     """
     # Get the new config for this workspace
     new_config = _get_workspace_config(
-        workspace, branch, workspace_suffix, branches_path
+        workspace,
+        branch=branch,
+        workspace_suffix=workspace_suffix,
+        branches_path=branches_path,
     )
-    if not new_config:
-        logger.warning(f'No configuration found for workspace {workspace}.')
-        return None
 
     if not config_path:
         config_path = os.path.join(project_path, 'config.json')
@@ -731,9 +738,15 @@ def export_workspace_config(
 
             # Process each workspace
             for workspace_name, workspace_config in workspaces.items():
+
+                workspace_name_without_suffix = workspace_name.split(
+                    workspace_suffix
+                )[0]
+
                 if (
                     merge_mode == 'preserve'
-                    and workspace_name in existing_config[branch_name]
+                    and workspace_name_without_suffix
+                    in existing_config[branch_name]
                 ):
                     logger.info(
                         f'Workspace "{workspace_name}" already exists in branch "{branch_name}". Preserving existing config.'
@@ -741,26 +754,34 @@ def export_workspace_config(
                     continue
 
                 # Ensure workspace exists in existing config
-                if workspace_name not in existing_config[branch_name]:
-                    existing_config[branch_name][workspace_name] = {}
+                if (
+                    workspace_name_without_suffix
+                    not in existing_config[branch_name]
+                ):
+                    existing_config[branch_name][
+                        workspace_name_without_suffix
+                    ] = {}
 
                 # Merge workspace_config with existing data, preserving other keys like 'folders'
                 if merge_mode == 'update':
                     # Update only the workspace_config, preserve other keys like 'folders'
-                    existing_config[branch_name][workspace_name][
+                    existing_config[branch_name][
+                        workspace_name_without_suffix
+                    ]['workspace_config'] = workspace_config[
                         'workspace_config'
-                    ] = workspace_config['workspace_config']
+                    ]
                     logger.info(
                         f'Updated workspace_config for "{workspace_name}" in branch "{branch_name}"'
                     )
                 else:
                     # For other modes, replace the entire workspace config
                     existing_config[branch_name][
-                        workspace_name
+                        workspace_name_without_suffix
                     ] = workspace_config
                     action = (
                         'Updated'
-                        if workspace_name in existing_config[branch_name]
+                        if workspace_name_without_suffix
+                        in existing_config[branch_name]
                         else 'Added'
                     )
                     logger.info(
@@ -772,3 +793,24 @@ def export_workspace_config(
     logger.info(
         f'Workspace configuration successfully written to {config_path}'
     )
+
+
+def _resolve_workspace_path(
+    workspace: str,
+    workspace_suffix: str,
+    project_path: str,
+    workspace_path: str | None,
+) -> str | None:
+    """Resolve workspace_name for export items"""
+    workspace_name = get_workspace(workspace).get('displayName', '')
+    if not workspace_name:
+        logger.warning(f"Workspace '{workspace}' not found.")
+        return None
+    else:
+        workspace_alias = workspace_name.split(workspace_suffix)[0]
+
+    # Add the workspace path
+    if not workspace_path:
+        workspace_path = workspace_alias
+
+    return workspace_path

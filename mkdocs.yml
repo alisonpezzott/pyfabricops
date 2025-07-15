@@ -28,10 +28,11 @@ nav:
     - Workspaces: functions/workspaces.md
     - Orchestration:
       - Workspaces: functions/orchestration/workspaces.md
+    - Raises and Logging:
+      - Exceptions: functions/raises_and_logging/exceptions.md
+      - Logging: functions/raises_and_logging/logging_system.md
     - Auxiliary:
       - Decorators: functions/auxiliary/decorators.md
-      - Exceptions: functions/auxiliary/exceptions.md
-      - Helpers: functions/auxiliary/helpers.md
       - Utils: functions/auxiliary/utils.md
 
 theme:

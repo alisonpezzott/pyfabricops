@@ -3,10 +3,10 @@ import logging
 from ._core import api_core_request, pagination_handler
 from ._decorators import df
 from ._exceptions import ResourceNotFoundError
+from ._logging import get_logger
 from ._utils import is_valid_uuid
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
+logger = get_logger(__name__)
 
 
 @df

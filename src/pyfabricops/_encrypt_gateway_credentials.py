@@ -15,9 +15,9 @@ from cryptography.hazmat.primitives.asymmetric.padding import MGF1, OAEP
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 from ._gateways import get_gateway_public_key
+from ._logging import get_logger
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
+logger = get_logger(__name__)
 
 
 class _AuthenticatedEncryption:

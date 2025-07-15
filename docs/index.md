@@ -5,8 +5,8 @@
 [![PyPI version](https://img.shields.io/pypi/v/pyfabricops.svg)](https://pypi.org/project/pyfabricops/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python versions](https://img.shields.io/pypi/pyversions/pyfabricops.svg)](https://pypi.org/project/pyfabricops/)
-[![Typing status](https://img.shields.io/badge/typing-PEP%20561-blue)](https://peps.python.org/pep-0561/)
-[![Tests](https://github.com/alisonpezzott/pyfabricops/actions/workflows/test.yml/badge.svg)](https://github.com/alisonpezzott/pyfabricops/actions/workflows/test.yml)    
+[![Typing status](https://img.shields.io/badge/typing-PEP%20561-blue)](https://peps.python.org/pep-0561/)    
+[![Tests](https://github.com/alisonpezzott/pyfabricops/actions/workflows/test.yml/badge.svg)](https://github.com/alisonpezzott/pyfabricops/actions/workflows/test.yml)  
 
 > A Python wrapper library for Microsoft Fabric (and Power BI) operations, providing a simple interface to the official Fabric REST APIs. Falls back to Power BI REST APIs where needed. Designed to run in Python notebooks, pure Python scripts or integrated into YAML-based workflows for CI/CD.
 Access to the repositoy on [GitHub](https://github.com/alisonpezzott/pyfabricops).
@@ -102,14 +102,6 @@ Create a branches.json file in the root of your repository to define your branch
 ```
 This file maps your local branches to Fabric branches, allowing the library to automatically manage branch names for CI/CD scenarios.
 
-### Logging configuration
-This library uses the standard Python logging module. You can configure it in your script or notebook using the helper function:
-
-```python
-import logging
-pf.enable_notebook_logging(level=logging.INFO)
-```
-
 
 ## 🪄 Examples
 
@@ -155,11 +147,79 @@ src/
     └── _workspaces.py
 ```  
 
+### Logging configuration  
+
+The custom logging system implemented in `pyfabricops` provides a complete and flexible solution for monitoring and debugging the library.
+
+
+#### 🎨 **Custom Formatting**
+- **Automatic colors**: Different colors for each log level (DEBUG=Cyan, INFO=Green, WARNING=Yellow, ERROR=Red, CRITICAL=Magenta)
+- **Multiple styles**:
+  - `minimal`: Only timestamp, level and message
+  - `standard`: Includes module name in compact form
+  - `detailed`: Complete format with all information
+
+#### 🎛️ **Easy Configuration**
+```python
+import pyfabricops as pf
+
+# Basic configuration
+pf.setup_logging(level='INFO', format_style='standard')
+
+# Debug mode for development
+pf.enable_debug_mode(include_external=False)
+
+# Disable logging completely
+pf.disable_logging()
+
+# Reset to default configuration
+pf.reset_logging()
+```  
+
+For complete logging configuration options, refer to the [logging_system.md](./logging_system.md)   
+
+
 ## ❤️Contributing
 1. Fork this repository
 2. Create a new branch (feat/my-feature)
-3. Run pip install -e . to develop locally
-4. Submit a pull request 🚀  
+3. Run `poetry install` to set up the development environment
+4. Run `poetry run task test` to run tests
+5. Submit a pull request 🚀  
+
+## 🚀 Publishing
+
+### For Maintainers
+
+To publish a new version to PyPI:
+
+1. Update the version in `pyproject.toml` and `src/pyfabricops/_version.py`
+2. Commit and push changes
+3. Create a new release on GitHub with a tag (e.g., `v0.1.0`)
+4. The GitHub Action will automatically:
+   - Run tests
+   - Build the package
+   - Publish to PyPI
+
+### Testing with TestPyPI
+
+```bash
+# Configure TestPyPI
+poetry config repositories.testpypi https://test.pypi.org/legacy/
+poetry config pypi-token.testpypi <your-testpypi-token>
+
+# Build and publish to TestPyPI
+poetry build
+poetry publish -r testpypi
+
+# Install from TestPyPI
+pip install --index-url https://test.pypi.org/simple/ pyfabricops
+```
+
+### Prerequisites for Publishing
+
+- Set up a PyPI account at https://pypi.org/
+- Generate an API token at https://pypi.org/manage/account/token/
+- Add the token as `PYPI_TOKEN` secret in GitHub repository settings  
 
 ## 🐞 Issues  
 If you encounter any issues, please report them at [https://github.com/alisonpezzott/pyfabricops/issues](https://github.com/alisonpezzott/pyfabricops/issues)  
@@ -177,4 +237,5 @@ Feedback, issues and stars are welcome 🌟
 [![Discord](https://img.shields.io/badge/Discord-%235865F2.svg?&logo=discord&logoColor=white)](https://discord.gg/sJTDvWz9sM)
 [![Telegram](https://img.shields.io/badge/Telegram-2CA5E0?logo=telegram&logoColor=white)](https://t.me/alisonpezzott)
 [![Instagram](https://img.shields.io/badge/Instagram-%23E4405F.svg?logo=Instagram&logoColor=white)](https://instagram.com/alisonpezzott)  
+
 

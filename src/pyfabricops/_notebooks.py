@@ -1,4 +1,3 @@
-import logging
 import os
 
 import pandas
@@ -6,6 +5,7 @@ import pandas
 from ._core import api_core_request, lro_handler, pagination_handler
 from ._decorators import df
 from ._folders import resolve_folder
+from ._logging import get_logger
 from ._utils import (
     get_current_branch,
     get_workspace_suffix,
@@ -15,10 +15,13 @@ from ._utils import (
     unpack_item_definition,
     write_json,
 )
-from ._workspaces import get_workspace, resolve_workspace
+from ._workspaces import (
+    _resolve_workspace_path,
+    get_workspace,
+    resolve_workspace,
+)
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
+logger = get_logger(__name__)
 
 
 @df
@@ -137,9 +140,9 @@ def get_notebook(
 def update_notebook(
     workspace: str,
     notebook: str,
+    *,
     display_name: str = None,
     description: str = None,
-    *,
     df: bool = False,
 ) -> dict | pandas.DataFrame:
     """
@@ -352,6 +355,7 @@ def create_notebook(
     workspace: str,
     display_name: str,
     path: str,
+    *,
     description: str = None,
     folder: str = None,
 ) -> dict | None:
@@ -423,7 +427,8 @@ def export_notebook(
     workspace: str,
     notebook: str,
     project_path: str,
-    workspace_path: str = 'workspace',
+    *,
+    workspace_path: str = None,
     update_config: bool = True,
     config_path: str = None,
     branch: str = None,
@@ -453,6 +458,12 @@ def export_notebook(
         export_notebook('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', 'path/to/project')
         ```
     """
+    workspace_path = _resolve_workspace_path(
+        workspace=workspace,
+        workspace_suffix=workspace_suffix,
+        project_path=project_path,
+        workspace_path=workspace_path,
+    )
     workspace_id = resolve_workspace(workspace)
     workspace_name = get_workspace(workspace_id).get('displayName')
     if not workspace_id:
@@ -549,7 +560,8 @@ def export_notebook(
 def export_all_notebooks(
     workspace: str,
     project_path: str,
-    workspace_path: str = 'workspace',
+    *,
+    workspace_path: str = None,
     update_config: bool = True,
     config_path: str = None,
     branch: str = None,
@@ -601,7 +613,8 @@ def deploy_notebook(
     workspace: str,
     display_name: str,
     project_path: str,
-    workspace_path: str = 'workspace',
+    *,
+    workspace_path: str = None,
     config_path: str = None,
     description: str = None,
     branch: str = None,
@@ -628,6 +641,12 @@ def deploy_notebook(
         deploy_notebook('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', 'path/to/project')
         ```
     """
+    workspace_path = _resolve_workspace_path(
+        workspace=workspace,
+        workspace_suffix=workspace_suffix,
+        project_path=project_path,
+        workspace_path=workspace_path,
+    )
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return None
@@ -779,7 +798,8 @@ def deploy_notebook(
 def deploy_all_notebooks(
     workspace: str,
     project_path: str,
-    workspace_path: str = 'workspace',
+    *,
+    workspace_path: str = None,
     config_path: str = None,
     branch: str = None,
     workspace_suffix: str = None,
@@ -808,6 +828,12 @@ def deploy_all_notebooks(
         deploy_all_notebooks('MyProjectWorkspace', 'path/to/project', workspace_suffix='Workspace')
         ```
     """
+    workspace_path = _resolve_workspace_path(
+        workspace=workspace,
+        workspace_suffix=workspace_suffix,
+        project_path=project_path,
+        workspace_path=workspace_path,
+    )
     base_path = f'{project_path}/{workspace_path}'
 
     if not os.path.exists(base_path):

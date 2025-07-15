@@ -6,6 +6,7 @@ import pandas
 from ._core import api_core_request, lro_handler, pagination_handler
 from ._decorators import df
 from ._folders import resolve_folder
+from ._logging import get_logger
 from ._utils import (
     get_current_branch,
     get_workspace_suffix,
@@ -15,10 +16,13 @@ from ._utils import (
     unpack_item_definition,
     write_json,
 )
-from ._workspaces import get_workspace, resolve_workspace
+from ._workspaces import (
+    _resolve_workspace_path,
+    get_workspace,
+    resolve_workspace,
+)
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
+logger = get_logger(__name__)
 
 
 @df
@@ -137,9 +141,9 @@ def get_data_pipeline(
 def update_data_pipeline(
     workspace: str,
     data_pipeline: str,
+    *,
     display_name: str = None,
     description: str = None,
-    *,
     df: bool = False,
 ) -> dict | pandas.DataFrame:
     """
@@ -352,6 +356,7 @@ def create_data_pipeline(
     workspace: str,
     display_name: str,
     path: str,
+    *,
     description: str = None,
     folder: str = None,
 ):
@@ -422,7 +427,8 @@ def export_data_pipeline(
     workspace: str,
     data_pipeline: str,
     project_path: str,
-    workspace_path: str = 'workspace',
+    *,
+    workspace_path: str = None,
     update_config: bool = True,
     config_path: str = None,
     branch: str = None,
@@ -473,6 +479,13 @@ def export_data_pipeline(
         )
         ```
     """
+    workspace_path = _resolve_workspace_path(
+        workspace=workspace,
+        workspace_suffix=workspace_suffix,
+        project_path=project_path,
+        workspace_path=workspace_path,
+    )
+
     workspace_id = resolve_workspace(workspace)
     workspace_name = get_workspace(workspace_id).get('displayName')
     if not workspace_id:
@@ -577,7 +590,8 @@ def export_data_pipeline(
 def export_all_data_pipelines(
     workspace: str,
     project_path: str,
-    workspace_path: str = 'workspace',
+    *,
+    workspace_path: str = None,
     update_config: bool = True,
     config_path: str = None,
     branch: str = None,
@@ -645,7 +659,8 @@ def deploy_data_pipeline(
     workspace: str,
     display_name: str,
     project_path: str,
-    workspace_path: str = 'workspace',
+    *,
+    workspace_path: str = None,
     config_path: str = None,
     description: str = None,
     branch: str = None,
@@ -698,6 +713,13 @@ def deploy_data_pipeline(
         )
         ```
     """
+    workspace_path = _resolve_workspace_path(
+        workspace=workspace,
+        workspace_suffix=workspace_suffix,
+        project_path=project_path,
+        workspace_path=workspace_path,
+    )
+
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return None
@@ -859,7 +881,8 @@ def deploy_data_pipeline(
 def deploy_all_data_pipelines(
     workspace: str,
     project_path: str,
-    workspace_path: str = 'workspace',
+    *,
+    workspace_path: str = None,
     config_path: str = None,
     branch: str = None,
     workspace_suffix: str = None,

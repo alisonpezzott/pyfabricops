@@ -1,5 +1,4 @@
 import json
-import logging
 import os
 import time
 import uuid
@@ -11,6 +10,7 @@ from ._core import api_core_request, pagination_handler
 from ._decorators import df
 from ._folders import resolve_folder
 from ._items import list_items
+from ._logging import get_logger
 from ._scopes import PLATFORM_SCHEMA, PLATFORM_VERSION
 from ._utils import (
     get_current_branch,
@@ -19,10 +19,13 @@ from ._utils import (
     read_json,
     write_json,
 )
-from ._workspaces import get_workspace, resolve_workspace
+from ._workspaces import (
+    _resolve_workspace_path,
+    get_workspace,
+    resolve_workspace,
+)
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
+logger = get_logger(__name__)
 
 
 @df
@@ -185,10 +188,10 @@ def get_lakehouse(
 def create_lakehouse(
     workspace: str,
     display_name: str,
+    *,
     description: str = '',
     folder: str = '',
     enable_schemas: bool = False,
-    *,
     df: bool = False,
 ):
     """
@@ -246,9 +249,9 @@ def create_lakehouse(
 def update_lakehouse(
     workspace: str,
     lakehouse: str,
+    *,
     display_name: str = None,
     description: str = None,
-    *,
     df: bool = False,
 ) -> dict | pandas.DataFrame:
     """
@@ -345,15 +348,44 @@ def delete_lakehouse(workspace: str, lakehouse: str):
 def export_lakehouse(
     workspace: str,
     lakehouse: str,
-    project_path: str = None,
-    workspace_path: str = 'workspace',
+    project_path: str,
+    *,
+    workspace_path: str = None,
     update_config: bool = True,
     config_path: str = None,
     branch: str = None,
     workspace_suffix: str = None,
     branches_path: str = None,
-    **kwargs,
 ) -> bool:
+    """
+    Exports a lakehouse to the specified project path.
+
+    Args:
+        workspace (str): The workspace name or ID.
+        lakehouse (str): The name or ID of the lakehouse to export.
+        project_path (str): The path to the project directory.
+        workspace_path (str, optional): The path to the workspace directory. Defaults to None.
+        update_config (bool, optional): Whether to update the config file. Defaults to True.
+        config_path (str, optional): The path to the config file. Defaults to None.
+        branch (str, optional): The branch to use. Defaults to None.
+        workspace_suffix (str, optional): The workspace suffix to use. Defaults to None.
+        branches_path (str, optional): The path to the branches directory. Defaults to None.
+
+    Returns:
+        bool: True if the export was successful, otherwise False.
+
+    Examples:
+        ```python
+        export_lakehouse('MyProjectWorkspace', 'SalesDataLakehouse', '/path/to/project')
+        export_lakehouse('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', '/path/to/project', workspace_suffix='dev')
+        ```
+    """
+    workspace_path = _resolve_workspace_path(
+        workspace=workspace,
+        workspace_suffix=workspace_suffix,
+        project_path=project_path,
+        workspace_path=workspace_path,
+    )
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return None
@@ -583,14 +615,14 @@ def export_lakehouse(
 def export_all_lakehouses(
     workspace: str,
     project_path: str,
-    workspace_path: str = 'workspace',
+    *,
+    workspace_path: str = None,
     update_config: bool = True,
     config_path: str = None,
     branch: str = None,
     workspace_suffix: str = None,
     branches_path: str = None,
     excluded_starts: tuple = ('Staging',),
-    **kwargs,
 ) -> bool:
     """
     Exports all lakehouses in the specified workspace.
@@ -616,6 +648,12 @@ def export_all_lakehouses(
         export_all_lakehouses('MyProjectWorkspace', '/path/to/project', update_config=False)
         ```
     """
+    workspace_path = _resolve_workspace_path(
+        workspace=workspace,
+        workspace_suffix=workspace_suffix,
+        project_path=project_path,
+        workspace_path=workspace_path,
+    )
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return None
@@ -641,5 +679,4 @@ def export_all_lakehouses(
                 branch=branch,
                 workspace_suffix=workspace_suffix,
                 branches_path=branches_path,
-                **kwargs,
             )

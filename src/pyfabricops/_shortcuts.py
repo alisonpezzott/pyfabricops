@@ -6,11 +6,11 @@ import pandas
 from ._core import api_core_request, pagination_handler
 from ._decorators import df
 from ._lakehouses import resolve_lakehouse
+from ._logging import get_logger
 from ._shortcuts_payloads import shortcuts_payloads_targets
-from ._workspaces import get_workspace, resolve_workspace
+from ._workspaces import resolve_workspace
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
+logger = get_logger(__name__)
 
 
 @df
@@ -152,6 +152,7 @@ def create_shortcut(
         'oneLake',
         's3Compatible',
     ] = 'oneLake',
+    *,
     target_connection_id: str = None,
     target_location: str = None,
     target_subpath: str = None,
@@ -163,7 +164,6 @@ def create_shortcut(
     target_workspace_id: str = None,
     target_bucket: str = None,
     custom_target_payload: dict = None,
-    *,
     df: bool = False,
 ) -> dict | pandas.DataFrame | None:
     """
