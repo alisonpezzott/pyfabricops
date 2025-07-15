@@ -13,11 +13,11 @@ def get_public_functions_and_classes(file_path):
             content = f.read()
 
         tree = ast.parse(content)
-        
+
         # Check if __all__ is defined in the module
         has_all = False
         all_items_from_module = []
-        
+
         for node in ast.walk(tree):
             if isinstance(node, ast.Assign):
                 for target in node.targets:
@@ -28,13 +28,17 @@ def get_public_functions_and_classes(file_path):
                             for elt in node.value.elts:
                                 if isinstance(elt, ast.Str):  # Python < 3.8
                                     all_items_from_module.append(elt.s)
-                                elif isinstance(elt, ast.Constant) and isinstance(elt.value, str):  # Python >= 3.8
+                                elif isinstance(
+                                    elt, ast.Constant
+                                ) and isinstance(
+                                    elt.value, str
+                                ):  # Python >= 3.8
                                     all_items_from_module.append(elt.value)
-        
+
         # If __all__ is defined, use only those items
         if has_all:
             return all_items_from_module
-        
+
         # Otherwise, use the original logic (all public functions/classes)
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef):
@@ -43,7 +47,7 @@ def get_public_functions_and_classes(file_path):
             elif isinstance(node, ast.ClassDef):
                 if not node.name.startswith('_'):
                     public_items.append(node.name)
-                    
+
     except Exception as e:
         print(f'Error processing {file_path}: {e}')
 

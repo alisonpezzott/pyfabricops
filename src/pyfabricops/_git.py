@@ -5,10 +5,10 @@ from typing import Literal
 from ._connections import resolve_connection
 from ._core import api_core_request, lro_handler
 from ._decorators import df
+from ._logging import get_logger
 from ._workspaces import resolve_workspace
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
+logger = get_logger(__name__)
 
 
 def github_connect(

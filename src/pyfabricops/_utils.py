@@ -1,7 +1,6 @@
 import base64
 import fnmatch
 import json
-import logging
 import os
 import re
 import shutil
@@ -17,9 +16,9 @@ from ._exceptions import (
     FileNotFoundError,
     ResourceNotFoundError,
 )
+from ._logging import get_logger
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
+logger = get_logger(__name__)
 
 
 def copy_to_staging(path: str) -> str:

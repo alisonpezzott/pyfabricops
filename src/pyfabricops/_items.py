@@ -7,6 +7,7 @@ from ._core import api_core_request, lro_handler, pagination_handler
 from ._decorators import df
 from ._fabric_items import _FABRIC_ITEMS
 from ._folders import resolve_folder
+from ._logging import get_logger
 from ._utils import (
     get_current_branch,
     get_workspace_suffix,
@@ -16,10 +17,13 @@ from ._utils import (
     unpack_item_definition,
     write_json,
 )
-from ._workspaces import get_workspace, resolve_workspace, _resolve_workspace_path
+from ._workspaces import (
+    _resolve_workspace_path,
+    get_workspace,
+    resolve_workspace,
+)
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
+logger = get_logger(__name__)
 
 
 @df
@@ -537,12 +541,12 @@ def export_item(
         item_id = item_['id']
         item_name = item_['displayName']
         item_descr = item_.get('description', '')
-        
+
         workspace_path = _resolve_workspace_path(
             workspace=workspace,
             workspace_suffix=workspace_suffix,
             project_path=project_path,
-            workspace_path=workspace_path
+            workspace_path=workspace_path,
         )
 
         # Find the key in the folders dict whose value matches folder_id
@@ -717,7 +721,7 @@ def deploy_item(
         workspace=workspace,
         workspace_suffix=workspace_suffix,
         project_path=project_path,
-        workspace_path=workspace_path
+        workspace_path=workspace_path,
     )
     root_path = f'{project_path}/{workspace_path}/{item_name_dot_type}'
     if os.path.exists(root_path):

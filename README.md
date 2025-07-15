@@ -100,14 +100,6 @@ Create a branches.json file in the root of your repository to define your branch
 ```
 This file maps your local branches to Fabric branches, allowing the library to automatically manage branch names for CI/CD scenarios.
 
-### Logging configuration
-This library uses the standard Python logging module. You can configure it in your script or notebook using the helper function:
-
-```python
-import logging
-pf.enable_notebook_logging(level=logging.INFO)
-```
-
 
 ## 🪄 Examples
 
@@ -152,6 +144,38 @@ src/
     ├── _warehouses.py
     └── _workspaces.py
 ```  
+
+### Logging configuration  
+
+The custom logging system implemented in `pyfabricops` provides a complete and flexible solution for monitoring and debugging the library.
+
+
+#### 🎨 **Custom Formatting**
+- **Automatic colors**: Different colors for each log level (DEBUG=Cyan, INFO=Green, WARNING=Yellow, ERROR=Red, CRITICAL=Magenta)
+- **Multiple styles**:
+  - `minimal`: Only timestamp, level and message
+  - `standard`: Includes module name in compact form
+  - `detailed`: Complete format with all information
+
+#### 🎛️ **Easy Configuration**
+```python
+import pyfabricops as pf
+
+# Basic configuration
+pf.setup_logging(level='INFO', format_style='standard')
+
+# Debug mode for development
+pf.enable_debug_mode(include_external=False)
+
+# Disable logging completely
+pf.disable_logging()
+
+# Reset to default configuration
+pf.reset_logging()
+```  
+
+For complete logging configuration options, refer to the [logging_system.md](logging_system.md)  
+
 
 ## ❤️Contributing
 1. Fork this repository

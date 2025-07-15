@@ -7,6 +7,7 @@ import pandas
 
 from ._core import api_core_request
 from ._decorators import df
+from ._logging import get_logger
 from ._utils import (
     get_current_branch,
     is_valid_uuid,
@@ -15,10 +16,14 @@ from ._utils import (
     write_json,
     write_single_line_json,
 )
-from ._workspaces import get_workspace, get_workspace_suffix, resolve_workspace
+from ._workspaces import (
+    _resolve_workspace_path,
+    get_workspace,
+    get_workspace_suffix,
+    resolve_workspace,
+)
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
+logger = get_logger(__name__)
 
 
 @df
@@ -301,8 +306,9 @@ def takeover_dataflow_gen1(workspace: str, dataflow: str) -> bool | None:
 def export_dataflow_gen1(
     workspace: str,
     dataflow: str,
-    project_path: str = None,
-    workspace_path: str = 'workspace',
+    project_path: str,
+    *,
+    workspace_path: str = None,
     update_config: bool = True,
     config_path: str = None,
     branch: str = None,
@@ -332,6 +338,13 @@ def export_dataflow_gen1(
         export_dataflow_gen1('123e4567-e89b-12d3-a456-426614174000', 'SalesDataflowGen1', project_path='path/to/project')
         ```
     """
+    workspace_path = _resolve_workspace_path(
+        workspace=workspace,
+        workspace_suffix=workspace_suffix,
+        project_path=project_path,
+        workspace_path=workspace_path,
+    )
+
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return None
@@ -424,7 +437,8 @@ def export_dataflow_gen1(
 def export_all_dataflows_gen1(
     workspace: str,
     project_path: str,
-    workspace_path: str = 'workspace',
+    *,
+    workspace_path: str = None,
     update_config: bool = True,
     config_path: str = None,
     branch: str = None,

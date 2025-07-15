@@ -1,4 +1,3 @@
-import logging
 import os
 
 import pandas
@@ -6,6 +5,7 @@ import pandas
 from ._core import api_core_request, lro_handler, pagination_handler
 from ._decorators import df
 from ._folders import resolve_folder
+from ._logging import get_logger
 from ._utils import (
     get_current_branch,
     get_workspace_suffix,
@@ -16,10 +16,13 @@ from ._utils import (
     unpack_item_definition,
     write_json,
 )
-from ._workspaces import get_workspace, resolve_workspace, _resolve_workspace_path
+from ._workspaces import (
+    _resolve_workspace_path,
+    get_workspace,
+    resolve_workspace,
+)
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
+logger = get_logger(__name__)
 
 
 @df
@@ -284,20 +287,22 @@ def get_semantic_model_definition(workspace: str, semantic_model: str) -> dict:
         endpoint=f'/workspaces/{workspace_id}/semanticModels/{semantic_model_id}/getDefinition',
         method='post',
     )
-    
+
     if not response.success:
         logger.warning(f'{response.status_code}: {response.error}.')
         return None
-    
+
     # Check if it's a long-running operation (status 202)
     if response.status_code == 202:
         logger.debug('Long-running operation detected, handling LRO...')
         lro_response = lro_handler(response)
         if not lro_response.success:
-            logger.warning(f'{lro_response.status_code}: {lro_response.error}.')
+            logger.warning(
+                f'{lro_response.status_code}: {lro_response.error}.'
+            )
             return None
         return lro_response.data
-    
+
     # For immediate success (status 200)
     return response.data
 
@@ -341,20 +346,22 @@ def update_semantic_model_definition(
         payload={'definition': definition},
         params=params,
     )
-    
+
     if not response.success:
         logger.warning(f'{response.status_code}: {response.error}.')
         return None
-    
+
     # Check if it's a long-running operation (status 202)
     if response.status_code == 202:
         logger.debug('Long-running operation detected, handling LRO...')
         lro_response = lro_handler(response)
         if not lro_response.success:
-            logger.warning(f'{lro_response.status_code}: {lro_response.error}.')
+            logger.warning(
+                f'{lro_response.status_code}: {lro_response.error}.'
+            )
             return None
         return lro_response.data
-    
+
     # For immediate success (status 200)
     return response.data
 
@@ -413,16 +420,18 @@ def create_semantic_model(
     if not response.success:
         logger.warning(f'{response.status_code}: {response.error}.')
         return None
-    
+
     # Check if it's a long-running operation (status 202)
     if response.status_code == 202:
         logger.debug('Long-running operation detected, handling LRO...')
         lro_response = lro_handler(response)
         if not lro_response.success:
-            logger.warning(f'{lro_response.status_code}: {lro_response.error}.')
+            logger.warning(
+                f'{lro_response.status_code}: {lro_response.error}.'
+            )
             return None
         return lro_response.data
-    
+
     # For immediate success (status 200)
     return response.data
 
@@ -466,7 +475,7 @@ def export_semantic_model(
         workspace=workspace,
         workspace_suffix=workspace_suffix,
         project_path=project_path,
-        workspace_path=workspace_path
+        workspace_path=workspace_path,
     )
     workspace_id = resolve_workspace(workspace)
     workspace_name = get_workspace(workspace_id).get('displayName')
@@ -714,7 +723,7 @@ def deploy_semantic_model(
         workspace=workspace,
         workspace_suffix=workspace_suffix,
         project_path=project_path,
-        workspace_path=workspace_path
+        workspace_path=workspace_path,
     )
     root_path = f'{project_path}/{workspace_path}/{display_name}.SemanticModel'
     if os.path.exists(root_path):
@@ -873,7 +882,7 @@ def deploy_all_semantic_models(
         workspace=workspace,
         workspace_suffix=workspace_suffix,
         project_path=project_path,
-        workspace_path=workspace_path
+        workspace_path=workspace_path,
     )
     base_path = f'{project_path}/{workspace_path}'
 

@@ -16,10 +16,10 @@ from ._exceptions import (
     OptionNotAvailableError,
     ResourceNotFoundError,
 )
+from ._logging import get_logger
 from ._scopes import FABRIC_SCOPE, POWERBI_SCOPE, TOKEN_TEMPLATE
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
+logger = get_logger(__name__)
 
 # Define what should be publicly exported from this module
 __all__ = ['set_auth_provider']

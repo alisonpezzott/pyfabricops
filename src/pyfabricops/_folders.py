@@ -1,6 +1,5 @@
 import logging
 import os
-from logging import config
 from re import sub
 from typing import Literal
 
@@ -8,6 +7,7 @@ import pandas
 
 from ._core import api_core_request, pagination_handler
 from ._decorators import df
+from ._logging import get_logger
 from ._utils import (
     get_current_branch,
     get_workspace_suffix,
@@ -15,10 +15,13 @@ from ._utils import (
     read_json,
     write_json,
 )
-from ._workspaces import get_workspace, resolve_workspace, _resolve_workspace_path
+from ._workspaces import (
+    _resolve_workspace_path,
+    get_workspace,
+    resolve_workspace,
+)
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
+logger = get_logger(__name__)
 
 
 @df
@@ -417,12 +420,12 @@ def export_folders(
     #     workspace_path = workspace_alias
     # path = os.path.join(project_path, workspace_path)
     workspace_path = _resolve_workspace_path(
-        workspace=workspace, 
-        workspace_suffix=workspace_suffix, 
-        project_path=project_path, 
+        workspace=workspace,
+        workspace_suffix=workspace_suffix,
+        project_path=project_path,
         workspace_path=workspace_path,
     )
-    
+
     path = os.path.join(project_path, workspace_path)
 
     os.makedirs(path, exist_ok=True)

@@ -29,7 +29,8 @@ EXPORT_FUNCS = [
 def export_full_workspace(
     workspace: str,
     project_path: str,
-    workspace_path: str = 'workspace',
+    *,
+    workspace_path: str = None,
     update_config: bool = True,
     config_path: str = None,
     branch: str = None,

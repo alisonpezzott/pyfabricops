@@ -1,4 +1,3 @@
-import logging
 import os
 from typing import Dict, List, Literal
 
@@ -7,7 +6,8 @@ import pandas
 from ._capacities import get_capacity
 from ._core import api_core_request, pagination_handler
 from ._decorators import df
-from ._exceptions import OptionNotAvailableError, ResourceNotFoundError
+from ._exceptions import OptionNotAvailableError
+from ._logging import get_logger
 from ._utils import (
     find_project_root_path,
     get_current_branch,
@@ -17,8 +17,7 @@ from ._utils import (
     write_json,
 )
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
+logger = get_logger(__name__)
 
 root_path = find_project_root_path()
 
@@ -792,8 +791,14 @@ def export_workspace_config(
         f'Workspace configuration successfully written to {config_path}'
     )
 
-def _resolve_workspace_path(workspace: str, workspace_suffix: str, project_path: str, workspace_path: str | None) -> str | None:
-    """ Resolve workspace_name for export items"""
+
+def _resolve_workspace_path(
+    workspace: str,
+    workspace_suffix: str,
+    project_path: str,
+    workspace_path: str | None,
+) -> str | None:
+    """Resolve workspace_name for export items"""
     workspace_name = get_workspace(workspace).get('displayName', '')
     if not workspace_name:
         logger.warning(f"Workspace '{workspace}' not found.")

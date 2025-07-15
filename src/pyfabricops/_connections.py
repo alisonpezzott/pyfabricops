@@ -6,10 +6,10 @@ import pandas
 from ._core import ApiResult, api_core_request, pagination_handler
 from ._decorators import df
 from ._encrypt_gateway_credentials import _get_encrypt_gateway_credentials
+from ._logging import get_logger
 from ._utils import is_valid_uuid
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
+logger = get_logger(__name__)
 
 
 @df

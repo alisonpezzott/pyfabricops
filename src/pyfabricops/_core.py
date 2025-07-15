@@ -1,4 +1,3 @@
-import logging
 import time
 from typing import Any, Literal, NamedTuple, Optional
 from urllib.parse import urlencode
@@ -7,10 +6,10 @@ import requests
 
 from ._auth import _get_token
 from ._exceptions import AuthenticationError, InvalidParameterError
+from ._logging import get_logger
 from ._scopes import FABRIC_API, POWERBI_API
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
+logger = get_logger(__name__)
 
 
 class ApiResult(NamedTuple):
@@ -149,7 +148,7 @@ def api_core_request(
         request_kwargs['json'] = payload
 
     # Log the request for debugging
-    logger.info(f'Making {method.upper()} request to {url}')
+    logger.debug(f'Making {method.upper()} request to {url}')
     logger.debug(f'Headers: {headers}')
     if payload and payload != {}:
         logger.debug(f'Payload: {payload}')
@@ -263,14 +262,14 @@ def lro_handler(api_result: NamedTuple) -> ApiResult:
     # Check if headers exist first
     if not api_result.headers:
         return api_result
-        
+
     # Check if is a long-running operation (LRO) - check both cases
     location_header = None
     if 'Location' in api_result.headers:
         location_header = api_result.headers['Location']
     elif 'location' in api_result.headers:
         location_header = api_result.headers['location']
-    
+
     if not location_header:
         return api_result
 
@@ -286,15 +285,14 @@ def lro_handler(api_result: NamedTuple) -> ApiResult:
         """Get the final result from LRO."""
         try:
             response = requests.request(
-                method='GET',
-                url=result_url,
-                headers=headers,
-                timeout=timeout
+                method='GET', url=result_url, headers=headers, timeout=timeout
             )
             return ApiResult(
                 success=response.ok,
                 status_code=response.status_code,
-                data=response.json() if response.ok and response.content else None,
+                data=response.json()
+                if response.ok and response.content
+                else None,
                 headers=dict(response.headers) if response.ok else None,
                 error=response.text if not response.ok else None,
                 request_kwargs=None,
@@ -312,10 +310,7 @@ def lro_handler(api_result: NamedTuple) -> ApiResult:
     def _check_lro_status(status_url: str) -> tuple[str, requests.Response]:
         """Check LRO status and return status and response."""
         response = requests.request(
-            method='GET', 
-            url=status_url, 
-            headers=headers,
-            timeout=timeout
+            method='GET', url=status_url, headers=headers, timeout=timeout
         )
         response.raise_for_status()
         status = response.json().get('status', 'Unknown')
@@ -338,7 +333,7 @@ def lro_handler(api_result: NamedTuple) -> ApiResult:
     # Handle immediate completion states
     if status in ['Succeeded']:
         return _get_lro_result(f'{location_header}/result')
-    
+
     elif status in ['Failed', 'Undefined']:
         return ApiResult(
             success=False,
@@ -353,38 +348,42 @@ def lro_handler(api_result: NamedTuple) -> ApiResult:
     elif status in ['Running', 'NotStarted']:
         MAX_RETRIES = 10
         RETRY_INTERVAL = 5
-        
+
         for attempt in range(1, MAX_RETRIES + 1):
             try:
                 logger.debug(f'LRO polling attempt {attempt}/{MAX_RETRIES}')
                 time.sleep(RETRY_INTERVAL)
-                
+
                 status, state_response = _check_lro_status(location_header)
-                
+
                 if status == 'Succeeded':
                     return _get_lro_result(f'{location_header}/result')
-                
+
                 elif status in ['Failed', 'Undefined']:
                     return ApiResult(
                         success=False,
                         status_code=state_response.status_code,
-                        data=state_response.json() if state_response.content else None,
+                        data=state_response.json()
+                        if state_response.content
+                        else None,
                         headers=dict(state_response.headers),
                         error=f'LRO failed with status: {status}',
                         request_kwargs=None,
                     )
-                
+
                 # Continue polling if still running
                 elif status in ['Running', 'NotStarted']:
                     continue
-                
+
                 # Unknown status
                 else:
                     logger.warning(f'Unknown LRO status: {status}')
                     continue
 
             except Exception as e:
-                logger.error(f'LRO polling failed at attempt {attempt}: {str(e)}')
+                logger.error(
+                    f'LRO polling failed at attempt {attempt}: {str(e)}'
+                )
                 # If it's the last attempt, return error
                 if attempt == MAX_RETRIES:
                     return ApiResult(
@@ -407,7 +406,7 @@ def lro_handler(api_result: NamedTuple) -> ApiResult:
             error=f'LRO max retries ({MAX_RETRIES}) exceeded. Last status: {status}',
             request_kwargs=None,
         )
-    
+
     # Unknown initial status
     else:
         return ApiResult(
