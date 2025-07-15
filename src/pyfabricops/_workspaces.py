@@ -791,3 +791,18 @@ def export_workspace_config(
     logger.info(
         f'Workspace configuration successfully written to {config_path}'
     )
+
+def _resolve_workspace_path(workspace: str, workspace_suffix: str, project_path: str, workspace_path: str | None) -> str | None:
+    """ Resolve workspace_name for export items"""
+    workspace_name = get_workspace(workspace).get('displayName', '')
+    if not workspace_name:
+        logger.warning(f"Workspace '{workspace}' not found.")
+        return None
+    else:
+        workspace_alias = workspace_name.split(workspace_suffix)[0]
+
+    # Add the workspace path
+    if not workspace_path:
+        workspace_path = workspace_alias
+
+    return workspace_path

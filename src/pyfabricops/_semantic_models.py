@@ -16,7 +16,7 @@ from ._utils import (
     unpack_item_definition,
     write_json,
 )
-from ._workspaces import get_workspace, resolve_workspace
+from ._workspaces import get_workspace, resolve_workspace, _resolve_workspace_path
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -154,9 +154,9 @@ def get_semantic_model(
 def update_semantic_model(
     workspace: str,
     semantic_model: str,
+    *,
     display_name: str = None,
     description: str = None,
-    *,
     df: bool = False,
 ) -> dict | pandas.DataFrame:
     """
@@ -284,25 +284,22 @@ def get_semantic_model_definition(workspace: str, semantic_model: str) -> dict:
         endpoint=f'/workspaces/{workspace_id}/semanticModels/{semantic_model_id}/getDefinition',
         method='post',
     )
+    
     if not response.success:
         logger.warning(f'{response.status_code}: {response.error}.')
         return None
-    elif response.status_code == 202:
-        # If the response is a long-running operation, handle it
+    
+    # Check if it's a long-running operation (status 202)
+    if response.status_code == 202:
+        logger.debug('Long-running operation detected, handling LRO...')
         lro_response = lro_handler(response)
         if not lro_response.success:
-            logger.warning(
-                f'{lro_response.status_code}: {lro_response.error}.'
-            )
+            logger.warning(f'{lro_response.status_code}: {lro_response.error}.')
             return None
-        else:
-            return lro_response.data
-    elif response.status_code == 200:
-        # If the response is successful, we can process it
-        return response.data
-    else:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
+        return lro_response.data
+    
+    # For immediate success (status 200)
+    return response.data
 
 
 def update_semantic_model_definition(
@@ -344,31 +341,29 @@ def update_semantic_model_definition(
         payload={'definition': definition},
         params=params,
     )
+    
     if not response.success:
         logger.warning(f'{response.status_code}: {response.error}.')
         return None
-    elif response.status_code == 202:
-        # If the response is a long-running operation, handle it
+    
+    # Check if it's a long-running operation (status 202)
+    if response.status_code == 202:
+        logger.debug('Long-running operation detected, handling LRO...')
         lro_response = lro_handler(response)
         if not lro_response.success:
-            logger.warning(
-                f'{lro_response.status_code}: {lro_response.error}.'
-            )
+            logger.warning(f'{lro_response.status_code}: {lro_response.error}.')
             return None
-        else:
-            return lro_response.data
-    elif response.status_code == 200:
-        # If the response is successful, we can process it
-        return response.data
-    else:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
+        return lro_response.data
+    
+    # For immediate success (status 200)
+    return response.data
 
 
 def create_semantic_model(
     workspace: str,
     display_name: str,
     path: str,
+    *,
     description: str = None,
     folder: str = None,
 ) -> None:
@@ -418,29 +413,26 @@ def create_semantic_model(
     if not response.success:
         logger.warning(f'{response.status_code}: {response.error}.')
         return None
-    elif response.status_code == 202:
-        # If the response is a long-running operation, handle it
+    
+    # Check if it's a long-running operation (status 202)
+    if response.status_code == 202:
+        logger.debug('Long-running operation detected, handling LRO...')
         lro_response = lro_handler(response)
         if not lro_response.success:
-            logger.warning(
-                f'{lro_response.status_code}: {lro_response.error}.'
-            )
+            logger.warning(f'{lro_response.status_code}: {lro_response.error}.')
             return None
-        else:
-            return lro_response.data
-    elif response.status_code == 200:
-        # If the response is successful, we can process it
-        return response.data
-    else:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
+        return lro_response.data
+    
+    # For immediate success (status 200)
+    return response.data
 
 
 def export_semantic_model(
     workspace: str,
     semantic_model: str,
     project_path: str,
-    workspace_path: str = 'workspace',
+    *,
+    workspace_path: str = None,
     update_config: bool = True,
     config_path: str = None,
     branch: str = None,
@@ -470,6 +462,12 @@ def export_semantic_model(
         export_semantic_model('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', 'path/to/project', workspace_path='workspace', config_path='config.json', branches_path='branches', branch='main', workspace_suffix='dev')
         ```
     """
+    workspace_path = _resolve_workspace_path(
+        workspace=workspace,
+        workspace_suffix=workspace_suffix,
+        project_path=project_path,
+        workspace_path=workspace_path
+    )
     workspace_id = resolve_workspace(workspace)
     workspace_name = get_workspace(workspace_id).get('displayName')
     if not workspace_id:
@@ -591,7 +589,8 @@ def export_semantic_model(
 def export_all_semantic_models(
     workspace: str,
     project_path: str,
-    workspace_path: str = 'workspace',
+    *,
+    workspace_path: str = None,
     update_config: bool = True,
     config_path: str = None,
     branch: str = None,
@@ -644,7 +643,8 @@ def deploy_semantic_model(
     workspace: str,
     display_name: str,
     project_path: str,
-    workspace_path: str = 'workspace',
+    *,
+    workspace_path: str = None,
     config_path: str = None,
     description: str = None,
     branch: str = None,
@@ -710,6 +710,12 @@ def deploy_semantic_model(
     semantic_model_full_path = None
 
     # Check if semantic model exists in workspace root
+    workspace_path = _resolve_workspace_path(
+        workspace=workspace,
+        workspace_suffix=workspace_suffix,
+        project_path=project_path,
+        workspace_path=workspace_path
+    )
     root_path = f'{project_path}/{workspace_path}/{display_name}.SemanticModel'
     if os.path.exists(root_path):
         semantic_model_folder_path = workspace_path
@@ -835,7 +841,8 @@ def deploy_semantic_model(
 def deploy_all_semantic_models(
     workspace: str,
     project_path: str,
-    workspace_path: str = 'workspace',
+    *,
+    workspace_path: str = None,
     config_path: str = None,
     branch: str = None,
     workspace_suffix: str = None,
@@ -862,6 +869,12 @@ def deploy_all_semantic_models(
         deploy_all_semantic_models('MyProjectWorkspace', 'path/to/project', workspace_path='workspace', config_path='config.json', branches_path='branches', branch='main', workspace_suffix='dev')
         ```
     """
+    workspace_path = _resolve_workspace_path(
+        workspace=workspace,
+        workspace_suffix=workspace_suffix,
+        project_path=project_path,
+        workspace_path=workspace_path
+    )
     base_path = f'{project_path}/{workspace_path}'
 
     if not os.path.exists(base_path):

@@ -15,7 +15,7 @@ from ._utils import (
     read_json,
     write_json,
 )
-from ._workspaces import get_workspace, resolve_workspace
+from ._workspaces import get_workspace, resolve_workspace, _resolve_workspace_path
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -404,17 +404,25 @@ def export_folders(
         export_folders('123e4567-e89b-12d3-a456-426614174000', '/path/to/project')
         ```
     """
-    # Resolve workspace_name for export_folders
-    workspace_name = get_workspace(workspace).get('displayName', '')
-    if not workspace_name:
-        logger.warning(f"Workspace '{workspace}' not found.")
-        return None
-    else:
-        workspace_alias = workspace_name.split(workspace_suffix)[0]
+    # # Resolve workspace_name for export_folders
+    # workspace_name = get_workspace(workspace).get('displayName', '')
+    # if not workspace_name:
+    #     logger.warning(f"Workspace '{workspace}' not found.")
+    #     return None
+    # else:
+    #     workspace_alias = workspace_name.split(workspace_suffix)[0]
 
-    # Add the workspace path
-    if not workspace_path:
-        workspace_path = workspace_alias
+    # # Add the workspace path
+    # if not workspace_path:
+    #     workspace_path = workspace_alias
+    # path = os.path.join(project_path, workspace_path)
+    workspace_path = _resolve_workspace_path(
+        workspace=workspace, 
+        workspace_suffix=workspace_suffix, 
+        project_path=project_path, 
+        workspace_path=workspace_path,
+    )
+    
     path = os.path.join(project_path, workspace_path)
 
     os.makedirs(path, exist_ok=True)

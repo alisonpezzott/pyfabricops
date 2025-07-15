@@ -16,7 +16,7 @@ from ._utils import (
     unpack_item_definition,
     write_json,
 )
-from ._workspaces import get_workspace, resolve_workspace
+from ._workspaces import get_workspace, resolve_workspace, _resolve_workspace_path
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -24,7 +24,7 @@ logger.addHandler(logging.NullHandler())
 
 @df
 def list_items(
-    workspace: str, excluded_starts: tuple = ('Staging'), *, df: bool = False
+    workspace: str, *, excluded_starts: tuple = ('Staging'), df: bool = False
 ) -> list | pandas.DataFrame:
     """
     Returns a list of items from the specified workspace.
@@ -171,9 +171,9 @@ def get_item(
 def update_item(
     workspace: str,
     item: str,
+    *,
     display_name: str = None,
     description: str = None,
-    *,
     df: bool = False,
 ) -> dict | pandas.DataFrame:
     """
@@ -384,6 +384,7 @@ def create_item(
     workspace: str,
     display_name: str,
     path: str,
+    *,
     description: str = None,
     folder: str = None,
 ):
@@ -455,7 +456,8 @@ def export_item(
     workspace: str,
     item: str,
     project_path: str,
-    workspace_path: str = 'workspace',
+    *,
+    workspace_path: str = None,
     update_config: bool = True,
     config_path: str = None,
     branch: str = None,
@@ -535,6 +537,13 @@ def export_item(
         item_id = item_['id']
         item_name = item_['displayName']
         item_descr = item_.get('description', '')
+        
+        workspace_path = _resolve_workspace_path(
+            workspace=workspace,
+            workspace_suffix=workspace_suffix,
+            project_path=project_path,
+            workspace_path=workspace_path
+        )
 
         # Find the key in the folders dict whose value matches folder_id
         if folder_id:
@@ -587,7 +596,8 @@ def export_item(
 def export_all_items(
     workspace: str,
     project_path: str,
-    workspace_path: str = 'workspace',
+    *,
+    workspace_path: str = None,
     update_config: bool = True,
     config_path: str = None,
     branch: str = None,
@@ -639,7 +649,8 @@ def deploy_item(
     workspace: str,
     item_name_dot_type: str,
     project_path: str,
-    workspace_path: str = 'workspace',
+    *,
+    workspace_path: str = None,
     config_path: str = None,
     description: str = None,
     branch: str = None,
@@ -697,11 +708,17 @@ def deploy_item(
         )
         folders_mapping = {}
 
-    # Find where the semantic model is located locally
-    semantic_model_folder_path = None
-    semantic_model_full_path = None
+    # Find where the item is located locally
+    item_folder_path = None
+    item_full_path = None
 
     # Check if item exists in workspace root
+    workspace_path = _resolve_workspace_path(
+        workspace=workspace,
+        workspace_suffix=workspace_suffix,
+        project_path=project_path,
+        workspace_path=workspace_path
+    )
     root_path = f'{project_path}/{workspace_path}/{item_name_dot_type}'
     if os.path.exists(root_path):
         item_folder_path = workspace_path
@@ -814,7 +831,8 @@ def deploy_item(
 def deploy_all_items(
     workspace: str,
     project_path: str,
-    workspace_path: str = 'workspace',
+    *,
+    workspace_path: str = None,
     config_path: str = None,
     branch: str = None,
     workspace_suffix: str = None,

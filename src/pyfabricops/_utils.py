@@ -464,7 +464,8 @@ def parse_tmdl_parameters(path: str) -> dict:
                     )
                     continue
 
-            params[name] = {'Value': value, **meta_items}
+            # params[name] = {'Value': value, **meta_items}
+            params[name] = value
 
         except Exception as e:
             logger.warning(f'Error parsing parameter from match: {str(e)}')
