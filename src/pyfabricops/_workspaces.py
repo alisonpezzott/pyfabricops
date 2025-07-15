@@ -9,8 +9,8 @@ from ._core import api_core_request, pagination_handler
 from ._decorators import df
 from ._exceptions import OptionNotAvailableError, ResourceNotFoundError
 from ._utils import (
+    find_project_root_path,
     get_current_branch,
-    get_root_path,
     get_workspace_suffix,
     is_valid_uuid,
     read_json,
@@ -20,7 +20,7 @@ from ._utils import (
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
-root_path = get_root_path()
+root_path = find_project_root_path()
 
 
 @df
