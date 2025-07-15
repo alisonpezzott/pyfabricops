@@ -119,9 +119,9 @@ def get_workspace(
 @df
 def update_workspace(
     workspace: str,
+    *,
     display_name: str = None,
     description: str = None,
-    *,
     df=False,
 ) -> dict | pandas.DataFrame:
     """
@@ -456,10 +456,10 @@ def unassign_from_capacity(workspace: str) -> None:
 @df
 def create_workspace(
     workspace_name: str,
+    *,
     capacity: str = None,
     description: str = None,
     roles: List[Dict[str, str]] = None,
-    *,
     df=False,
 ) -> Dict | None:
     """
@@ -551,6 +551,7 @@ def create_workspace(
 
 def _get_workspace_config(
     workspace: str,
+    *,
     branch: str = None,
     workspace_suffix: str = None,
     branches_path: str = None,
@@ -582,7 +583,7 @@ def _get_workspace_config(
     workspace_id = workspace_details.get('id', '')
     workspace_description = workspace_details.get('description', '')
     capacity_id = workspace_details.get('capacityId', '')
-    capacity_region = workspace_details.get('capacityRegion')
+    capacity_region = workspace_details.get('capacityRegion', '')
 
     # Retrieving workspace roles
     # Retrieve details
@@ -655,6 +656,7 @@ def _get_workspace_config(
 def export_workspace_config(
     workspace: str,
     project_path: str,
+    *,
     config_path: str = None,
     merge_mode: Literal['update', 'replace', 'preserve'] = 'update',
     branch: str = None,
@@ -693,7 +695,10 @@ def export_workspace_config(
     """
     # Get the new config for this workspace
     new_config = _get_workspace_config(
-        workspace, branch, workspace_suffix, branches_path
+        workspace,
+        branch=branch,
+        workspace_suffix=workspace_suffix,
+        branches_path=branches_path,
     )
     if not new_config:
         logger.warning(f'No configuration found for workspace {workspace}.')
@@ -731,9 +736,15 @@ def export_workspace_config(
 
             # Process each workspace
             for workspace_name, workspace_config in workspaces.items():
+
+                workspace_name_without_suffix = workspace_name.split(
+                    workspace_suffix
+                )[0]
+
                 if (
                     merge_mode == 'preserve'
-                    and workspace_name in existing_config[branch_name]
+                    and workspace_name_without_suffix
+                    in existing_config[branch_name]
                 ):
                     logger.info(
                         f'Workspace "{workspace_name}" already exists in branch "{branch_name}". Preserving existing config.'
@@ -741,26 +752,34 @@ def export_workspace_config(
                     continue
 
                 # Ensure workspace exists in existing config
-                if workspace_name not in existing_config[branch_name]:
-                    existing_config[branch_name][workspace_name] = {}
+                if (
+                    workspace_name_without_suffix
+                    not in existing_config[branch_name]
+                ):
+                    existing_config[branch_name][
+                        workspace_name_without_suffix
+                    ] = {}
 
                 # Merge workspace_config with existing data, preserving other keys like 'folders'
                 if merge_mode == 'update':
                     # Update only the workspace_config, preserve other keys like 'folders'
-                    existing_config[branch_name][workspace_name][
+                    existing_config[branch_name][
+                        workspace_name_without_suffix
+                    ]['workspace_config'] = workspace_config[
                         'workspace_config'
-                    ] = workspace_config['workspace_config']
+                    ]
                     logger.info(
                         f'Updated workspace_config for "{workspace_name}" in branch "{branch_name}"'
                     )
                 else:
                     # For other modes, replace the entire workspace config
                     existing_config[branch_name][
-                        workspace_name
+                        workspace_name_without_suffix
                     ] = workspace_config
                     action = (
                         'Updated'
-                        if workspace_name in existing_config[branch_name]
+                        if workspace_name_without_suffix
+                        in existing_config[branch_name]
                         else 'Added'
                     )
                     logger.info(
