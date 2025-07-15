@@ -24,15 +24,16 @@ class ApiResult(NamedTuple):
 
 def api_core_request(
     endpoint: str,
+    *,  # Force keyword-only arguments after endpoint
     content_type: str = 'application/json',
     payload: Optional[dict] = None,
     data: Optional[dict] = None,
     params: Optional[dict] = None,
     audience: Literal['fabric', 'powerbi'] = 'fabric',
     credential_type: Literal['spn', 'user'] = 'spn',
-    method: Literal['get', 'post', 'patch', 'delete'] = 'get',
-    *,
+    method: Literal['get', 'post', 'patch', 'delete', 'put'] = 'get',
     return_raw: bool = False,
+    timeout: int = 30,
 ):
     """
     Makes a request to the Microsoft Fabric or Power BI API.
@@ -44,27 +45,28 @@ def api_core_request(
 
     Args:
         endpoint (str): The API endpoint to call.
-        resource_id (str): The ID of the resource to retrieve or modify (if applicable).
         content_type (str): The content type of the request. Defaults to "application/json".
         payload (Optional[dict]): The JSON payload to send with the request. Defaults to None.
         data (Optional[dict]): The data to send with the request. Defaults to None.
-        params (Optional[str]): Query parameters to append to the URL. Defaults to None.
+        params (Optional[dict]): Query parameters to append to the URL. Defaults to None.
         audience (Literal["fabric", "powerbi"]): The API audience to target. Defaults to "fabric".
         credential_type (Literal["spn", "user"]): The type of credentials to use for authentication. Defaults to "spn".
-        method (Literal["get", "post", "patch", "delete"]): The HTTP method to use for the request. Defaults to "get".
+        method (Literal["get", "post", "patch", "delete", "put"]): The HTTP method to use for the request. Defaults to "get".
         return_raw (bool, optional): If True, returns the raw response object. Defaults to False.
+        timeout (int): Request timeout in seconds. Defaults to 30.
 
     Returns:
         ApiResult (NamedTuple): The response object from the request.
             success: bool
             status_code: int
             data: Optional[Any] = None
+            headers: Optional[dict] = None
             error: Optional[str] = None
+            request_kwargs: Optional[dict] = None
 
     Raises:
         AuthenticationError: If the token retrieval fails.
         InvalidParameterError: If the payload is not a dictionary or if both payload and data are provided.
-        requests.RequestException: If the request fails.
 
     Examples:
         ```python
@@ -75,10 +77,13 @@ def api_core_request(
         api_core_request('capacities', method='post', payload={'name': 'New Capacity'})
 
         # Makes a DELETE request to the 'capacities' endpoint for the resource with ID '12345'.
-        api_core_request('capacities', method='delete', resource_id='12345')
+        api_core_request('capacities/12345', method='delete')
 
         # Makes a GET request to the Power BI API for dataflows in the specified group.
         api_core_request(audience="powerbi", endpoint=f"/groups/MyProject/dataflows")
+
+        # Makes a request with custom timeout.
+        api_core_request('capacities', timeout=60)
         ```
     """
     # Base URL selection based on audience
@@ -130,7 +135,12 @@ def api_core_request(
         raise InvalidParameterError('Payload must be a dictionary.')
 
     # Request execution - modified to support data
-    request_kwargs = {'method': method.upper(), 'url': url, 'headers': headers}
+    request_kwargs = {
+        'method': method.upper(),
+        'url': url,
+        'headers': headers,
+        'timeout': timeout,
+    }
 
     # Handle data vs json
     if data is not None:
@@ -138,103 +148,216 @@ def api_core_request(
     else:
         request_kwargs['json'] = payload
 
-    # Request execution
-    response = requests.request(**request_kwargs)
+    # Log the request for debugging
+    logger.info(f'Making {method.upper()} request to {url}')
+    logger.debug(f'Headers: {headers}')
+    if payload and payload != {}:
+        logger.debug(f'Payload: {payload}')
+
+    # Request execution with proper error handling
+    try:
+        response = requests.request(**request_kwargs)
+    except requests.exceptions.Timeout:
+        return ApiResult(
+            success=False,
+            status_code=408,
+            data=None,
+            headers=None,
+            error=f'Request timeout after {timeout} seconds',
+            request_kwargs=request_kwargs,
+        )
+    except requests.exceptions.ConnectionError as e:
+        return ApiResult(
+            success=False,
+            status_code=503,
+            data=None,
+            headers=None,
+            error=f'Connection error: {str(e)}',
+            request_kwargs=request_kwargs,
+        )
+    except requests.exceptions.RequestException as e:
+        return ApiResult(
+            success=False,
+            status_code=500,
+            data=None,
+            headers=None,
+            error=f'Request failed: {str(e)}',
+            request_kwargs=request_kwargs,
+        )
+
+    # Log response status
+    logger.debug(f'Response status: {response.status_code}')
 
     if return_raw:
         return response
     else:
+        # Parse JSON safely
+        try:
+            json_data = (
+                response.json() if response.ok and response.content else None
+            )
+        except ValueError:
+            json_data = None
+
         return ApiResult(
             success=response.ok,
             status_code=response.status_code,
-            data=response.json() if response.ok else None,
-            headers=response.headers if response.ok else None,
+            data=json_data,
+            headers=dict(response.headers) if response.ok else None,
             error=response.text if not response.ok else None,
             request_kwargs=request_kwargs,
         )
 
 
 def pagination_handler(api_result: NamedTuple) -> ApiResult:
-    # check for continuation token
-    if 'continuationToken' in api_result.data:
-        continuation_token = api_result.data.get('continuationToken')
-
-        data = api_result.data.get('value', [])
-
-        # Continue fetching data until no continuation token is left
-        while continuation_token:
-            response = requests.request(api_result.request_kwargs)
-            new_data = response.json().get('value', [])
-            data.extend(new_data)
-            continuation_token = response.json().get('continuationToken')
-        return ApiResult(success=True, status_code=200, data={'value': data})
-    else:
+    """Handle paginated responses with continuation tokens."""
+    # Check for continuation token
+    if not api_result.data or 'continuationToken' not in api_result.data:
         return api_result
+
+    continuation_token = api_result.data.get('continuationToken')
+    data = api_result.data.get('value', [])
+
+    # Get original request kwargs for subsequent requests
+    original_kwargs = api_result.request_kwargs.copy()
+    headers = original_kwargs.get('headers', {})
+
+    # Continue fetching data until no continuation token is left
+    while continuation_token:
+        try:
+            # Update URL with continuation token
+            base_url = original_kwargs['url'].split('?')[
+                0
+            ]  # Remove existing params
+            new_url = f'{base_url}?continuationToken={continuation_token}'
+
+            response = requests.request(
+                method='GET',  # Pagination is always GET
+                url=new_url,
+                headers=headers,
+            )
+            response.raise_for_status()
+
+            response_data = response.json()
+            new_data = response_data.get('value', [])
+            data.extend(new_data)
+            continuation_token = response_data.get('continuationToken')
+
+        except Exception as e:
+            logger.error(f'Pagination failed: {str(e)}')
+            # Return what we have so far
+            break
+
+    return ApiResult(
+        success=True,
+        status_code=200,
+        data={'value': data},
+        headers=api_result.headers,
+        error=None,
+        request_kwargs=api_result.request_kwargs,
+    )
 
 
 def lro_handler(api_result: NamedTuple) -> ApiResult:
+    """Handle long-running operations (LRO)."""
     # Check if is a long-running operation (LRO)
-    if 'location' in api_result.headers:
-        location = api_result.headers['Location']
-        logger.debug(f'Long-running operation detected at {location}')
+    if 'location' not in api_result.headers:
+        return api_result
+
+    location = api_result.headers['Location']
+    logger.debug(f'Long-running operation detected at {location}')
 
     headers = api_result.request_kwargs.get('headers')
     logger.debug(f'Headers for LRO request: {headers}')
 
     # Request execution
-    state = requests.request(method='GET', url=location, headers=headers)
-    logger.debug(f'State of LRO request: {state.json()}')
-
-    status = state.json().get('status')
-
-    if status in ['Succeeded', 'Failed', 'Undefined']:
-        response = requests.request(
-            method='GET',
-            url=f'{location}/result',
-            headers=headers,
-        )
+    try:
+        state = requests.request(method='GET', url=location, headers=headers)
+        logger.debug(f'State of LRO request: {state.json()}')
+        status = state.json().get('status')
+    except Exception as e:
         return ApiResult(
-            success=response.ok,
-            status_code=response.status_code,
-            data=response.json() if response.ok else None,
-            headers=response.headers if response.ok else None,
-            error=response.text if not response.ok else None,
+            success=False,
+            status_code=500,
+            data=None,
+            headers=None,
+            error=f'Failed to check LRO status: {str(e)}',
             request_kwargs=None,
         )
+
+    if status in ['Succeeded', 'Failed', 'Undefined']:
+        try:
+            response = requests.request(
+                method='GET',
+                url=f'{location}/result',
+                headers=headers,
+            )
+            return ApiResult(
+                success=response.ok,
+                status_code=response.status_code,
+                data=response.json() if response.ok else None,
+                headers=response.headers if response.ok else None,
+                error=response.text if not response.ok else None,
+                request_kwargs=None,
+            )
+        except Exception as e:
+            return ApiResult(
+                success=False,
+                status_code=500,
+                data=None,
+                headers=None,
+                error=f'Failed to get LRO result: {str(e)}',
+                request_kwargs=None,
+            )
 
     elif status in ['Running', 'NotStarted']:
         MAX_RETRIES = 10
         RETRY_INTERVAL = 5
         for attempt in range(1, MAX_RETRIES + 1):
-            state = requests.request(
-                method='GET', url=location, headers=headers
-            )
-            status = state.json().get('status')
-            if status in ['Failed', 'Undefined']:
-                return ApiResult(
-                    success=response.ok,
-                    status_code=response.status_code,
-                    data=response.json() if response.ok else None,
-                    headers=response.headers if response.ok else None,
-                    error=response.text if not response.ok else None,
-                    request_kwargs=None,
+            try:
+                state = requests.request(
+                    method='GET', url=location, headers=headers
                 )
-            if status == 'Succeeded':
-                response = requests.request(
-                    method='GET',
-                    url=f'{location}/result',
-                    headers=headers,
-                )
-                return ApiResult(
-                    success=response.ok,
-                    status_code=response.status_code,
-                    data=response.json() if response.ok else None,
-                    headers=response.headers if response.ok else None,
-                    error=response.text if not response.ok else None,
-                    request_kwargs=None,
-                )
+                status = state.json().get('status')
 
-            time.sleep(RETRY_INTERVAL)
+                if status in ['Failed', 'Undefined']:
+                    return ApiResult(
+                        success=False,
+                        status_code=state.status_code,
+                        data=state.json() if state.ok else None,
+                        headers=state.headers if state.ok else None,
+                        error=state.text
+                        if not state.ok
+                        else f'LRO failed with status: {status}',
+                        request_kwargs=None,
+                    )
+
+                if status == 'Succeeded':
+                    response = requests.request(
+                        method='GET',
+                        url=f'{location}/result',
+                        headers=headers,
+                    )
+                    return ApiResult(
+                        success=response.ok,
+                        status_code=response.status_code,
+                        data=response.json() if response.ok else None,
+                        headers=response.headers if response.ok else None,
+                        error=response.text if not response.ok else None,
+                        request_kwargs=None,
+                    )
+
+                time.sleep(RETRY_INTERVAL)
+
+            except Exception as e:
+                return ApiResult(
+                    success=False,
+                    status_code=500,
+                    data=None,
+                    headers=None,
+                    error=f'LRO polling failed at attempt {attempt}: {str(e)}',
+                    request_kwargs=None,
+                )
 
         return ApiResult(
             success=False,
