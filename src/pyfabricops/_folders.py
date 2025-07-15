@@ -426,14 +426,14 @@ def export_folders(
         workspace_path=workspace_path,
     )
     new_config = _get_folders_config(
-            workspace,
-            branch=branch,
-            workspace_suffix=workspace_suffix,
-            branches_path=branches_path,
-        )
+        workspace,
+        branch=branch,
+        workspace_suffix=workspace_suffix,
+        branches_path=branches_path,
+    )
     if not new_config:
         return None
-    
+
     path = os.path.join(project_path, workspace_path)
 
     os.makedirs(path, exist_ok=True)

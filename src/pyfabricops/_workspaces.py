@@ -105,15 +105,15 @@ def get_workspace(
         ```
     """
     workspace_id = resolve_workspace(workspace)
-    
+
     if not workspace_id:
         raise ResourceNotFoundError(f'Workspace {workspace} not found.')
-    
+
     if not workspace_id:
         return None
-    
+
     response = api_core_request(endpoint=f'/workspaces/{workspace_id}')
-    
+
     if not response.success:
         logger.warning(f'{response.status_code}: {response.error}.')
         return None

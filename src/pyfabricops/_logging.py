@@ -39,24 +39,28 @@ class PyFabricOpsFormatter(logging.Formatter):
 
     # Colored symbols for each log level
     SYMBOLS = {
-        'DEBUG': '\033[36m🔧\033[0m',    # Cyan wrench (debug/fix)
-        'INFO': '\033[32m✅\033[0m',     # Green check (success/info)
-        'WARNING': '\033[33m⚠️\033[0m',   # Yellow warning
-        'ERROR': '\033[31m❌\033[0m',    # Red X (error)
-        'CRITICAL': '\033[35m🚨\033[0m', # Magenta siren (critical)
+        'DEBUG': '\033[36m🔧\033[0m',  # Cyan wrench (debug/fix)
+        'INFO': '\033[32m✅\033[0m',  # Green check (success/info)
+        'WARNING': '\033[33m⚠️\033[0m',  # Yellow warning
+        'ERROR': '\033[31m❌\033[0m',  # Red X (error)
+        'CRITICAL': '\033[35m🚨\033[0m',  # Magenta siren (critical)
     }
 
     # Fallback symbols without colors (for terminals that don't support colors)
     SYMBOLS_NO_COLOR = {
-        'DEBUG': '🔧',    # Wrench
-        'INFO': '✅',     # Check mark
-        'WARNING': '⚠️',   # Warning
-        'ERROR': '❌',    # X mark
-        'CRITICAL': '🚨', # Siren
+        'DEBUG': '🔧',  # Wrench
+        'INFO': '✅',  # Check mark
+        'WARNING': '⚠️',  # Warning
+        'ERROR': '❌',  # X mark
+        'CRITICAL': '🚨',  # Siren
     }
 
     def __init__(
-        self, include_colors: bool = True, include_module: bool = True, ultra_minimal: bool = False, include_symbols: bool = True
+        self,
+        include_colors: bool = True,
+        include_module: bool = True,
+        ultra_minimal: bool = False,
+        include_symbols: bool = True,
     ):
         """
         Initialize the custom formatter.
@@ -115,9 +119,9 @@ class PyFabricOpsFormatter(logging.Formatter):
                     symbol = self.SYMBOLS.get(record.levelname, '')
                 else:
                     symbol = self.SYMBOLS_NO_COLOR.get(record.levelname, '')
-                return f"{symbol} {message}"
+                return f'{symbol} {message}'
             return message
-        
+
         # Create a copy of the record to avoid modifying the original
         record_copy = logging.makeLogRecord(record.__dict__)
 
@@ -139,15 +143,15 @@ class PyFabricOpsFormatter(logging.Formatter):
 
         # Format the message with the base formatter
         formatted_message = super().format(record_copy)
-        
+
         # Add colored symbol prefix if enabled
         if self.include_symbols:
             if self.include_colors:
                 symbol = self.SYMBOLS.get(record.levelname, '')
             else:
                 symbol = self.SYMBOLS_NO_COLOR.get(record.levelname, '')
-            return f"{symbol} {formatted_message}"
-        
+            return f'{symbol} {formatted_message}'
+
         return formatted_message
 
 
@@ -192,7 +196,7 @@ def setup_logging(
         level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL or numeric)
         format_style: Format style ('standard', 'minimal', 'detailed')
                      - 'minimal': Only message (ultra-minimal)
-                     - 'standard': Timestamp, level, and message  
+                     - 'standard': Timestamp, level, and message
                      - 'detailed': Timestamp, module, level, and message
         include_colors: Whether to use colored output in console
         include_module: Whether to include module names in logs
@@ -223,15 +227,24 @@ def setup_logging(
     # Create formatter based on style
     if format_style == 'minimal':
         formatter = PyFabricOpsFormatter(
-            include_colors=include_colors, include_module=False, ultra_minimal=True, include_symbols=include_symbols
+            include_colors=include_colors,
+            include_module=False,
+            ultra_minimal=True,
+            include_symbols=include_symbols,
         )
     elif format_style == 'detailed':
         formatter = PyFabricOpsFormatter(
-            include_colors=include_colors, include_module=True, ultra_minimal=False, include_symbols=include_symbols
+            include_colors=include_colors,
+            include_module=True,
+            ultra_minimal=False,
+            include_symbols=include_symbols,
         )
     else:  # standard
         formatter = PyFabricOpsFormatter(
-            include_colors=include_colors, include_module=include_module, ultra_minimal=False, include_symbols=include_symbols
+            include_colors=include_colors,
+            include_module=include_module,
+            ultra_minimal=False,
+            include_symbols=include_symbols,
         )
 
     console_handler.setFormatter(formatter)
