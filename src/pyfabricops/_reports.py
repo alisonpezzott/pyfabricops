@@ -16,7 +16,7 @@ from ._utils import (
     unpack_item_definition,
     write_json,
 )
-from ._workspaces import get_workspace, resolve_workspace
+from ._workspaces import get_workspace, resolve_workspace, _resolve_workspace_path
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -267,22 +267,18 @@ def get_report_definition(workspace: str, report: str) -> dict:
     if not response.success:
         logger.warning(f'{response.status_code}: {response.error}.')
         return None
-    elif response.status_code == 202:
-        # If the response is a long-running operation, handle it
+    
+    # Check if it's a long-running operation (status 202)
+    if response.status_code == 202:
+        logger.debug('Long-running operation detected, handling LRO...')
         lro_response = lro_handler(response)
         if not lro_response.success:
-            logger.warning(
-                f'{lro_response.status_code}: {lro_response.error}.'
-            )
+            logger.warning(f'{lro_response.status_code}: {lro_response.error}.')
             return None
-        else:
-            return lro_response.data
-    elif response.status_code == 200:
-        # If the response is successful, we can process it
-        return response.data
-    else:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
+        return lro_response.data
+    
+    # For immediate success (status 200)
+    return response.data
 
 
 def update_report_definition(workspace: str, report: str, path: str):
@@ -325,22 +321,18 @@ def update_report_definition(workspace: str, report: str, path: str):
     if not response.success:
         logger.warning(f'{response.status_code}: {response.error}.')
         return None
-    elif response.status_code == 202:
-        # If the response is a long-running operation, handle it
+    
+    # Check if it's a long-running operation (status 202)
+    if response.status_code == 202:
+        logger.debug('Long-running operation detected, handling LRO...')
         lro_response = lro_handler(response)
         if not lro_response.success:
-            logger.warning(
-                f'{lro_response.status_code}: {lro_response.error}.'
-            )
+            logger.warning(f'{lro_response.status_code}: {lro_response.error}.')
             return None
-        else:
-            return lro_response.data
-    elif response.status_code == 200:
-        # If the response is successful, we can process it
-        return response.data
-    else:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
+        return lro_response.data
+    
+    # For immediate success (status 200)
+    return response.data
 
 
 def create_report(
@@ -396,29 +388,26 @@ def create_report(
     if not response.success:
         logger.warning(f'{response.status_code}: {response.error}.')
         return None
-    elif response.status_code == 202:
-        # If the response is a long-running operation, handle it
+    
+    # Check if it's a long-running operation (status 202)
+    if response.status_code == 202:
+        logger.debug('Long-running operation detected, handling LRO...')
         lro_response = lro_handler(response)
         if not lro_response.success:
-            logger.warning(
-                f'{lro_response.status_code}: {lro_response.error}.'
-            )
+            logger.warning(f'{lro_response.status_code}: {lro_response.error}.')
             return None
-        else:
-            return lro_response.data
-    elif response.status_code == 200:
-        # If the response is successful, we can process it
-        return response.data
-    else:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
+        return lro_response.data
+    
+    # For immediate success (status 200)
+    return response.data
 
 
 def export_report(
     workspace: str,
     report: str,
     project_path: str,
-    workspace_path: str = 'workspace',
+    *,
+    workspace_path: str = None,
     update_config: bool = True,
     config_path: str = None,
     branch: str = None,
@@ -448,6 +437,12 @@ def export_report(
         export_report('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', '/path/to/project')
         ```
     """
+    workspace_path = _resolve_workspace_path(
+        workspace=workspace,
+        workspace_suffix=workspace_suffix,
+        project_path=project_path,
+        workspace_path=workspace_path
+    )
     workspace_id = resolve_workspace(workspace)
     workspace_name = get_workspace(workspace_id).get('displayName')
     if not workspace_id:
@@ -554,7 +549,8 @@ def export_report(
 def export_all_reports(
     workspace: str,
     project_path: str,
-    workspace_path: str = 'workspace',
+    *,
+    workspace_path: str = None,
     update_config: bool = True,
     config_path: str = None,
     branch: str = None,
@@ -606,7 +602,8 @@ def deploy_report(
     workspace: str,
     display_name: str,
     project_path: str,
-    workspace_path: str = 'workspace',
+    *,
+    workspace_path: str = None,
     config_path: str = None,
     description: str = None,
     branch: str = None,
@@ -669,6 +666,12 @@ def deploy_report(
     report_full_path = None
 
     # Check if report exists in workspace root
+    workspace_path = _resolve_workspace_path(
+        workspace=workspace,
+        workspace_suffix=workspace_suffix,
+        project_path=project_path,
+        workspace_path=workspace_path
+    )
     root_path = f'{project_path}/{workspace_path}/{display_name}.Report'
     if os.path.exists(root_path):
         report_folder_path = workspace_path
@@ -778,7 +781,8 @@ def deploy_report(
 def deploy_all_reports(
     workspace: str,
     project_path: str,
-    workspace_path: str = 'workspace',
+    *,
+    workspace_path: str = None,
     config_path: str = None,
     branch: str = None,
     workspace_suffix: str = None,
@@ -807,6 +811,12 @@ def deploy_all_reports(
         deploy_all_reports('MyProjectWorkspace', '/path/to/project', workspace_suffix='WorkspaceSuffix')
         ```
     """
+    workspace_path = _resolve_workspace_path(
+        workspace=workspace,
+        workspace_suffix=workspace_suffix,
+        project_path=project_path,
+        workspace_path=workspace_path
+    )
     base_path = f'{project_path}/{workspace_path}'
 
     if not os.path.exists(base_path):
