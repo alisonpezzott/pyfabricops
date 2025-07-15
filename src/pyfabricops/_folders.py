@@ -569,7 +569,7 @@ def deploy_folders(
     workspace: str,
     project_path: str,
     *,
-    workspace_path: str = 'workspace',
+    workspace_path: str = None,
     update_config: bool = True,
     config_path: str = None,
     merge_mode: Literal['update', 'replace', 'preserve'] = 'update',
@@ -600,6 +600,12 @@ def deploy_folders(
         export_folders('123e4567-e89b-12d3-a456-426614174000', '/path/to/project')
         ```
     """
+    workspace_path = _resolve_workspace_path(
+        workspace=workspace,
+        workspace_suffix=workspace_suffix,
+        project_path=project_path,
+        workspace_path=workspace_path,
+    )
     path = os.path.join(project_path, workspace_path)
 
     if not os.path.exists(path):
