@@ -4,14 +4,15 @@ import os
 import re
 
 import pandas
+from requests import get
 
 from ._core import api_core_request, lro_handler, pagination_handler
 from ._decorators import df
 from ._folders import resolve_folder
 from ._logging import get_logger
 from ._utils import (
-    find_project_root_path,
     get_current_branch,
+    get_root_path,
     get_workspace_suffix,
     is_valid_uuid,
     pack_item_definition,
@@ -923,7 +924,7 @@ def deploy_all_reports_cicd(
         )
         ```
     """
-    repo_root = find_project_root_path()
+    repo_root = get_root_path()
 
     if not branch:
         branch = get_current_branch()

@@ -9,7 +9,6 @@ from ._decorators import df
 from ._exceptions import OptionNotAvailableError, ResourceNotFoundError
 from ._logging import get_logger
 from ._utils import (
-    find_project_root_path,
     get_current_branch,
     get_workspace_suffix,
     is_valid_uuid,
@@ -18,8 +17,6 @@ from ._utils import (
 )
 
 logger = get_logger(__name__)
-
-root_path = find_project_root_path()
 
 
 @df

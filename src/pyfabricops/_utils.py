@@ -108,36 +108,11 @@ def write_json(data: dict, path: str) -> None:
         json.dump(data, file, ensure_ascii=False, indent=4)
 
 
-def find_project_root_path(
-    start: Path = None,
-    marker_files: tuple = ('.gitignore',),
-) -> Path:
+def get_root_path() -> Path:
     """
-    Traverse up the directory tree from `start` (or the current file's directory)
-    until it finds a directory containing one of the `marker_files`.
-
-    Args:
-        start (Path): The starting directory. Defaults to the directory of the current file.
-        marker_files (tuple): A tuple of filenames to look for as markers of the project root.
-
-    Returns:
-        Path: The path to the project root directory.
-
-    Examples:
-        ```python
-        find_project_root()
-        ```
+    Find the root path.
     """
-    current = (start or Path(__file__).resolve()).parent
-
-    for folder in (current, *current.parents):
-        if any((folder / marker).exists() for marker in marker_files):
-            return folder
-
-    raise FileNotFoundError(
-        f'Not found any of the markers {marker_files!r} '
-        f'starting from {current}'
-    )
+    return os.getcwd()
 
 
 def get_current_branch(branch: str = None) -> str:
@@ -205,7 +180,7 @@ def get_workspace_suffix(
 
     if not path:
         try:
-            path = os.path.join(find_project_root_path(), 'branches.json')
+            path = os.path.join(get_root_path(), 'branches.json')
         except:
             raise ResourceNotFoundError(
                 'branches.json not configured in the root path.'
