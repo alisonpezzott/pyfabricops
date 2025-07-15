@@ -425,7 +425,15 @@ def export_folders(
         project_path=project_path,
         workspace_path=workspace_path,
     )
-
+    new_config = _get_folders_config(
+            workspace,
+            branch=branch,
+            workspace_suffix=workspace_suffix,
+            branches_path=branches_path,
+        )
+    if not new_config:
+        return None
+    
     path = os.path.join(project_path, workspace_path)
 
     os.makedirs(path, exist_ok=True)
@@ -483,17 +491,17 @@ def export_folders(
 
     if update_config:
         # Get the new config for this workspace
-        new_config = _get_folders_config(
-            workspace,
-            branch=branch,
-            workspace_suffix=workspace_suffix,
-            branches_path=branches_path,
-        )
-        if not new_config:
-            logger.warning(
-                f'No configuration found for workspace {workspace}.'
-            )
-            return None
+        # new_config = _get_folders_config(
+        #     workspace,
+        #     branch=branch,
+        #     workspace_suffix=workspace_suffix,
+        #     branches_path=branches_path,
+        # )
+        # if not new_config:
+        #     logger.warning(
+        #         f'No configuration found for workspace {workspace}.'
+        #     )
+        #     return None
 
         if not config_path:
             config_path = os.path.join(project_path, 'config.json')

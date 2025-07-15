@@ -111,20 +111,6 @@ pf.setup_logging(
 13:00:25 | pyfabricops._core    | DEBUG    | Response status: 200
 ```
 
-## 🔄 **Migration**
-
-The system is **backward compatible**. Existing code continues to work, but can now take advantage of new features:
-
-```python
-# Before (still works)
-import logging
-logging.basicConfig(level=logging.DEBUG)
-
-# Now (better)
-import pyfabricops as pf
-pf.enable_debug_mode()
-```
-
 ## 🎯 **Use Cases**
 
 1. **Development**: Detailed debug with colors

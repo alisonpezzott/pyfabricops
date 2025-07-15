@@ -6,7 +6,7 @@ import pandas
 from ._capacities import get_capacity
 from ._core import api_core_request, pagination_handler
 from ._decorators import df
-from ._exceptions import OptionNotAvailableError
+from ._exceptions import OptionNotAvailableError, ResourceNotFoundError
 from ._logging import get_logger
 from ._utils import (
     find_project_root_path,
@@ -73,7 +73,7 @@ def resolve_workspace(workspace: str, *, silent: bool = False) -> str:
 
     workspaces = list_workspaces(df=False)
     if not workspaces:
-        return None
+        raise ResourceNotFoundError(f'No workspaces found.')
 
     for _workspace in workspaces:
         if _workspace['displayName'] == workspace:
@@ -105,9 +105,15 @@ def get_workspace(
         ```
     """
     workspace_id = resolve_workspace(workspace)
+    
+    if not workspace_id:
+        raise ResourceNotFoundError(f'Workspace {workspace} not found.')
+    
     if not workspace_id:
         return None
+    
     response = api_core_request(endpoint=f'/workspaces/{workspace_id}')
+    
     if not response.success:
         logger.warning(f'{response.status_code}: {response.error}.')
         return None
@@ -576,7 +582,7 @@ def _get_workspace_config(
     # Retrieving details from the workspace
     workspace_details = get_workspace(workspace)
     if not workspace_details:
-        return None
+        raise ResourceNotFoundError(f'Workspace {workspace} not found.')
 
     workspace_name = workspace_details.get('displayName', '')
     workspace_id = workspace_details.get('id', '')
@@ -699,9 +705,6 @@ def export_workspace_config(
         workspace_suffix=workspace_suffix,
         branches_path=branches_path,
     )
-    if not new_config:
-        logger.warning(f'No configuration found for workspace {workspace}.')
-        return None
 
     if not config_path:
         config_path = os.path.join(project_path, 'config.json')
