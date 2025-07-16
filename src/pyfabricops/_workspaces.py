@@ -537,7 +537,7 @@ def create_workspace(
         if _workspace_description != description:
             logger.info(f'Updating description...')
             payload = {'description': description}
-            update_workspace(workspace_id, new_description=description)
+            update_workspace(workspace_id, description=description)
 
     if roles:
         for role_assignment in roles:
@@ -794,9 +794,12 @@ def export_workspace_config(
 
 def _resolve_workspace_path(
     workspace: str,
-    workspace_suffix: str,
     project_path: str,
-    workspace_path: str | None,
+    *,
+    workspace_path: str = None,
+    branch: str = None,
+    workspace_suffix: str = None,
+    branches_path: str = None,
 ) -> str | None:
     """Resolve workspace_name for export items"""
     workspace_name = get_workspace(workspace).get('displayName', '')
@@ -804,6 +807,12 @@ def _resolve_workspace_path(
         logger.warning(f"Workspace '{workspace}' not found.")
         return None
     else:
+        if not workspace_suffix:
+            workspace_suffix = get_workspace_suffix(
+                branch=branch,
+                workspace_suffix=workspace_suffix,
+                path=branches_path,
+            )
         workspace_alias = workspace_name.split(workspace_suffix)[0]
 
     # Add the workspace path

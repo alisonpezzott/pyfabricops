@@ -1073,15 +1073,29 @@ def extract_semantic_models_parameters(
         f'Captured parameters for semantic models: {json.dumps(semantic_models_config, indent=2)}'
     )
 
-    # Write back to config json
+    # Write back to config json - merge with existing data
     if not branch in config_content:
         config_content[branch] = {}
     if not workspace_alias in config_content[branch]:
         config_content[branch][workspace_alias] = {}
     if not 'semantic_models' in config_content[branch][workspace_alias]:
-        config_content[branch][workspace_alias][
-            'semantic_models'
-        ] = semantic_models_config
+        config_content[branch][workspace_alias]['semantic_models'] = {}
+
+    # Merge semantic_models_config with existing config instead of overwriting
+    existing_semantic_models = config_content[branch][workspace_alias][
+        'semantic_models'
+    ]
+    for (
+        semantic_model_name,
+        semantic_model_data,
+    ) in semantic_models_config.items():
+        if semantic_model_name not in existing_semantic_models:
+            existing_semantic_models[semantic_model_name] = {}
+
+        # Only update the parameters, preserve other existing data (id, description, etc.)
+        existing_semantic_models[semantic_model_name][
+            'parameters'
+        ] = semantic_model_data['parameters']
 
     with open(config_path, 'w', encoding='utf-8') as f:
         json.dump(config_content, f, indent=4)
