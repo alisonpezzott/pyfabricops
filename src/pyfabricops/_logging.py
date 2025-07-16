@@ -1,10 +1,17 @@
 """
 Custom logging configuration for pyfabricops.
 
-This module provides a centralized logging system with customizable formatters,
+T    # Colored symbols for each log level
+    SYMBOLS = {
+        'DEBUG':    ESC + '36m○\033[0m',      # Cyan circle
+        'INFO':     ESC + '34mi\033[0m',      # Blue "i"
+        'SUCCESS':  ESC + '32m✓\033[0m',      # Green check
+        'WARNING':  ESC + '33m△\033[0m',      # Yellow triangle
+        'ERROR':    ESC + '31m✕\033[0m',      # Red X
+        'CRITICAL': ESC + '41;97m⊗\033[0m',   # Red background + bright white circled times
+    }e provides a centralized logging system with customizable formatters,
 handlers, and configuration options for better debugging and monitoring.
 """
-
 import logging
 import logging.handlers
 import os
@@ -21,38 +28,57 @@ __all__ = [
     'enable_debug_mode',
     'disable_logging',
     'reset_logging',
+    'SUCCESS_LEVEL',
 ]
+
+# Define custom SUCCESS level (between INFO and WARNING)
+SUCCESS_LEVEL = 25
+logging.addLevelName(SUCCESS_LEVEL, 'SUCCESS')
+
+
+def success(self, message, *args, **kwargs):
+    """Log a message with severity 'SUCCESS'."""
+    if self.isEnabledFor(SUCCESS_LEVEL):
+        self._log(SUCCESS_LEVEL, message, args, **kwargs)
+
+
+# Add success method to Logger class
+logging.Logger.success = success
 
 
 class PyFabricOpsFormatter(logging.Formatter):
     """Custom formatter for pyfabricops with colored output and structured format."""
 
-    # Color codes for different log levels
+    ESC = '\x1b['
+
     COLORS = {
-        'DEBUG': '\033[36m',  # Cyan
-        'INFO': '\033[32m',  # Green
-        'WARNING': '\033[33m',  # Yellow
-        'ERROR': '\033[31m',  # Red
-        'CRITICAL': '\033[35m',  # Magenta
-        'RESET': '\033[0m',  # Reset
+        'DEBUG':    ESC + '36m',              # Cyan text
+        'INFO':     ESC + '34m',              # Blue text
+        'SUCCESS':  ESC + '32m',              # Green text
+        'WARNING':  ESC + '33m',              # Yellow text
+        'ERROR':    ESC + '31m',              # Red text
+        'CRITICAL': ESC + '31m',              # Red text
+        'RESET':    ESC + '0m',               # Reset
     }
 
     # Colored symbols for each log level
     SYMBOLS = {
-        'DEBUG': '\033[36m🔧\033[0m',  # Cyan wrench (debug/fix)
-        'INFO': '\033[32m✅\033[0m',  # Green check (success/info)
-        'WARNING': '\033[33m⚠️\033[0m',  # Yellow warning
-        'ERROR': '\033[31m❌\033[0m',  # Red X (error)
-        'CRITICAL': '\033[35m🚨\033[0m',  # Magenta siren (critical)
+        'DEBUG':    ESC + '36m○\033[0m',  # Cyan circle
+        'INFO':     ESC + '34mi\033[0m',  # Blue “i”
+        'SUCCESS':  ESC + '32m✓\033[0m',  # Green check
+        'WARNING':  ESC + '33m△\033[0m',  # Yellow triangle
+        'ERROR':    ESC + '31m✕\033[0m',  # Red X
+        'CRITICAL': ESC + '31m⊗\033[0m',  # Red circled times
     }
 
     # Fallback symbols without colors (for terminals that don't support colors)
     SYMBOLS_NO_COLOR = {
-        'DEBUG': '🔧',  # Wrench
-        'INFO': '✅',  # Check mark
-        'WARNING': '⚠️',  # Warning
-        'ERROR': '❌',  # X mark
-        'CRITICAL': '🚨',  # Siren
+        'DEBUG': '○',  # Wrench
+        'INFO': 'i',  # Check mark
+        'SUCCESS': '✓',  # Check mark
+        'WARNING': '△',  # Warning
+        'ERROR': '✕',  # X mark
+        'CRITICAL': '⊗',  # Siren
     }
 
     def __init__(
