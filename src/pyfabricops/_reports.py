@@ -765,7 +765,7 @@ def deploy_report(
             )
             return None
 
-        logger.info(f"Successfully updated report '{display_name}'")
+        logger.success(f"Successfully updated report '{display_name}'")
         return get_report(workspace_id, report_id)
 
     else:
@@ -788,7 +788,7 @@ def deploy_report(
             )
             return None
 
-        logger.info(f"Successfully created report '{display_name}'")
+        logger.success(f"Successfully created report '{display_name}'")
         return get_report(workspace_id, display_name)
 
 
@@ -886,7 +886,7 @@ def deploy_all_reports(
         except Exception as e:
             logger.error(f"Error deploying {report_info['name']}: {str(e)}")
 
-    logger.info(
+    logger.success(
         f'Deployment completed. Successfully deployed {len(deployed_reports)} reports.'
     )
     return deployed_reports
@@ -1152,8 +1152,8 @@ def convert_reports_to_local_references(
             with open(definition_path, 'w', encoding='utf-8') as f:
                 json.dump(updated_definition, f, indent=2)
 
-            logger.info(
-                f'✅ Successfully converted {report_name} to use byPath reference'
+            logger.success(
+                f'Successfully converted {report_name} to use byPath reference'
             )
             converted_reports.append(
                 {
@@ -1166,7 +1166,7 @@ def convert_reports_to_local_references(
         except Exception as e:
             logger.error(f'Error writing updated definition.pbir: {e}')
 
-    logger.info(
+    logger.success(
         f'Conversion completed. Successfully converted {len(converted_reports)} reports.'
     )
     return converted_reports

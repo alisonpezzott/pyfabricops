@@ -766,10 +766,10 @@ def deploy_semantic_model(
     # Determine folder_id based on local path
     folder_id = None
 
-    # Para semantic models em subpastas, precisamos mapear o caminho da pasta pai
+    # For semantic models in subfolders, we need to map the parent folder path
     if semantic_model_folder_path != workspace_path:
-        # O semantic model está em uma subpasta, precisamos encontrar o folder_id
-        # Remover o "workspace/" do início do caminho para obter apenas a estrutura de pastas
+        # The semantic model is in a subfolder, we need to find the folder_id
+        # Remove the "workspace/" from the beginning of the path to get only the folder structure
         folder_relative_path = semantic_model_folder_path.replace(
             f'{workspace_path}/', ''
         )
@@ -823,7 +823,7 @@ def deploy_semantic_model(
             )
             return None
 
-        logger.info(f"Successfully updated semantic model '{display_name}'")
+        logger.success(f"Successfully updated semantic model '{display_name}'")
         return get_semantic_model(workspace_id, semantic_model_id)
 
     else:
@@ -846,7 +846,7 @@ def deploy_semantic_model(
             )
             return None
 
-        logger.info(f"Successfully created semantic model '{display_name}'")
+        logger.success(f"Successfully created semantic model '{display_name}'")
         return get_semantic_model(workspace_id, display_name)
 
 
@@ -878,7 +878,15 @@ def deploy_all_semantic_models(
 
     Examples:
         ```python
-        deploy_all_semantic_models('MyProjectWorkspace', 'path/to/project', workspace_path='workspace', config_path='config.json', branches_path='branches', branch='main', workspace_suffix='dev')
+        deploy_all_semantic_models(
+            'MyProjectWorkspace',
+            'path/to/project',
+            workspace_path='workspace',
+            config_path='config.json',
+            branches_path='branches',
+            branch='main',
+            workspace_suffix='dev'
+        )
         ```
     """
     workspace_path = _resolve_workspace_path(
@@ -911,51 +919,19 @@ def deploy_all_semantic_models(
                     }
                 )
 
-    if not semantic_model_folders:
-        logger.warning(f'No semantic model folders found in {base_path}')
-        return None
-
-    logger.debug(
-        f'Found {len(semantic_model_folders)} semantic models to deploy:'
-    )
-    for sm in semantic_model_folders:
-        logger.debug(f"  - {sm['name']} at {sm['relative_path']}")
-
-    # Deploy each semantic model
-    deployed_models = []
     for semantic_model_info in semantic_model_folders:
-        try:
-            logger.debug(
-                f"Deploying semantic model: {semantic_model_info['name']}"
-            )
-            result = deploy_semantic_model(
-                workspace=workspace,
-                display_name=semantic_model_info['name'],
-                project_path=project_path,
-                workspace_path=workspace_path,
-                config_path=config_path,
-                branch=branch,
-                workspace_suffix=workspace_suffix,
-                branches_path=branches_path,
-            )
-            if result:
-                deployed_models.append(semantic_model_info['name'])
-                logger.debug(
-                    f"Successfully deployed: {semantic_model_info['name']}"
-                )
-            else:
-                logger.debug(
-                    f"Failed to deploy: {semantic_model_info['name']}"
-                )
-        except Exception as e:
-            logger.error(
-                f"Error deploying {semantic_model_info['name']}: {str(e)}"
-            )
+        deploy_semantic_model(
+            workspace=workspace,
+            display_name=semantic_model_info['name'],
+            project_path=project_path,
+            workspace_path=workspace_path,
+            config_path=config_path,
+            branch=branch,
+            workspace_suffix=workspace_suffix,
+            branches_path=branches_path,
+        )
 
-    logger.info(
-        f'Deployment completed. Successfully deployed {len(deployed_models)} semantic models.'
-    )
-    return deployed_models
+    return None
 
 
 def extract_semantic_models_parameters(
@@ -997,12 +973,11 @@ def extract_semantic_models_parameters(
     try:
         with open(config_path, 'r') as f:
             config_content = json.load(f)
-        config = config_content[branch]
-
-        semantic_models_config = config[workspace_alias]['semantic_models']
     except:
+        logger.warning(
+            f'Failed to read config.json from {config_path}. Creating a new one.'
+        )
         config_content = {}
-        semantic_models_config = {}
 
     for semantic_model_path in glob.glob(
         f'{project_path}/**/*.SemanticModel', recursive=True
@@ -1056,51 +1031,39 @@ def extract_semantic_models_parameters(
             ):
                 variables['DatabaseId'] = database_value
 
-        if semantic_model_name not in semantic_models_config:
-            semantic_models_config[semantic_model_name] = {}
-        if 'parameters' not in semantic_models_config[semantic_model_name]:
-            semantic_models_config[semantic_model_name][
-                'parameters'
-            ] = variables
+        if branch not in config_content:
+            config_content[branch] = {}
+        if workspace_alias not in config_content[branch]:
+            config_content[branch][workspace_alias] = {}
+        if 'semantic_models' not in config_content[branch][workspace_alias]:
+            config_content[branch][workspace_alias]['semantic_models'] = {}
+        if (
+            semantic_model_name
+            not in config_content[branch][workspace_alias]['semantic_models']
+        ):
+            config_content[branch][workspace_alias]['semantic_models'][
+                semantic_model_name
+            ] = {}
+        if (
+            'parameters'
+            not in config_content[branch][workspace_alias]['semantic_models'][
+                semantic_model_name
+            ]
+        ):
+            config_content[branch][workspace_alias]['semantic_models'][
+                semantic_model_name
+            ]['parameters'] = variables
 
         # Add the variables to the semantic model config
-        semantic_models_config[semantic_model_name]['parameters'].update(
-            variables
-        )
-
-    # Print the captured parameters
-    logger.info(
-        f'Captured parameters for semantic models: {json.dumps(semantic_models_config, indent=2)}'
-    )
+        config_content[branch][workspace_alias]['semantic_models'][
+            semantic_model_name
+        ]['parameters'].update(variables)
 
     # Write back to config json - merge with existing data
-    if not branch in config_content:
-        config_content[branch] = {}
-    if not workspace_alias in config_content[branch]:
-        config_content[branch][workspace_alias] = {}
-    if not 'semantic_models' in config_content[branch][workspace_alias]:
-        config_content[branch][workspace_alias]['semantic_models'] = {}
-
-    # Merge semantic_models_config with existing config instead of overwriting
-    existing_semantic_models = config_content[branch][workspace_alias][
-        'semantic_models'
-    ]
-    for (
-        semantic_model_name,
-        semantic_model_data,
-    ) in semantic_models_config.items():
-        if semantic_model_name not in existing_semantic_models:
-            existing_semantic_models[semantic_model_name] = {}
-
-        # Only update the parameters, preserve other existing data (id, description, etc.)
-        existing_semantic_models[semantic_model_name][
-            'parameters'
-        ] = semantic_model_data['parameters']
-
     with open(config_path, 'w', encoding='utf-8') as f:
         json.dump(config_content, f, indent=4)
 
-    logger.info(f'Updated config.json at {config_path}')
+    logger.success(f'Updated config.json at {config_path}')
 
 
 def replace_semantic_models_parameters_with_placeholders(
@@ -1277,8 +1240,8 @@ def replace_semantic_models_parameters_with_placeholders(
         try:
             with open(expressions_path, 'w', encoding='utf-8') as f:
                 f.write(expressions_with_placeholders)
-            logger.info(
-                f'✅ Updated expressions.tmdl for: {semantic_model_name} ({replacements_made} replacements)'
+            logger.success(
+                f'Updated expressions.tmdl for: {semantic_model_name} ({replacements_made} replacements)'
             )
         except Exception as e:
             logger.error(f'Error writing expressions.tmdl: {e}')
@@ -1429,7 +1392,7 @@ def replace_semantic_models_placeholders_with_parameters(
                     )
                     if old_content != expressions_with_values:
                         logger.info(
-                            f'✅ Replaced placeholder {parameter_name} with value using {description} pattern'
+                            f'Replaced placeholder {parameter_name} with value using {description} pattern'
                         )
                         replacements_made += 1
                         pattern_found = True
@@ -1459,8 +1422,8 @@ def replace_semantic_models_placeholders_with_parameters(
         try:
             with open(expressions_path, 'w', encoding='utf-8') as f:
                 f.write(expressions_with_values)
-            logger.info(
-                f'✅ Updated expressions.tmdl for: {semantic_model_name} ({replacements_made} replacements)'
+            logger.success(
+                f'Updated expressions.tmdl for: {semantic_model_name} ({replacements_made} replacements)'
             )
         except Exception as e:
             logger.error(f'Error writing expressions.tmdl: {e}')
