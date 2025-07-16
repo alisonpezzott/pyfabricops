@@ -180,7 +180,7 @@ def get_warehouse(
                 'connectionString'
             ]
             if warehouse_sql_endpoint:
-                logger.info('Warehouse SQL endpoint is now available.')
+                logger.success('Warehouse SQL endpoint is now available.')
                 break
             time.sleep(RETRY_INTERVAL)
         return response.data

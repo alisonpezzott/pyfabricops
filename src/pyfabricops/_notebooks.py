@@ -768,7 +768,7 @@ def deploy_notebook(
             )
             return None
 
-        logger.info(f"Successfully updated notebook '{display_name}'")
+        logger.success(f"Successfully updated notebook '{display_name}'")
         return get_notebook(workspace_id, notebook_id)
 
     else:
@@ -791,7 +791,7 @@ def deploy_notebook(
             )
             return None
 
-        logger.info(f"Successfully created notebook '{display_name}'")
+        logger.success(f"Successfully created notebook '{display_name}'")
         return get_notebook(workspace_id, display_name)
 
 
@@ -889,7 +889,7 @@ def deploy_all_notebooks(
         except Exception as e:
             logger.error(f"Error deploying {notebook_info['name']}: {str(e)}")
 
-    logger.info(
+    logger.success(
         f'Deployment completed. Successfully deployed {len(deployed_notebooks)} notebooks.'
     )
     return deployed_notebooks

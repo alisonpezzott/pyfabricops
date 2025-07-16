@@ -341,7 +341,7 @@ def add_workspace_role_assignment(
         logger.warning(f'{response.status_code}: {response.error}.')
         return None
     else:
-        logger.info(
+        logger.success(
             f'User "{user_uuid}", type "{user_type}" with role "{role}" was added to workspace {workspace} successfully.'
         )
         return list_workspace_roles(
@@ -526,7 +526,7 @@ def create_workspace(
                 logger.warning('Workspace ID not found in response.')
                 return None
 
-            logger.info(f'Workspace {workspace_name} created successfully.')
+            logger.success(f'Workspace {workspace_name} created successfully.')
 
     # If exists
     else:
@@ -727,7 +727,9 @@ def export_workspace_config(
         if merge_mode == 'replace':
             # Replace entire branch
             existing_config[branch_name] = workspaces
-            logger.info(f'Replaced all workspaces in branch "{branch_name}"')
+            logger.success(
+                f'Replaced all workspaces in branch "{branch_name}"'
+            )
         else:
             # Ensure branch exists in existing config
             if branch_name not in existing_config:
@@ -767,7 +769,7 @@ def export_workspace_config(
                     ]['workspace_config'] = workspace_config[
                         'workspace_config'
                     ]
-                    logger.info(
+                    logger.success(
                         f'Updated workspace_config for "{workspace_name}" in branch "{branch_name}"'
                     )
                 else:
@@ -787,7 +789,7 @@ def export_workspace_config(
 
     # Write the updated configuration to the file
     write_json(existing_config, config_path)
-    logger.info(
+    logger.success(
         f'Workspace configuration successfully written to {config_path}'
     )
 

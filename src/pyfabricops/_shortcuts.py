@@ -130,7 +130,7 @@ def delete_shortcut(
         logger.warning(f'{response.status_code}: {response.error}.')
         return False
     else:
-        logger.info(f'Successfully deleted shortcut: {shortcut_name}.')
+        logger.success(f'Successfully deleted shortcut: {shortcut_name}.')
         return True
 
 
@@ -286,5 +286,5 @@ def create_shortcut(
         logger.warning(f'{response.status_code}: {response.error}.')
         return None
     else:
-        logger.info(f'Successfully created shortcut: {shortcut_name}.')
+        logger.success(f'Successfully created shortcut: {shortcut_name}.')
         return response.data

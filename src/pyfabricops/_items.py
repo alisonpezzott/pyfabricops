@@ -804,7 +804,7 @@ def deploy_item(
             )
             return None
 
-        logger.info(f"Successfully updated item '{item_name_dot_type}'")
+        logger.success(f"Successfully updated item '{item_name_dot_type}'")
         return get_item(workspace_id, item_id)
 
     else:
@@ -828,7 +828,7 @@ def deploy_item(
             )
             return None
 
-        logger.info(f"Successfully created item '{item_name_dot_type}'")
+        logger.success(f"Successfully created item '{item_name_dot_type}'")
         return get_item(workspace_id, item_name_dot_type)
 
 

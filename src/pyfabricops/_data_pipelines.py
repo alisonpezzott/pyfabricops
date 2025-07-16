@@ -851,7 +851,7 @@ def deploy_data_pipeline(
             )
             return None
 
-        logger.info(f"Successfully updated data_pipeline '{display_name}'")
+        logger.success(f"Successfully updated data_pipeline '{display_name}'")
         return get_data_pipeline(workspace_id, data_pipeline_id)
 
     else:
@@ -874,7 +874,7 @@ def deploy_data_pipeline(
             )
             return None
 
-        logger.info(f"Successfully created data_pipeline '{display_name}'")
+        logger.success(f"Successfully created data_pipeline '{display_name}'")
         return get_data_pipeline(workspace_id, display_name)
 
 
@@ -989,7 +989,7 @@ def deploy_all_data_pipelines(
                 f"Error deploying {data_pipeline_info['name']}: {str(e)}"
             )
 
-    logger.info(
+    logger.success(
         f'Deployment completed. Successfully deployed {len(deployed_data_pipelines)} data_pipelines.'
     )
     return deployed_data_pipelines

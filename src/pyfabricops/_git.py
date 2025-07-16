@@ -83,7 +83,7 @@ def github_connect(
         )
         return False
     else:
-        logger.info(
+        logger.success(
             f"Successfully connected GitHub repository '{repository_name}' to workspace '{workspace_id}'."
         )
         return True
@@ -156,7 +156,9 @@ def git_init(
             return lro_response.data
     elif response.status_code == 200:
         # If the response is successful, we can process it
-        logger.info(f'Successfully initialized Git connection for workspace.')
+        logger.success(
+            f'Successfully initialized Git connection for workspace.'
+        )
         return response.data
 
 
@@ -284,7 +286,7 @@ def update_from_git(
             and workspace_head
             and remote_commit == workspace_head
         ):
-            logger.info('Workspace is already up to date.')
+            logger.success('Workspace is already up to date.')
             return True
 
         # Not up to date—prepare updateFromGit request
@@ -329,7 +331,9 @@ def update_from_git(
                 f'Post-update | Remote: {remote_after} | Head: {head_after}'
             )
             if remote_after and head_after and remote_after == head_after:
-                logger.info('Update successful. Workspace is now up to date.')
+                logger.success(
+                    'Update successful. Workspace is now up to date.'
+                )
                 return True
             else:
                 logger.warning('Workspace still not up to date; retrying...')
@@ -405,7 +409,7 @@ def commit_to_git(
             return lro_response.data
     elif response.status_code == 200:
         # If the response is successful, we can process it
-        logger.info(f'Successfully committed changes to git.')
+        logger.success(f'Successfully committed changes to git.')
         return response.data
 
 
@@ -443,7 +447,7 @@ def git_disconnect(workspace: str) -> bool:
             f'Failed to disconnect workspace from git: {response.status_code} - {response.error}'
         )
         return False
-    logger.info(f'Successfully disconnected workspace from git.')
+    logger.success(f'Successfully disconnected workspace from git.')
     return True
 
 
@@ -647,7 +651,7 @@ def ado_connect(
         )
         return False
     else:
-        logger.info(
+        logger.success(
             f"Successfully connected Azure DevOps repository '{repository_name}' to workspace '{workspace}'."
         )
         return True

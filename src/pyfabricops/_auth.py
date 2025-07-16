@@ -183,7 +183,7 @@ class OAuthProvider:
         if not new_token:
             raise ResourceNotFoundError('Access token not found.')
 
-        logger.info('Token retrieved successfully.')
+        logger.success('Token retrieved successfully.')
 
         # Calculate expires_in based on expires_on
         expires_in = int(new_token.expires_on - time.time())

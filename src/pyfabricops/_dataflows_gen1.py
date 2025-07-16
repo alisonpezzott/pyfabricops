@@ -267,7 +267,7 @@ def deploy_dataflow_gen1(workspace: str, path: str) -> bool | None:
             f'Error deploying the dataflow: {response.status_code} - {response.json().get("error", {})}'
         )
         return None
-    logger.info(f'Dataflow deployed successfully.')
+    logger.success(f'Dataflow deployed successfully.')
     return True
 
 
@@ -378,7 +378,7 @@ def export_dataflow_gen1(
     model_json_path = os.path.join(dataflow_path, 'model.json')
     write_single_line_json(definition_response, model_json_path)
 
-    logger.info(f'Exported dataflow {dataflow_name} to {dataflow_path}.')
+    logger.success(f'Exported dataflow {dataflow_name} to {dataflow_path}.')
 
     if not update_config:
         return None

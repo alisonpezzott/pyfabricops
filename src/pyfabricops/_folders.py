@@ -487,7 +487,7 @@ def export_folders(
 
     # Fix f-string backslash issue
     normalized_path = path.replace('\\', '/')
-    logger.info(f'Folder structure created at {normalized_path}')
+    logger.success(f'Folder structure created at {normalized_path}')
 
     if update_config:
         # Get the new config for this workspace
@@ -537,7 +537,7 @@ def export_folders(
                     existing_config[branch_name][workspace_name][
                         'folders'
                     ] = folders_config['folders']
-                    logger.info(
+                    logger.success(
                         f'Replaced folders config for workspace "{workspace_name}" in branch "{branch_name}"'
                     )
                 elif (
@@ -554,13 +554,13 @@ def export_folders(
                     existing_config[branch_name][workspace_name][
                         'folders'
                     ] = folders_config['folders']
-                    logger.info(
+                    logger.success(
                         f'Updated folders config for workspace "{workspace_name}" in branch "{branch_name}"'
                     )
 
         # Write the updated configuration to the file
         write_json(existing_config, config_path)
-        logger.info(
+        logger.success(
             f'Folders configuration successfully written to {config_path}.'
         )
 
@@ -730,7 +730,7 @@ def deploy_folders(
         else:
             create_folder(workspace, folder_name)
 
-    logger.info(f'Created folders for workspace {workspace}.')
+    logger.success(f'Created folders for workspace {workspace}.')
 
     if update_config:
         # Get the new config for this workspace
@@ -780,7 +780,7 @@ def deploy_folders(
                     existing_config[branch_name][workspace_name][
                         'folders'
                     ] = folders_config['folders']
-                    logger.info(
+                    logger.success(
                         f'Replaced folders config for workspace "{workspace_name}" in branch "{branch_name}"'
                     )
                 elif (
@@ -797,12 +797,12 @@ def deploy_folders(
                     existing_config[branch_name][workspace_name][
                         'folders'
                     ] = folders_config['folders']
-                    logger.info(
+                    logger.success(
                         f'Updated folders config for workspace "{workspace_name}" in branch "{branch_name}"'
                     )
 
         # Write the updated configuration to the file
         write_json(existing_config, config_path)
-        logger.info(
+        logger.success(
             f'Folders configuration successfully written to {config_path}.'
         )

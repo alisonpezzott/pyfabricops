@@ -178,7 +178,7 @@ def get_lakehouse(
                 'sqlEndpointProperties'
             ]['id']
             if lakehouse_sql_endpoint_id:
-                logger.info('Lakehouse SQL endpoint is now available.')
+                logger.success('Lakehouse SQL endpoint is now available.')
                 break
             time.sleep(RETRY_INTERVAL)
         return response.data

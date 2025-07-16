@@ -766,7 +766,7 @@ def deploy_dataflow(
             )
             return None
 
-        logger.info(f"Successfully updated dataflow '{display_name}'")
+        logger.success(f"Successfully updated dataflow '{display_name}'")
         return get_dataflow(workspace_id, dataflow_id)
 
     else:
@@ -789,7 +789,7 @@ def deploy_dataflow(
             )
             return None
 
-        logger.info(f"Successfully created dataflow '{display_name}'")
+        logger.success(f"Successfully created dataflow '{display_name}'")
         return get_dataflow(workspace_id, display_name)
 
 
@@ -886,7 +886,7 @@ def deploy_all_dataflows(
         except Exception as e:
             logger.error(f"Error deploying {dataflow_info['name']}: {str(e)}")
 
-    logger.info(
+    logger.success(
         f'Deployment completed. Successfully deployed {len(deployed_dataflows)} dataflows.'
     )
     return deployed_dataflows
