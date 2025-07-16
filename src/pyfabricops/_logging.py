@@ -52,22 +52,22 @@ class PyFabricOpsFormatter(logging.Formatter):
     ESC = '\x1b['
 
     COLORS = {
-        'DEBUG':    ESC + '36m',              # Cyan text
-        'INFO':     ESC + '34m',              # Blue text
-        'SUCCESS':  ESC + '32m',              # Green text
-        'WARNING':  ESC + '33m',              # Yellow text
-        'ERROR':    ESC + '31m',              # Red text
-        'CRITICAL': ESC + '31m',              # Red text
-        'RESET':    ESC + '0m',               # Reset
+        'DEBUG': ESC + '36m',  # Cyan text
+        'INFO': ESC + '34m',  # Blue text
+        'SUCCESS': ESC + '32m',  # Green text
+        'WARNING': ESC + '33m',  # Yellow text
+        'ERROR': ESC + '31m',  # Red text
+        'CRITICAL': ESC + '31m',  # Red text
+        'RESET': ESC + '0m',  # Reset
     }
 
     # Colored symbols for each log level
     SYMBOLS = {
-        'DEBUG':    ESC + '36m○\033[0m',  # Cyan circle
-        'INFO':     ESC + '34mi\033[0m',  # Blue “i”
-        'SUCCESS':  ESC + '32m✓\033[0m',  # Green check
-        'WARNING':  ESC + '33m△\033[0m',  # Yellow triangle
-        'ERROR':    ESC + '31m✕\033[0m',  # Red X
+        'DEBUG': ESC + '36m○\033[0m',  # Cyan circle
+        'INFO': ESC + '34mi\033[0m',  # Blue “i”
+        'SUCCESS': ESC + '32m✓\033[0m',  # Green check
+        'WARNING': ESC + '33m△\033[0m',  # Yellow triangle
+        'ERROR': ESC + '31m✕\033[0m',  # Red X
         'CRITICAL': ESC + '31m⊗\033[0m',  # Red circled times
     }
 
