@@ -356,6 +356,7 @@ def export_lakehouse(
     branch: str = None,
     workspace_suffix: str = None,
     branches_path: str = None,
+    workspace_items: list = None,
 ) -> bool:
     """
     Exports a lakehouse to the specified project path.
@@ -370,6 +371,7 @@ def export_lakehouse(
         branch (str, optional): The branch to use. Defaults to None.
         workspace_suffix (str, optional): The workspace suffix to use. Defaults to None.
         branches_path (str, optional): The path to the branches directory. Defaults to None.
+        workspace_items (list, optional): A list of workspace items to improve performance.
 
     Returns:
         bool: True if the export was successful, otherwise False.
@@ -568,7 +570,7 @@ def export_lakehouse(
                     shortcut_target_type
                 ]['itemId']
 
-                if not kwargs.get('workspace_items'):
+                if not workspace_items:
                     workspace_items = list_items(shortcut_target_workspace_id)
                     for item in workspace_items:
                         if item['id'] == shortcut_target_item_id:
