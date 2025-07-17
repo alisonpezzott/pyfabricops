@@ -157,6 +157,7 @@ from ._reports import (
     update_report_definition,
 )
 from ._semantic_models import (
+    bind_semantic_model_to_gateway,
     create_semantic_model,
     delete_semantic_model,
     deploy_all_semantic_models,
@@ -167,6 +168,7 @@ from ._semantic_models import (
     get_semantic_model,
     get_semantic_model_definition,
     list_semantic_models,
+    refresh_semantic_model,
     replace_semantic_models_parameters_with_placeholders,
     replace_semantic_models_placeholders_with_parameters,
     resolve_semantic_model,
@@ -242,6 +244,7 @@ __all__ = [
     'ado_connect',
     'api_core_request',
     'assign_to_capacity',
+    'bind_semantic_model_to_gateway',
     'commit_to_git',
     'convert_reports_to_local_references',
     'copy_to_staging',
@@ -377,6 +380,7 @@ __all__ = [
     'parse_definition_report',
     'parse_tmdl_parameters',
     'read_json',
+    'refresh_semantic_model',
     'replace_semantic_models_parameters_with_placeholders',
     'replace_semantic_models_placeholders_with_parameters',
     'reset_logging',
