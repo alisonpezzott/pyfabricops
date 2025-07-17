@@ -222,6 +222,7 @@ from ._workspaces import (
     unassign_from_capacity,
     update_workspace,
 )
+from .cicd._support_files import create_support_files
 from .orchestration._workspaces import export_full_workspace
 
 __all__ = [
@@ -256,6 +257,7 @@ __all__ = [
     'create_shortcut',
     'create_sql_cloud_connection',
     'create_sql_on_premises_connection',
+    'create_support_files',
     'create_warehouse',
     'create_workspace',
     'delete_connection',

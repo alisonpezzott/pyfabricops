@@ -10,6 +10,7 @@ from ._core import api_core_request, lro_handler, pagination_handler
 from ._decorators import df
 from ._folders import resolve_folder
 from ._logging import get_logger
+from ._reports_support import REPORT_DEFINITION
 from ._utils import (
     get_current_branch,
     get_root_path,
@@ -984,12 +985,13 @@ def deploy_all_reports_cicd(
         print(f'Semantic Model ID: {semantic_model_id}')
 
         # Replace the definition.pbir with the updated template
-        with open(
-            os.path.join(repo_root, 'template_report_definition.pbir'),
-            'r',
-            encoding='utf-8',
-        ) as f:
-            report_definition_template = f.read()
+        # with open(
+        #     os.path.join(repo_root, 'template_report_definition.pbir'),
+        #     'r',
+        #     encoding='utf-8',
+        # ) as f:
+        #     report_definition_template = f.read()
+        report_definition_template = REPORT_DEFINITION
 
         report_definition_updated = report_definition_template.replace(
             '#{workspace_name}#', workspace_name

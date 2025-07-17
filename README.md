@@ -111,6 +111,9 @@ Visit: [https://github.com/alisonpezzott/pyfabricops-examples](https://github.co
 ```bash
 src/
 └── pyfabricops/
+    ├── cicd/
+    │   ├── __init__.py
+    │   └── _support_files.py
     ├── orchestration/
     │   ├── __init__.py
     │   └── _workspaces.py
@@ -129,11 +132,11 @@ src/
     ├── _folders.py
     ├── _gateways.py
     ├── _git.py
-    ├── _helpers.py
     ├── _items.py
     ├── _lakehouses.py
-    ├── _logging_config.py
+    ├── _logging.py
     ├── _notebooks.py
+    ├── _reports_support.py
     ├── _reports.py
     ├── _scopes.py
     ├── _semantic_models.py
@@ -141,6 +144,7 @@ src/
     ├── _shortcuts.py
     ├── _utils.py
     ├── _version.py
+    ├── _warehouses_support.py
     ├── _warehouses.py
     └── _workspaces.py
 ```  
