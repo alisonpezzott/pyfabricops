@@ -117,14 +117,13 @@ def git_init(
         ValueError: If the workspace cannot be resolved.
 
     Examples:
-    ```python
+        ```python
         git_init(
             workspace='my_workspace',
             initialize_strategy='PreferWorkspace',
             provider='GitHub'
         )
-    )
-    ```
+        ```
     """
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
@@ -253,7 +252,7 @@ def update_from_git(
             conflict_resolution_policy='PreferRemote',
             allow_override_items=False
         )
-    ```
+        ```
     """
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
@@ -377,7 +376,7 @@ def commit_to_git(
             workspace='my_workspace',
             mode='Selective'
         )
-    ```
+        ```
     """
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
@@ -555,7 +554,7 @@ def update_my_git_connection(
             workspace='my_workspace',
             request_body_type='UpdateGitCredentialsToAutomaticRequest'
         )
-    ```
+        ```
     """
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:

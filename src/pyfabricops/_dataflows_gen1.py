@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import uuid
+from typing import Literal
 
 import pandas
 
@@ -488,3 +489,111 @@ def export_all_dataflows_gen1(
                 workspace_suffix=workspace_suffix,
                 branches_path=branches_path,
             )
+
+
+def refresh_dataflow_gen1(
+    workspace: str,
+    dataflow: str,
+    *,
+    process_type: str = 'default',
+    notify_option: Literal[
+        'MailOnFailure', 'NoNotification'
+    ] = 'NoNotification',
+) -> None:
+    """
+    Refresh a dataflow in the specified workspace.
+
+    Args:
+        workspace (str): The workspace name or ID.
+        dataflow (str): The name or ID of the dataflow to refresh.
+        process_type (str, optional): The process type to use for the refresh. Defaults to 'default'.
+        notify_option (Literal['MailOnFailure', 'NoNotification'], optional): The notification option to use for the refresh. Defaults to 'NoNotification'.
+
+    Returns:
+        None: If the refresh was successful.
+
+    Examples:
+        ```python
+        refresh_dataflow_gen1('MyProjectWorkspace', 'SalesDataflow')
+        refresh_dataflow_gen1('123e4567-e89b-12d3-a456-426614174000', 'SalesDataflow')
+        ```
+    """
+    workspace_id = resolve_workspace(workspace)
+    if not workspace_id:
+        return None
+
+    dataflow_id = resolve_dataflow_gen1(workspace_id, dataflow)
+    if not dataflow_id:
+        return None
+
+    payload = {'notifyOption': notify_option}
+
+    params = {'processType': process_type}
+
+    response = api_core_request(
+        endpoint=f'/groups/{workspace_id}/dataflows/{dataflow_id}/refreshes',
+        method='post',
+        params=params,
+        payload=payload,
+        audience='powerbi',
+    )
+    if response.status_code == 200:
+        logger.success('Refresh accepted successfully.')
+        return None
+    else:
+        logger.error(f'{response.status_code}: Error refreshing dataflow.')
+        return None
+
+
+@df
+def get_dataflow_gen1_transactions(
+    workspace: str, dataflow: str, *, df: bool = False
+) -> list | pandas.DataFrame:
+    workspace_id = resolve_workspace(workspace)
+    if not workspace_id:
+        return None
+
+    dataflow_id = resolve_dataflow_gen1(workspace_id, dataflow)
+    if not dataflow_id:
+        return None
+
+    response = api_core_request(
+        endpoint=f'/groups/{workspace_id}/dataflows/{dataflow_id}/transactions',
+        audience='powerbi',
+    )
+
+    if response.status_code == 200:
+        logger.success('Retrieved dataflow transactions successfully.')
+        return response.data.get('value', [])
+    else:
+        logger.error(
+            f'{response.status_code}: Error retrieving dataflow transactions.'
+        )
+        return None
+
+
+@df
+def get_dataflows_gen1_datasources(
+    workspace: str, dataflow: str, *, df: bool = False
+) -> list | pandas.DataFrame:
+    workspace_id = resolve_workspace(workspace)
+    if not workspace_id:
+        return None
+
+    dataflow_id = resolve_dataflow_gen1(workspace_id, dataflow)
+    if not dataflow_id:
+        return None
+
+    response = api_core_request(
+        endpoint=f'/groups/{workspace_id}/dataflows/{dataflow_id}/datasources',
+        audience='powerbi',
+    )
+
+    if response.status_code == 200:
+        logger.success('Retrieved dataflow datasources successfully.')
+        return response.data.get('value', [])
+    else:
+        logger.error(
+            f'{response.status_code}: Error retrieving dataflow datasources.'
+        )
+        return None

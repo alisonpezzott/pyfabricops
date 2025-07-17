@@ -2,12 +2,14 @@ import glob
 import json
 import os
 import re
+from typing import Literal
 
 import pandas
 
 from ._core import api_core_request, lro_handler, pagination_handler
 from ._decorators import df
 from ._folders import resolve_folder
+from ._gateways import resolve_gateway
 from ._logging import get_logger
 from ._utils import (
     get_current_branch,
@@ -1427,3 +1429,171 @@ def replace_semantic_models_placeholders_with_parameters(
             )
         except Exception as e:
             logger.error(f'Error writing expressions.tmdl: {e}')
+
+
+def bind_semantic_model_to_gateway(
+    workspace: str,
+    semantic_model: str,
+    gateway: str,
+    *,
+    datasource_ids: list[str] = None,
+) -> None:
+    """
+    Binds the specified dataset from the specified workspace to the specified gateway, optionally with a given set of data source IDs. If you don't supply a specific data source ID, the dataset will be bound to the first matching data source in the gateway.
+
+    Args:
+        workspace (str): The workspace name or ID.
+        semantic_model (str): The semantic model name or ID.
+        gateway (str): The gateway name or ID.
+        datasource_ids (list[str], optional): List of data source IDs to bind. If not provided, the first matching data source will be used.
+
+    Returns:
+        None
+
+    Examples:
+        ```python
+        bind_semantic_model_to_gateway(
+            workspace="AdventureWorks",
+            semantic_model="SalesAnalysis",
+            gateway="my_gateway",
+            datasource_ids=["id1", "id2", "id3"]
+        )
+        ```
+    """
+    workspace_id = resolve_workspace(workspace)
+    if not workspace_id:
+        logger.error(f'Workspace "{workspace}" not found.')
+        return None
+
+    semantic_model_id = resolve_semantic_model(
+        workspace_id, semantic_model, silent=True
+    )
+    if not semantic_model_id:
+        logger.error(
+            f'Semantic model "{semantic_model}" not found in workspace "{workspace}".'
+        )
+        return None
+
+    gateway_id = resolve_gateway(gateway, silent=True)
+    if not gateway_id:
+        logger.error(f'Gateway "{gateway}" not found.')
+        return None
+
+    payload = {'gatewayObjectId': gateway}
+    if datasource_ids:
+        payload['datasourceObjectIds'] = datasource_ids
+
+    response = api_core_request(
+        endpoint=f'/groups/{workspace}/datasets/{semantic_model}/Default.BindToGateway',
+        method='post',
+        payload=payload,
+        audience='powerbi',
+    )
+
+    print(response.status_code)
+
+    if response.status_code == 200:
+        logger.success(
+            f'Successfully bound semantic model "{semantic_model}" to gateway "{gateway}".'
+        )
+        return None
+    else:
+        logger.error(
+            f'Failed to bind semantic model "{semantic_model}" to gateway "{gateway}".'
+        )
+        return None
+
+
+def refresh_semantic_model(
+    workspace: str,
+    semantic_model: str,
+    *,
+    notify_option: Literal[
+        'MailOnCompletion', 'MailOnFailure', 'NoNotification'
+    ] = 'NoNotification',
+    apply_refresh_policy: bool = False,
+    commit_mode: Literal['PartialBatch', 'Transactional'] = 'Transactional',
+    effective_date: str = None,
+    max_parallelism: int = 1,
+    objects: list[dict[str, str]] = None,
+    retry_count: int = 3,
+    timeout: str = '00:30:00',
+    type: Literal[
+        'Automatic',
+        'Calculate',
+        'ClearValues',
+        'DataOnly',
+        'Defragment',
+        'Full',
+    ] = 'Full',
+) -> None:
+    """
+    Refreshes the specified semantic model in the specified workspace.
+
+    Args:
+        workspace (str): The workspace name or ID.
+        semantic_model (str): The semantic model name or ID.
+        notify_option (Literal['MailOnCompletion', 'MailOnFailure', 'NoNotification'], optional): Notification option for the refresh operation.
+        apply_refresh_policy (bool, optional): Whether to apply the refresh policy.
+        commit_mode (Literal['PartialBatch', 'Transactional'], optional): Commit mode for the refresh operation.
+        effective_date (str, optional): Effective date for the refresh operation.
+        max_parallelism (int, optional): Maximum parallelism for the refresh operation.
+        objects (list[dict[str, str]], optional): List of objects to refresh.
+        retry_count (int, optional): Number of retry attempts for the refresh operation.
+        timeout (str, optional): Timeout duration for the refresh operation.
+        type (Literal['Automatic', 'Calculate', 'ClearValues', 'DataOnly','Defragment', 'Full'], optional): Type of refresh operation.
+
+    Returns:
+        None
+
+    Examples:
+        ```python
+        bind_semantic_model_to_gateway(
+            workspace="AdventureWorks",
+            semantic_model="SalesAnalysis",
+            gateway="my_gateway",
+            datasource_ids=["id1", "id2", "id3"]
+        )
+        ```
+    """
+    workspace_id = resolve_workspace(workspace)
+    if not workspace_id:
+        logger.error(f'Workspace "{workspace}" not found.')
+        return None
+
+    semantic_model_id = resolve_semantic_model(
+        workspace_id, semantic_model, silent=True
+    )
+    if not semantic_model_id:
+        logger.error(
+            f'Semantic model "{semantic_model}" not found in workspace "{workspace}".'
+        )
+        return None
+
+    payload = {'notifyOption': notify_option}
+    if apply_refresh_policy:
+        payload['applyRefreshPolicy'] = apply_refresh_policy
+    if commit_mode:
+        payload['commitMode'] = commit_mode
+    if effective_date:
+        payload['effectiveDate'] = effective_date
+    if max_parallelism:
+        payload['maxParallelism'] = max_parallelism
+    if objects:
+        payload['objects'] = objects
+    if retry_count:
+        payload['retryCount'] = retry_count
+    if timeout:
+        payload['timeout'] = timeout
+    if type:
+        payload['type'] = type
+
+    response = api_core_request(
+        endpoint=f'/groups/{workspace_id}/datasets/{semantic_model_id}/refreshes',
+        method='post',
+        payload=payload,
+        audience='powerbi',
+    )
+
+    if response.status_code == 202:
+        logger.success('Refresh accepted successfully.')
