@@ -439,6 +439,7 @@ def create_sql_cloud_connection(
             connection_encryption='NotEncrypted',
             df=True,
         )
+        ```
     """
     payload = {
         'connectivityType': 'ShareableCloud',
@@ -528,6 +529,7 @@ def create_sql_on_premises_connection(
             skip_test_connection=False,
             df=True,
         )
+        ```
     """
     encrypted_credentials = _get_encrypt_gateway_credentials(
         gateway_id=gateway_id, username=username, password=password

@@ -38,7 +38,6 @@ def copy_to_staging(path: str) -> str:
         ```python
         copy_to_staging('/path/to/directory')
         ```
-        '/path/to/current/directory/_stg/directory'
     """
     current_folder = os.path.dirname(__file__)
 
