@@ -8,24 +8,28 @@ edit_uri: tree/main/docs
 nav:
   - Home: index.md
   - Functions:
-    - Authentication: functions/auth.md
-    - Capacities: functions/capacities.md
-    - Connections: functions/connections.md
-    - Core: functions/core.md
-    - Data Pipelines: functions/data_pipelines.md
-    - Dataflows Gen1: functions/dataflows_gen1.md
-    - Dataflows Gen2: functions/dataflows_gen2.md
-    - Folders: functions/folders.md
-    - Gateways: functions/gateways.md
-    - Git: functions/git.md
-    - Items: functions/items.md
-    - Lakehouses: functions/lakehouses.md
-    - Notebooks: functions/notebooks.md
-    - Reports: functions/reports.md
-    - Semantic Models: functions/semantic_models.md
-    - Shortcuts: functions/shortcuts.md
-    - Warehouses: functions/warehouses.md
-    - Workspaces: functions/workspaces.md
+    - Core: 
+      - Authentication: functions/auth.md
+      - Capacities: functions/capacities.md
+      - Connections: functions/connections.md
+      - Core: functions/core.md
+      - Folders: functions/folders.md
+      - Gateways: functions/gateways.md
+      - Workspaces: functions/workspaces.md
+    - Items:
+      - Data Pipelines: functions/data_pipelines.md
+      - Dataflows Gen1: functions/dataflows_gen1.md
+      - Dataflows Gen2: functions/dataflows_gen2.md
+      - Items: functions/items.md
+      - Lakehouses: functions/lakehouses.md
+      - Notebooks: functions/notebooks.md
+      - Reports: functions/reports.md
+      - Semantic Models: functions/semantic_models.md
+      - Shortcuts: functions/shortcuts.md
+      - Warehouses: functions/warehouses.md
+    - CI/CD:
+      - Git: functions/git.md
+      - Support Files: functions/CI_CD/support_files.md   
     - Orchestration:
       - Workspaces: functions/orchestration/workspaces.md
     - Raises and Logging:
