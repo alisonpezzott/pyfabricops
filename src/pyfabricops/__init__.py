@@ -2,6 +2,7 @@ from ._auth import set_auth_provider
 from ._capacities import get_capacity, list_capacities
 from ._connections import (
     add_connection_role_assignment,
+    add_connection_roles_assignments,
     create_github_source_control_connection,
     create_sql_cloud_connection,
     create_sql_on_premises_connection,
@@ -243,6 +244,7 @@ __all__ = [
     'RequestError',
     'ResourceNotFoundError',
     'add_connection_role_assignment',
+    'add_connection_roles_assignments',
     'add_workspace_role_assignment',
     'ado_connect',
     'api_core_request',
