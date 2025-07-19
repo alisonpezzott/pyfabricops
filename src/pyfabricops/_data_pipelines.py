@@ -756,7 +756,7 @@ def deploy_data_pipeline(
     data_pipeline_full_path = None
 
     # Check if data_pipeline exists in workspace root
-    root_path = f'{project_path}/{workspace_path}/{display_name}.data_pipeline'
+    root_path = f'{project_path}/{workspace_path}/{display_name}.DataPipeline'
     if os.path.exists(root_path):
         data_pipeline_folder_path = workspace_path
         data_pipeline_full_path = root_path
@@ -765,19 +765,19 @@ def deploy_data_pipeline(
         # Search for the data_pipeline in subfolders (only once)
         base_search_path = f'{project_path}/{workspace_path}'
         logger.debug(
-            f'Searching for {display_name}.data_pipeline in: {base_search_path}'
+            f'Searching for {display_name}.DataPipeline in: {base_search_path}'
         )
 
         for root, dirs, files in os.walk(base_search_path):
-            if f'{display_name}.data_pipeline' in dirs:
+            if f'{display_name}.DataPipeline' in dirs:
                 data_pipeline_full_path = os.path.join(
-                    root, f'{display_name}.data_pipeline'
+                    root, f'{display_name}.DataPipeline'
                 )
                 data_pipeline_folder_path = os.path.relpath(
                     root, project_path
                 ).replace('\\', '/')
                 logger.debug(
-                    f'Found data_pipeline in: {data_pipeline_full_path}'
+                    f'Found DataPipeline in: {data_pipeline_full_path}'
                 )
                 logger.debug(
                     f'Relative folder path: {data_pipeline_folder_path}'
@@ -786,7 +786,7 @@ def deploy_data_pipeline(
 
     if not data_pipeline_folder_path or not data_pipeline_full_path:
         logger.debug(
-            f'data_pipeline {display_name}.data_pipeline not found in local structure'
+            f'DataPipeline {display_name}.DataPipeline not found in local structure'
         )
         logger.debug(f'Searched in: {project_path}/{workspace_path}')
         return None
@@ -803,7 +803,7 @@ def deploy_data_pipeline(
         )
 
         logger.debug(
-            f'data_pipeline located in subfolder: {folder_relative_path}'
+            f'DataPipeline located in subfolder: {folder_relative_path}'
         )
 
         # Procurar nos mapeamentos de pastas
@@ -832,9 +832,9 @@ def deploy_data_pipeline(
 
     if data_pipeline_id:
         logger.info(
-            f"data_pipeline '{display_name}' already exists, updating..."
+            f"DataPipeline '{display_name}' already exists, updating..."
         )
-        # Update existing data_pipeline
+        # Update existing DataPipeline
         payload = {'definition': definition}
         if description:
             payload['description'] = description
@@ -851,12 +851,12 @@ def deploy_data_pipeline(
             )
             return None
 
-        logger.success(f"Successfully updated data_pipeline '{display_name}'")
+        logger.success(f"Successfully updated DataPipeline '{display_name}'")
         return get_data_pipeline(workspace_id, data_pipeline_id)
 
     else:
-        logger.info(f'Creating new data_pipeline: {display_name}')
-        # Create new data_pipeline
+        logger.info(f'Creating new DataPipeline: {display_name}')
+        # Create new DataPipeline
         payload = {'displayName': display_name, 'definition': definition}
         if description:
             payload['description'] = description
@@ -870,11 +870,11 @@ def deploy_data_pipeline(
         )
         if response and response.error:
             logger.warning(
-                f"Failed to create data_pipeline '{display_name}': {response.error}"
+                f"Failed to create DataPipeline '{display_name}': {response.error}"
             )
             return None
 
-        logger.success(f"Successfully created data_pipeline '{display_name}'")
+        logger.success(f"Successfully created DataPipeline '{display_name}'")
         return get_data_pipeline(workspace_id, display_name)
 
 
@@ -934,10 +934,10 @@ def deploy_all_data_pipelines(
     data_pipeline_folders = []
     for root, dirs, files in os.walk(base_path):
         for dir_name in dirs:
-            if dir_name.endswith('.data_pipeline'):
+            if dir_name.endswith('.DataPipeline'):
                 full_path = os.path.join(root, dir_name)
-                # Extract just the data_pipeline name (without .data_pipeline suffix)
-                data_pipeline_name = dir_name.replace('.data_pipeline', '')
+                # Extract just the data_pipeline name (without .DataPipeline suffix)
+                data_pipeline_name = dir_name.replace('.DataPipeline', '')
                 data_pipeline_folders.append(
                     {
                         'name': data_pipeline_name,
