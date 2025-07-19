@@ -16,8 +16,10 @@ def github_connect(
     connection: str,
     owner_name: str,
     repository_name: str,
+    *,
     branch_name: str = 'main',
     directory_name: str = '/',
+    credential_type: Literal['spn', 'user'] = 'user',
 ) -> bool:
     """
     Connects a Fabric workspace to a Git repository.
@@ -29,6 +31,8 @@ def github_connect(
         repository_name (str): The name of the repository of the Git repository.
         branch_name (str): The name of the branch to connect to.
         directory_name (str, optional): The path to the folder where the repository is located. Defaults to "/".
+        credential_type (Literal["spn", "user"], optional):
+            The type of credentials to use for the Git connection. Defaults to "user".
 
     Returns:
         bool: True if the connection was successful, False otherwise.
@@ -75,7 +79,7 @@ def github_connect(
         method='post',
         payload=payload,
         return_raw=True,
-        credential_type='user',
+        credential_type=credential_type,
     )
     if not response.status_code == 200:
         logger.error(
@@ -92,11 +96,12 @@ def github_connect(
 @df
 def git_init(
     workspace: str,
+    *,
     initialize_strategy: Literal[
         'PreferWorkspace', 'PreferRemote', 'None'
     ] = 'PreferWorkspace',
     provider: Literal['GitHub', 'AzureDevOps'] = 'GitHub',
-    *,
+    credential_type: Literal['spn', 'user'] = 'user',
     df: bool = False,
 ) -> dict:
     """
@@ -108,6 +113,8 @@ def git_init(
             The strategy to use for initialization. Defaults to "PreferWorkspace".
         provider (Literal["GitHub", "AzureDevOps"], optional):
             The Git provider to use. Defaults to "GitHub".
+        credential_type (Literal["spn", "user"], optional):
+            The type of credentials to use for the Git connection. Defaults to "user".
         df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
 
     Returns:
@@ -135,7 +142,7 @@ def git_init(
         method='post',
         endpoint=f'/workspaces/{workspace_id}/git/initializeConnection',
         payload=payload,
-        credential_type='user',
+        credential_type=credential_type,
     )
 
     if not response.status_code in [200, 202]:
@@ -164,8 +171,9 @@ def git_init(
 @df
 def git_status(
     workspace: str,
-    provider: Literal['GitHub', 'AzureDevOps'] = 'GitHub',
     *,
+    provider: Literal['GitHub', 'AzureDevOps'] = 'GitHub',
+    credential_type: Literal['spn', 'user'] = 'user',
     df: bool = False,
 ) -> dict:
     """
@@ -175,6 +183,8 @@ def git_status(
         workspace (str): The name or ID of the Fabric workspace.
         provider (Literal["GitHub", "AzureDevOps"], optional):
             The Git provider to use. Defaults to "GitHub".
+        credential_type (Literal["spn", "user"], optional):
+            The type of credentials to use for the Git connection. Defaults to "user".
         df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
 
     Returns:
@@ -196,9 +206,8 @@ def git_status(
         return None
 
     response = api_core_request(
-        method='get',
         endpoint=f'/workspaces/{workspace_id}/git/status',
-        credential_type='user',
+        credential_type=credential_type,
     )
 
     if not response.status_code in [200, 202]:
@@ -218,16 +227,18 @@ def git_status(
             return lro_response.data
     elif response.status_code == 200:
         # If the response is successful, we can process it
-        logger.info(f'Successfully initialized Git connection for workspace.')
+        logger.info(f'Successfully Git status retrieved for workspace.')
         return response.data
 
 
 def update_from_git(
     workspace: str,
+    *,
     conflict_resolution_policy: Literal[
         'PreferRemote', 'PreferWorkspace'
     ] = 'PreferWorkspace',
     allow_override_items: bool = True,
+    credential_type: Literal['spn', 'user'] = 'user',
 ) -> bool:
     """
     Poll the workspace"s Git status and update from Git if not up to date.
@@ -238,6 +249,8 @@ def update_from_git(
         conflict_resolution_policy (Literal["PreferRemote", "PreferWorkspace"], optional):
             The conflict resolution policy to use. Defaults to "PreferWorkspace".
         allow_override_items (bool, optional): Whether to allow overriding items. Defaults to True.
+        credential_type (Literal["spn", "user"], optional):
+            The type of credentials to use for the Git connection. Defaults to "user".
 
     Raises:
         SystemExit: Exits with code 1 if max retries are reached without success.
@@ -348,9 +361,11 @@ def update_from_git(
 @df
 def commit_to_git(
     workspace: str,
-    mode: Literal['All', 'Selective'] = 'All',
-    selective_payload: dict = None,
     *,
+    mode: Literal['All', 'Selective'] = 'All',
+    comment: str = None,
+    selective_payload: dict = None,
+    credential_type: Literal['spn', 'user'] = 'user',
     df: bool = False,
 ) -> dict:
     """
@@ -362,6 +377,11 @@ def commit_to_git(
             The mode of the commit. "All" commits all changes, "Selective" commits only selected changes. Defaults to "All".
         selective_payload (dict, optional):
             The payload containing the specific changes to commit when in "Selective" mode.
+            See Microsoft documentation for details on the structure of this payload.
+            https://learn.microsoft.com/en-us/rest/api/fabric/core/git/commit-to-git?tabs=HTTP#itemidentifier
+        comment (str, optional): A comment for the commit. Defaults to None.
+        credential_type (Literal["spn", "user"], optional):
+            The type of credentials to use for the Git connection. Defaults to "user".
         df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
 
     Returns:
@@ -382,6 +402,8 @@ def commit_to_git(
     if not workspace_id:
         return None
     payload = {'mode': mode}
+    if comment:
+        payload['comment'] = comment
     if mode == 'Selective' and selective_payload:
         # If in selective mode, include the specific changes to commit
         payload.update(selective_payload)
@@ -389,7 +411,7 @@ def commit_to_git(
         method='post',
         endpoint=f'/workspaces/{workspace_id}/git/commitToGit',
         payload=payload,
-        credential_type='user',
+        credential_type=credential_type,
     )
     if not response.status_code in [200, 202]:
         logger.error(
@@ -412,12 +434,16 @@ def commit_to_git(
         return response.data
 
 
-def git_disconnect(workspace: str) -> bool:
+def git_disconnect(
+    workspace: str, *, credential_type: Literal['spn', 'user'] = 'user'
+) -> bool:
     """
     Disconnects the workspace from Git.
 
     Args:
         workspace (str): The name or ID of the Fabric workspace.
+        credential_type (Literal["spn", "user"], optional):
+            The type of credentials to use for the Git connection. Defaults to "user".
 
     Returns:
         bool: True if the disconnection was successful, False otherwise.
@@ -439,6 +465,7 @@ def git_disconnect(workspace: str) -> bool:
         method='post',
         audience='fabric',
         endpoint=f'/workspaces/{workspace_id}/git/disconnect',
+        credential_type=credential_type,
         return_raw=True,
     )
     if response.status_code != 200:
@@ -451,12 +478,19 @@ def git_disconnect(workspace: str) -> bool:
 
 
 @df
-def get_git_connection(workspace: str, *, df: bool = False) -> dict:
+def get_git_connection(
+    workspace: str,
+    *,
+    credential_type: Literal['spn', 'user'] = 'user',
+    df: bool = False,
+) -> dict:
     """
     Retrieves the Git connections for a Fabric workspace.
 
     Args:
         workspace (str): The name or ID of the Fabric workspace.
+        credential_type (Literal["spn", "user"], optional):
+            The type of credentials to use for the Git connection. Defaults to "user".
         df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
 
     Returns:
@@ -476,7 +510,8 @@ def get_git_connection(workspace: str, *, df: bool = False) -> dict:
     if not workspace_id:
         return None
     response = api_core_request(
-        method='get', endpoint=f'/workspaces/{workspace_id}/git/connection'
+        endpoint=f'/workspaces/{workspace_id}/git/connection',
+        credential_type=credential_type,
     )
     if response.status_code != 200:
         logger.warning(
@@ -488,12 +523,19 @@ def get_git_connection(workspace: str, *, df: bool = False) -> dict:
 
 
 @df
-def get_my_git_credentials(workspace: str, *, df: bool = False) -> dict:
+def get_my_git_credentials(
+    workspace: str,
+    *,
+    credential_type: Literal['spn', 'user'] = 'user',
+    df: bool = False,
+) -> dict:
     """
     Retrieves the Git credentials for a Fabric workspace.
 
     Args:
         workspace (str): The name or ID of the Fabric workspace.
+        credential_type (Literal["spn", "user"], optional):
+            The type of credentials to use for the Git connection. Defaults to "user".
         df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
 
     Returns:
@@ -513,8 +555,8 @@ def get_my_git_credentials(workspace: str, *, df: bool = False) -> dict:
     if not workspace_id:
         return None
     response = api_core_request(
-        method='get',
         endpoint=f'/workspaces/{workspace_id}/git/myGitCredentials',
+        credential_type=credential_type,
     )
     if response.status_code != 200:
         logger.warning(
@@ -527,12 +569,14 @@ def get_my_git_credentials(workspace: str, *, df: bool = False) -> dict:
 
 def update_my_git_connection(
     workspace: str,
+    *,
     request_body_type: Literal[
         'UpdateGitCredentialsToAutomaticRequest',
         'UpdateGitCredentialsToConfiguredConnectionRequest',
         'UpdateGitCredentialsToNoneRequest',
     ] = 'UpdateGitCredentialsToAutomaticRequest',
     connection_id: str = None,
+    credential_type: Literal['spn', 'user'] = 'user',
 ):
     """
     Updates the Git connection for a Fabric workspace.
@@ -541,6 +585,9 @@ def update_my_git_connection(
         workspace (str): The name or ID of the Fabric workspace.
         request_body_type (Literal["UpdateGitCredentialsToAutomaticRequest", "UpdateGitCredentialsToConfiguredConnectionRequest", "UpdateGitCredentialsToNoneRequest"], optional):
             The type of request body to use for the update. Defaults to "UpdateGitCredentialsToAutomaticRequest".
+        connection_id (str, optional): The ID of the configured connection to use if request_body_type is "UpdateGitCredentialsToConfiguredConnectionRequest".
+        credential_type (Literal["spn", "user"], optional):
+            The type of credentials to use for the Git connection. Defaults to "user".
 
     Returns:
         dict: The response data from the API if successful, or None if the workspace cannot be resolved.
@@ -578,6 +625,7 @@ def update_my_git_connection(
         method='patch',
         endpoint=f'/workspaces/{workspace_id}/git/myGitCredentials',
         payload=payload,
+        credential_type=credential_type,
     )
     if response.status_code != 200:
         logger.error(
@@ -590,11 +638,13 @@ def update_my_git_connection(
 
 def ado_connect(
     workspace: str,
+    *,
     organization_name: str,
     project_name: str,
     repository_name: str,
     branch_name: str = 'main',
     directory_name: str = '/',
+    credential_type: Literal['spn', 'user'] = 'user',
 ) -> bool:
     """
     Connects a Fabric workspace to an Azure DevOps repository.
@@ -606,6 +656,8 @@ def ado_connect(
         repository_name (str): The name of the Azure DevOps repository.
         branch_name (str): The name of the branch to connect to.
         directory_name (str, optional): The path to the folder where the repository is located. Defaults to "/".
+        credential_type (Literal["spn", "user"], optional):
+            The type of credentials to use for the Git connection. Defaults to "user".
 
     Returns:
         bool: True if the connection was successful, False otherwise.
@@ -642,7 +694,7 @@ def ado_connect(
         endpoint=f'/workspaces/{workspace_id}/git/connect',
         method='post',
         payload=payload,
-        credential_type='user',
+        credential_type=credential_type,
     )
     if not response.status_code == 200:
         logger.error(
