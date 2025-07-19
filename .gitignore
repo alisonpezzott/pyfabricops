@@ -207,6 +207,7 @@ branches.json
 connections.json
 gateways.json
 workspaces_roles.json 
+connections_roles.json 
 # scripts Exposed on v0.1.8
 PUBLISHING.md
 .pypirc.example 

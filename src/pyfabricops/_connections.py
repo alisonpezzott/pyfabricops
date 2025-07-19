@@ -214,6 +214,80 @@ def add_connection_role_assignment(
 
 
 @df
+def add_connection_roles_assignments(
+    connection: str,
+    role_assignments: list[dict[str, str]],
+    *,
+    df: bool = False,
+) -> dict | pandas.DataFrame:
+    """
+    Adds multiple role assignments to a connection.
+
+    Args:
+        connection (str): The ID or name of the connection to add the role assignments to.
+        role_assignments (list[dict]): A list of role assignment dictionaries.
+        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
+
+    Returns:
+        (dict or pandas.DataFrame): The response from the API if successful.
+
+    Examples:
+        ```python
+        add_connection_roles_assigments(
+            "My Connection",
+            [
+                {
+                    "user_uuid": "9322eb4a-4132-4bd1-8df1-5cd3d1d2400b",
+                    "user_type": "User",
+                    "role": "Owner"
+                },
+                {
+                    "user_uuid": "b025341a-965a-4c35-b12e-2af63e5eb58f",
+                    "user_type": "User",
+                    "role": "User"
+                },
+                {
+                    "user_uuid": "cbe83b10-3b7c-4479-8168-e5281fabf7ea",
+                    "user_type": "Group",
+                    "role": "UserWithReshare"
+                }
+            ],
+            df=True,
+        )
+        ```
+    """
+    connection_id = resolve_connection(connection)
+    if not connection_id:
+        return None
+
+    role_addeds = []
+
+    for assignment in role_assignments:
+        role_added = add_connection_role_assignment(
+            connection=connection_id,
+            user_uuid=assignment['user_uuid'],
+            user_type=assignment['user_type'],
+            role=assignment['role'],
+            df=False,
+        )
+        if role_added:
+            role_addeds.append(role_added)
+
+    if not role_addeds:
+        logger.warning(
+            f'No role assignments were added for connection {connection}.'
+        )
+        logger.info('Returning existing role assignments.')
+        return list_connection_role_assignments(connection, df=df)
+
+    else:
+        logger.info(
+            f'Added {len(role_addeds)} role assignments to connection {connection}.'
+        )
+        return role_addeds
+
+
+@df
 def get_connection_role_assignment(
     connection: str, user_uuid: str, *, df=False
 ) -> dict | pandas.DataFrame:
