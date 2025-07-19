@@ -1159,25 +1159,35 @@ def replace_semantic_models_parameters_with_placeholders(
 
             # Pattern 1: Import model syntax - expression ParameterName = "Value"
             pattern1 = rf'(expression\s+{re.escape(parameter_name)}\s*=\s*")({re.escape(actual_value)})(")'
-            replacement1 = rf'\1#{{{parameter_name}}}#\3'
+            replacement1 = (
+                lambda m: f'{m.group(1)}#{{{parameter_name}}}#{m.group(3)}'
+            )
 
             # Pattern 2: Direct Lake - Sql.Database("server", "database") - First parameter (server)
             pattern2 = (
                 rf'(Sql\.Database\s*\(\s*")({re.escape(actual_value)})("\s*,)'
             )
-            replacement2 = rf'\1#{{{parameter_name}}}#\3'
+            replacement2 = (
+                lambda m: f'{m.group(1)}#{{{parameter_name}}}#{m.group(3)}'
+            )
 
             # Pattern 3: Direct Lake - Sql.Database("server", "database") - Second parameter (database)
             pattern3 = rf'(Sql\.Database\s*\([^"]*"[^"]*"\s*,\s*")({re.escape(actual_value)})(")'
-            replacement3 = rf'\1#{{{parameter_name}}}#\3'
+            replacement3 = (
+                lambda m: f'{m.group(1)}#{{{parameter_name}}}#{m.group(3)}'
+            )
 
             # Pattern 4: Generic parameter syntax - ParameterName = "Value" (without 'expression' keyword)
             pattern4 = rf'({re.escape(parameter_name)}\s*=\s*")({re.escape(actual_value)})(")'
-            replacement4 = rf'\1#{{{parameter_name}}}#\3'
+            replacement4 = (
+                lambda m: f'{m.group(1)}#{{{parameter_name}}}#{m.group(3)}'
+            )
 
             # Pattern 5: Alternative syntax with single quotes
             pattern5 = rf"({re.escape(parameter_name)}\s*=\s*')({re.escape(actual_value)})(')"
-            replacement5 = rf'\1#{{{parameter_name}}}#\3'
+            replacement5 = (
+                lambda m: f'{m.group(1)}#{{{parameter_name}}}#{m.group(3)}'
+            )
 
             # Try each pattern
             patterns = [
@@ -1343,25 +1353,25 @@ def replace_semantic_models_placeholders_with_parameters(
 
             # Pattern 1: Import model syntax - expression ParameterName = "#{ParameterName}#"
             pattern1 = rf'(expression\s+{re.escape(parameter_name)}\s*=\s*")({re.escape(placeholder)})(")'
-            replacement1 = rf'\1{actual_value}\3'
+            replacement1 = lambda m: f'{m.group(1)}{actual_value}{m.group(3)}'
 
             # Pattern 2: Direct Lake - Sql.Database("#{ServerEndpoint}#", ...) - First parameter
             pattern2 = (
                 rf'(Sql\.Database\s*\(\s*")({re.escape(placeholder)})("\s*,)'
             )
-            replacement2 = rf'\1{actual_value}\3'
+            replacement2 = lambda m: f'{m.group(1)}{actual_value}{m.group(3)}'
 
             # Pattern 3: Direct Lake - Sql.Database(..., "#{DatabaseId}#") - Second parameter
             pattern3 = rf'(Sql\.Database\s*\([^"]*"[^"]*"\s*,\s*")({re.escape(placeholder)})(")'
-            replacement3 = rf'\1{actual_value}\3'
+            replacement3 = lambda m: f'{m.group(1)}{actual_value}{m.group(3)}'
 
             # Pattern 4: Generic parameter syntax - ParameterName = "#{ParameterName}#"
             pattern4 = rf'({re.escape(parameter_name)}\s*=\s*")({re.escape(placeholder)})(")'
-            replacement4 = rf'\1{actual_value}\3'
+            replacement4 = lambda m: f'{m.group(1)}{actual_value}{m.group(3)}'
 
             # Pattern 5: Alternative syntax with single quotes
             pattern5 = rf"({re.escape(parameter_name)}\s*=\s*')({re.escape(placeholder)})(')"
-            replacement5 = rf'\1{actual_value}\3'
+            replacement5 = lambda m: f'{m.group(1)}{actual_value}{m.group(3)}'
 
             # Try each pattern
             patterns = [
