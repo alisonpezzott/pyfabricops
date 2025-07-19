@@ -683,7 +683,7 @@ def deploy_notebook(
     notebook_full_path = None
 
     # Check if notebook exists in workspace root
-    root_path = f'{project_path}/{workspace_path}/{display_name}.notebook'
+    root_path = f'{project_path}/{workspace_path}/{display_name}.Notebook'
     if os.path.exists(root_path):
         notebook_folder_path = workspace_path
         notebook_full_path = root_path
@@ -692,13 +692,13 @@ def deploy_notebook(
         # Search for the notebook in subfolders (only once)
         base_search_path = f'{project_path}/{workspace_path}'
         logger.debug(
-            f'Searching for {display_name}.notebook in: {base_search_path}'
+            f'Searching for {display_name}.Notebook in: {base_search_path}'
         )
 
         for root, dirs, files in os.walk(base_search_path):
-            if f'{display_name}.notebook' in dirs:
+            if f'{display_name}.Notebook' in dirs:
                 notebook_full_path = os.path.join(
-                    root, f'{display_name}.notebook'
+                    root, f'{display_name}.Notebook'
                 )
                 notebook_folder_path = os.path.relpath(
                     root, project_path
@@ -709,7 +709,7 @@ def deploy_notebook(
 
     if not notebook_folder_path or not notebook_full_path:
         logger.debug(
-            f'notebook {display_name}.notebook not found in local structure'
+            f'notebook {display_name}.Notebook not found in local structure'
         )
         logger.debug(f'Searched in: {project_path}/{workspace_path}')
         return None
@@ -844,10 +844,10 @@ def deploy_all_notebooks(
     notebook_folders = []
     for root, dirs, files in os.walk(base_path):
         for dir_name in dirs:
-            if dir_name.endswith('.notebook'):
+            if dir_name.endswith('.Notebook'):
                 full_path = os.path.join(root, dir_name)
-                # Extract just the notebook name (without .notebook suffix)
-                notebook_name = dir_name.replace('.notebook', '')
+                # Extract just the notebook name (without .Notebook suffix)
+                notebook_name = dir_name.replace('.Notebook', '')
                 notebook_folders.append(
                     {
                         'name': notebook_name,
