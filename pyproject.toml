@@ -45,6 +45,9 @@ Docs = "https://pyfabricops.readthedocs.io/en/latest/"
 Issues = "https://github.com/alisonpezzott/pyfabricops/issues"
 Examples = "https://github.com/alisonpezzott/pyfabricops-examples.git"
 
+[project.scripts]
+pyfabricops = "pyfabricops.cli:main"
+
 [tool.poetry]
 packages = [{include = "pyfabricops", from = "src"}]
 

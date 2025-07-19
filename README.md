@@ -11,6 +11,7 @@ Access to the repositoy on [GitHub](https://github.com/alisonpezzott/pyfabricops
 
 ## 🚀 Features  
 
+- **Command Line Interface (CLI)** for quick operations and automation
 - Authenticate using environment variables (GitHub Secrets, ADO Secrets, AzKeyVault, .env ...)
 - Manage workspaces, capacities, semantic models, lakehouses, reports and connections
 - Execute Git operations and automate Fabric deployment flows (Power BI inclusive)
@@ -31,6 +32,58 @@ pip install -U pyfabricops
 ```
 
 ## ⚙️ Usage
+
+### Command Line Interface (CLI)
+
+pyfabricops provides a command-line interface for quick operations:
+
+```bash
+# Check version
+pyfabricops --version
+
+# List available workspaces
+pyfabricops list-workspaces
+
+# Get workspace details
+pyfabricops get-workspace <workspace_name_or_id>
+
+# List available capacities
+pyfabricops list-capacities
+
+# Get capacity details
+pyfabricops get-capacity <capacity_name_or_id>
+
+# List available connections
+pyfabricops list-connections
+
+# List data pipelines in a workspace
+pyfabricops list-data-pipelines <workspace_name_or_id>
+
+# List items in a workspace
+pyfabricops list-items <workspace_name_or_id>
+
+# Show help
+pyfabricops --help
+```
+
+**Note:** The CLI automatically uses environment variables for authentication. Make sure to set up your authentication variables before using the CLI.
+
+#### Environment Variables Setup
+
+Create a `.env` file in your project root with the required authentication variables:
+
+```bash
+# .env file
+FAB_CLIENT_ID=your_client_id_here
+FAB_CLIENT_SECRET=your_client_secret_here
+FAB_TENANT_ID=your_tenant_id_here
+FAB_USERNAME=your_username_here   # Necessary for some functions with no SPN support
+FAB_PASSWORD=your_password_here   # Necessary for some functions with no SPN support
+```
+
+Alternatively, you can set these variables directly in your system environment or use them in CI/CD pipelines (GitHub Secrets, Azure DevOps, etc.).
+
+### Python Library Usage
 
 > Create a repository and clone it locally.
 > Create a notebook or a script and import the library:
