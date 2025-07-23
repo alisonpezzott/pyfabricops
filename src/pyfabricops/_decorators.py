@@ -14,7 +14,7 @@ def df(func):
     If the output is a JSON-like structure (dict or list of dicts), it flattens it and converts it to a DataFrame.
 
     Args:
-        df(boolean): True to convert output to DataFrame, False to keep as is. Default is False.
+        df(boolean): True to convert output to DataFrame, False to keep as is. Default is True.
 
     Returns:
         function: The wrapped function that returns a DataFrame or None.
@@ -27,7 +27,7 @@ def df(func):
 
     @wraps(func)
     def _wrapper(*args, **kwargs):
-        df = kwargs.pop('df', False)
+        df = kwargs.pop('df', True)
         result = func(*args, **kwargs)
 
         if result is None:
