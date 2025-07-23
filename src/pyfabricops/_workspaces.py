@@ -7,6 +7,13 @@ from ._capacities import get_capacity
 from ._core import api_core_request, pagination_handler
 from ._decorators import df
 from ._exceptions import OptionNotAvailableError, ResourceNotFoundError
+from ._generic_endpoints import (
+    _post_generic,
+    _delete_generic,
+    _get_generic,
+    _list_generic,
+    _patch_generic
+)
 from ._logging import get_logger
 from ._utils import (
     get_current_branch,
@@ -20,77 +27,29 @@ logger = get_logger(__name__)
 
 
 @df
-def list_workspaces(*, df=False) -> list | pandas.DataFrame | None:
+def list_workspaces(df: bool = True) -> list | pandas.DataFrame | None:
     """
     Returns a list of workspaces.
 
     Args:
-        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
+        df (bool): If True, returns a pandas DataFrame. Defaults to True.
+        **kwargs: Additional keyword arguments for the API request.
 
     Returns:
-        (list or pandas.DataFrame or None): The list of workspaces if found. If `df=True`, returns a DataFrame with flattened keys.
-
-    Examples:
-        ```python
-        # Get workspaces as dictionary
-        workspaces = list_workspaces()
-
-        # Get workspaces as DataFrame
-        workspaces_df = list_workspaces(df=True)
-        ```
+        list | pandas.DataFrame | None: A list of workspaces or a DataFrame if df is True.
     """
-    response = api_core_request(endpoint='/workspaces')
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-    else:
-        response = pagination_handler(response)
-        return response.data.get('value')
-
-
-def resolve_workspace(workspace: str, *, silent: bool = False) -> str:
-    """
-    Resolves a workspace name to its ID.
-
-    Args:
-        workspace (str): The name of the workspace.
-        silent (bool, optional): If True, suppresses warnings. Defaults to False.
-
-    Returns:
-        str: The ID of the workspace, or None if not found.
-
-    Examples:
-        ```python
-        resolve_workspace('123e4567-e89b-12d3-a456-426614174000')
-        resolve_workspace('MyProject')
-        ```
-    """
-    if is_valid_uuid(workspace):
-        return workspace
-
-    workspaces = list_workspaces(df=False)
-    if not workspaces:
-        raise ResourceNotFoundError(f'No workspaces found.')
-
-    for _workspace in workspaces:
-        if _workspace['displayName'] == workspace:
-            return _workspace['id']
-
-    # If we get here, workspace was not found
-    if not silent:
-        logger.warning(f"Workspace '{workspace}' not found.")
-    return None
+    return _list_generic('workspaces')
 
 
 @df
 def get_workspace(
-    workspace: str, *, df: bool = False
-) -> dict | pandas.DataFrame:
+    workspace_id: str, df: bool = True
+) -> list | pandas.DataFrame | None:
     """
     Returns the specified workspace.
 
     Args:
-        workspace (str): The ID or name of the workspace to retrieve.
+        workspace (str): The ID of the workspace to retrieve.
         df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
 
     Returns:
@@ -101,30 +60,70 @@ def get_workspace(
         get_workspace('123e4567-e89b-12d3-a456-426614174000')
         ```
     """
-    workspace_id = resolve_workspace(workspace)
+    return _get_generic('workspaces', item_id=workspace_id)
 
-    if not workspace_id:
-        raise ResourceNotFoundError(f'Workspace {workspace} not found.')
 
-    if not workspace_id:
-        return None
+@df
+def create_workspace(
+    display_name: str,
+    *,
+    capacity_id: str = None,
+    description: str = None,
+    df=True,
+) -> Dict | None:
+    """
+    Create a new workspace with the specified name, capacity and description.
 
-    response = api_core_request(endpoint=f'/workspaces/{workspace_id}')
+    Args:
+        workspace_name (str): The name of the workspace to create.
+        capacity (str, optional): The ID or name of the capacity to assign to the workspace. Defaults to None.
+        description (str, optional): A description for the workspace. Defaults to None.
+        roles (List[Dict[str, str]], optional): A list of roles to assign to the workspace. Defaults to None.
+        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
 
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-    else:
-        return response.data
+    Returns:
+        (dict or pandas.DataFrame): The details of the created or updated workspace if successful, otherwise None. If `df=True`, returns a DataFrame with flattened keys.
+
+    Examples:
+        ```python
+        # Create a Fabric Workspace with role assignment
+        create_workspace(
+            'MyNewWorkspace',
+            capacity='cap-1234',
+            description='This is a new workspace.',
+            roles=[{
+                'user_uuid': 'FefEFewf-feF-1234-5678-9abcdef01234',
+                'user_type': 'User',
+                'role': 'Admin'
+            }]
+        )
+
+        # Create a Power BI Pro Workspace and return as dataframe
+        create_workspace(
+            'MyProject',
+            description='This is my Power BI Pro Workspace.',
+            df=True
+        )
+        ```
+    """
+    payload = {'displayName': display_name}
+
+    if capacity_id:
+        payload['capacityId'] = capacity_id
+
+    if description:
+        payload['description'] = description
+
+    return _post_generic('workspaces', payload=payload)
 
 
 @df
 def update_workspace(
-    workspace: str,
+    workspace_id: str,
+    display_name: str,
     *,
-    display_name: str = None,
     description: str = None,
-    df=False,
+    df=True,
 ) -> dict | pandas.DataFrame:
     """
     Updates the properties of a workspace.
@@ -144,31 +143,15 @@ def update_workspace(
         update_workspace('MyProject', description='Updated description')
         ```
     """
-    workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
+    payload = {'displayName': display_name}
 
-    payload = {}
-
-    if display_name:
-        payload['displayName'] = display_name
     if description:
         payload['description'] = description
-    if payload == {}:
-        logger.warning('No properties provided to update. Skipping update.')
-        return None
 
-    response = api_core_request(
-        endpoint=f'/workspaces/{workspace_id}', method='patch', payload=payload
-    )
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-    else:
-        return response.data
+    return _patch_generic('workspaces', item_id=workspace_id, payload=payload)
 
 
-def delete_workspace(workspace: str) -> None:
+def delete_workspace(workspace_id: str) -> None:
     """
     Delete a workspace by name or ID.
 
@@ -187,23 +170,12 @@ def delete_workspace(workspace: str) -> None:
         delete_workspace('MyProject')
         ```
     """
-    workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
-
-    response = api_core_request(
-        endpoint=f'/workspaces/{workspace_id}', method='delete'
-    )
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return response.success
-    else:
-        return response.success
+    return _delete_generic('workspaces', item_id=workspace_id)
 
 
 @df
 def list_workspace_roles(
-    workspace: str, *, df=False
+    workspace_id: str, *, df=True
 ) -> dict | pandas.DataFrame:
     """
     Lists all roles for a workspace.
@@ -222,25 +194,12 @@ def list_workspace_roles(
         list_workspace_roles('MyProject', df=True) # returns a DataFrame with flattened keys
         ```
     """
-    workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
-
-    response = api_core_request(
-        endpoint=f'/workspaces/{workspace_id}/roleAssignments'
-    )
-
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-    else:
-        response = pagination_handler(response)
-    return response.data.get('value')
+    return _list_generic('role_assignments', workspace_id=workspace_id)  
 
 
 @df
-def get_workspace_role(
-    workspace: str, user_uuid: str, *, df=False
+def get_workspace_role_assignment(
+    workspace_id: str, user_uuid: str, *, df=True
 ) -> dict | pandas.DataFrame:
     """
     Retrieves the role of a user in a workspace.
@@ -259,29 +218,19 @@ def get_workspace_role(
         get_workspace_role('MyProject', 'FefEFewf-feF-1234-5678-9abcdef01234')
         ```
     """
-    workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
-
-    response = list_workspace_roles(workspace_id, df=False)
-    if response:
-        for role in response:
-            if role['principal']['id'] == user_uuid:
-                return role
-    logger.warning(f'Role {user_uuid} not found.')
-    return None
+    return _get_generic('role_assignments', workspace_id=workspace_id, item_id=user_uuid)
 
 
 @df
 def add_workspace_role_assignment(
-    workspace: str,
+    workspace_id: str,
     user_uuid: str,
     user_type: Literal[
         'User', 'Group', 'ServicePrincipal', 'ServicePrincipalProfile'
     ] = 'User',
     role: Literal['Admin', 'Contributor', 'Member', 'Viewer'] = 'Admin',
     *,
-    df=False,
+    df=True,
 ) -> dict | pandas.DataFrame:
     """
     Adds a permission to a workspace for a user.
@@ -328,29 +277,11 @@ def add_workspace_role_assignment(
             f'Invalid role: {role}. Must be one of: Admin, Contributor, Member, Viewer'
         )
     payload = {'principal': {'id': user_uuid, 'type': user_type}, 'role': role}
-    workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
-
-    response = api_core_request(
-        endpoint=f'/workspaces/{workspace_id}/roleAssignments',
-        method='post',
-        payload=payload,
-    )
-    if not response.status_code == 201:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-    else:
-        logger.success(
-            f'User "{user_uuid}", type "{user_type}" with role "{role}" was added to workspace {workspace} successfully.'
-        )
-        return list_workspace_roles(
-            workspace_id, df=df
-        )   # Return the updated list of roles
+    return _post_generic('role_assignments', workspace_id=workspace_id, payload=payload)
 
 
 def delete_workspace_role_assignment(
-    workspace: str, workspace_role_assignment_id: str
+    workspace_id: str, user_uuid: str
 ):
     """
     Removes a permission from a workspace for a user.
@@ -368,28 +299,16 @@ def delete_workspace_role_assignment(
         delete_workspace_role_assignment('MyProject', 'FefEFewf-feF-1234-5678-9abcdef01234')
     ```
     """
-    workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
-
-    response = api_core_request(
-        endpoint=f'/workspaces/{workspace_id}/roleAssignments/{workspace_role_assignment_id}',
-        method='delete',
-    )
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return response.success
-    else:
-        return response.success
+    return _delete_generic('role_assignments', workspace_id=workspace_id, item_id=user_uuid)
 
 
-def assign_to_capacity(workspace: str, capacity: str) -> None:
+def assign_to_capacity(workspace_id: str, capacity_id: str) -> None:
     """
     Assigns a workspace to a capacity.
 
     Args:
-        workspace (str): The ID or name of the workspace to assign.
-        capacity (str): The ID or name of the capacity to assign the workspace to.
+        workspace_id (str): The ID of the workspace to assign.
+        capacity_id (str): The ID of the capacity to assign the workspace to.
 
     Returns:
         None: If the assignment is successful.
@@ -401,30 +320,14 @@ def assign_to_capacity(workspace: str, capacity: str) -> None:
         assign_to_capacity('MyOtherProject', 'b7e2c1a4-8f3e-4c2a-9d2e-7b1e5f6a8c9d')
         ```
     """
-    capacity_id = get_capacity(capacity, df=False).get('id')
-    if not capacity_id:
-        return None
-
     payload = {'capacityId': capacity_id}
-
-    workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
-
-    response = api_core_request(
-        endpoint=f'/workspaces/{workspace_id}/assignToCapacity',
-        method='post',
-        payload=payload,
-    )
-
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-    else:
-        return response.data
+    response = _post_generic('assign_to_capacity', workspace_id=workspace_id, payload=payload)
+    if not response:
+        logger.success(f'Workspace {workspace_id} assigned to capacity {capacity_id} successfully.')
+    return response
 
 
-def unassign_from_capacity(workspace: str) -> None:
+def unassign_from_capacity(workspace_id: str) -> None:
     """
     Unassigns a workspace from its current capacity.
 
@@ -440,115 +343,10 @@ def unassign_from_capacity(workspace: str) -> None:
         unassign_from_capacity('MyProject')
         ```
     """
-    workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
-
-    response = api_core_request(
-        endpoint=f'/workspaces/{workspace_id}/unassignFromCapacity',
-        method='post',
-    )
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-    else:
-        return response.data
-
-
-@df
-def create_workspace(
-    workspace_name: str,
-    *,
-    capacity: str = None,
-    description: str = None,
-    roles: List[Dict[str, str]] = None,
-    df=False,
-) -> Dict | None:
-    """
-    Create a new workspace with the specified name, capacity and description.
-
-    Args:
-        workspace_name (str): The name of the workspace to create.
-        capacity (str, optional): The ID or name of the capacity to assign to the workspace. Defaults to None.
-        description (str, optional): A description for the workspace. Defaults to None.
-        roles (List[Dict[str, str]], optional): A list of roles to assign to the workspace. Defaults to None.
-        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
-
-    Returns:
-        (dict or pandas.DataFrame): The details of the created or updated workspace if successful, otherwise None. If `df=True`, returns a DataFrame with flattened keys.
-
-    Examples:
-        ```python
-        # Create a Fabric Workspace with role assignment
-        create_workspace(
-            'MyNewWorkspace',
-            capacity='cap-1234',
-            description='This is a new workspace.',
-            roles=[{
-                'user_uuid': 'FefEFewf-feF-1234-5678-9abcdef01234',
-                'user_type': 'User',
-                'role': 'Admin'
-            }]
-        )
-
-        # Create a Power BI Pro Workspace and return as dataframe
-        create_workspace(
-            'MyProject',
-            description='This is my Power BI Pro Workspace.',
-            df=True
-        )
-        ```
-    """
-    workspace_id = resolve_workspace(workspace_name, silent=True)
-
-    # If not exists
-    if not workspace_id:
-        payload = {'displayName': workspace_name}
-
-        if capacity:
-            capacity_id = get_capacity(capacity, df=False).get('id')
-            if capacity_id:
-                payload['capacityId'] = capacity_id
-
-        if description:
-            payload['description'] = description
-
-        response = api_core_request(
-            endpoint='/workspaces', method='post', payload=payload
-        )
-        if not response.success:
-            logger.warning(f'{response.status_code}: {response.error}.')
-            return None
-        else:
-            _workspace = response.data
-            workspace_id = _workspace.get('id', None)
-            if not workspace_id:
-                logger.warning('Workspace ID not found in response.')
-                return None
-
-            logger.success(f'Workspace {workspace_name} created successfully.')
-
-    # If exists
-    else:
-        _workspace = get_workspace(workspace_id, df=False)
-        _workspace_description = (
-            _workspace['description'] if _workspace else None
-        )
-        if _workspace_description != description:
-            logger.info(f'Updating description...')
-            payload = {'description': description}
-            update_workspace(workspace_id, description=description)
-
-    if roles:
-        for role_assignment in roles:
-            user_uuid = role_assignment['user_uuid']
-            user_type = role_assignment['user_type']
-            role_name = role_assignment['role']
-            add_workspace_role_assignment(
-                workspace_id, user_uuid, user_type=user_type, role=role_name
-            )
-
-    return get_workspace(workspace_id)
+    response = _post_generic('unassign_from_capacity', workspace_id=workspace_id)
+    if not response:
+        logger.success(f'Workspace {workspace_id} unassigned from capacity successfully.')
+    return response
 
 
 def _get_workspace_config(
@@ -822,3 +620,37 @@ def _resolve_workspace_path(
         workspace_path = workspace_alias
 
     return workspace_path
+
+
+def resolve_workspace(workspace: str, *, silent: bool = False) -> str:
+    """
+    Resolves a workspace name to its ID.
+
+    Args:
+        workspace (str): The name of the workspace.
+        silent (bool, optional): If True, suppresses warnings. Defaults to False.
+
+    Returns:
+        str: The ID of the workspace, or None if not found.
+
+    Examples:
+        ```python
+        resolve_workspace('123e4567-e89b-12d3-a456-426614174000')
+        resolve_workspace('MyProject')
+        ```
+    """
+    if is_valid_uuid(workspace):
+        return workspace
+
+    workspaces = list_workspaces(df=False)
+    if not workspaces:
+        raise ResourceNotFoundError(f'No workspaces found.')
+
+    for _workspace in workspaces:
+        if _workspace['displayName'] == workspace:
+            return _workspace['id']
+
+    # If we get here, workspace was not found
+    if not silent:
+        logger.warning(f"Workspace '{workspace}' not found.")
+    return None
