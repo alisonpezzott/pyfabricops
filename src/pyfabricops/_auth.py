@@ -1,5 +1,4 @@
 import json
-import logging
 import os
 import tempfile
 import time
@@ -26,7 +25,7 @@ __all__ = ['set_auth_provider']
 
 
 class TokenCache:
-    """Gerencia o cache de tokens em arquivo temporário"""
+    """Manage the token cache in a temporary file"""
 
     CACHE_TEMPLATE = {
         'FABRIC_SPN': {'access_token': '', 'expires_at': 0},
