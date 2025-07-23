@@ -6,6 +6,7 @@ import pandas
 from ._core import api_core_request, lro_handler, pagination_handler
 from ._decorators import df
 from ._folders import resolve_folder
+from ._generic_endpoints import _list_generic
 from ._logging import get_logger
 from ._utils import (
     get_current_branch,
@@ -45,18 +46,7 @@ def list_data_pipelines(
         list_data_pipelines('123e4567-e89b-12d3-a456-426614174000')
         ```
     """
-    workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
-    response = api_core_request(
-        endpoint=f'/workspaces/{workspace_id}/dataPipelines'
-    )
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-    else:
-        response = pagination_handler(response)
-        return response.data.get('value')
+    return _list_generic('data_pipelines', workspace_id=workspace, df=df)
 
 
 def resolve_data_pipeline(

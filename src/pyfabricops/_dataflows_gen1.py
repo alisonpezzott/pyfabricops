@@ -8,6 +8,7 @@ import pandas
 
 from ._core import api_core_request
 from ._decorators import df
+from ._generic_endpoints import _list_generic
 from ._logging import get_logger
 from ._utils import (
     get_current_branch,
@@ -29,35 +30,22 @@ logger = get_logger(__name__)
 
 @df
 def list_dataflows_gen1(
-    workspace: str, *, df: bool = False, silent: bool = False
+    workspace_id: str, df: bool = True, **kwargs
 ) -> list | pandas.DataFrame | None:
     """
-    Lists all dataflows gen1 in the specified workspace.
+    Returns a list of Gen1 dataflows in a specified workspace.
 
     Args:
-        workspace (str): The ID of the workspace.
-        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
-        silent (bool, optional): Keyword-only. If True, suppresses warnings. Defaults to False.
+        workspace_id (str): The ID of the workspace.
+        df (bool): If True, returns a pandas DataFrame. Defaults to True.
+        **kwargs: Additional keyword arguments for the API request.
 
     Returns:
-        list | pandas.DataFrame | None: A list of dataflows if successful, otherwise None.
-
-    Examples:
-        ```python
-        list_dataflows_gen1('MyProjectWorkspace')
-        list_dataflows_gen1('123e4567-e89b-12d3-a456-426614174000')
-        ```
+        list | pandas.DataFrame | None: A list of Gen1 dataflows or a DataFrame if df is True.
     """
-    workspace_id = resolve_workspace(workspace)
-    response = api_core_request(
-        audience='powerbi',
-        endpoint=f'/groups/{workspace_id}/dataflows',
+    return _list_generic(
+        'dataflows_gen1', workspace_id=workspace_id, df=df, **kwargs
     )
-    if not response.success:
-        if not silent:
-            logger.warning(f'{response.status_code}: {response.error}')
-        return None
-    return response.data.get('value', [])
 
 
 def resolve_dataflow_gen1(workspace: str, dataflow: str) -> str | None:

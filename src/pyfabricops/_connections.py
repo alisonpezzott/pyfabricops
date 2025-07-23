@@ -6,6 +6,7 @@ import pandas
 from ._core import ApiResult, api_core_request, pagination_handler
 from ._decorators import df
 from ._encrypt_gateway_credentials import _get_encrypt_gateway_credentials
+from ._generic_endpoints import _list_generic
 from ._logging import get_logger
 from ._utils import is_valid_uuid
 
@@ -13,29 +14,20 @@ logger = get_logger(__name__)
 
 
 @df
-def list_connections(*, df=False) -> list | pandas.DataFrame:
+def list_connections(
+    df: bool = True, **kwargs
+) -> list | pandas.DataFrame | None:
     """
-    Lists all connections.
+    Returns a list of connections in a specified workspace.
 
     Args:
-        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
+        df (bool): If True, returns a pandas DataFrame. Defaults to True.
+        **kwargs: Additional keyword arguments for the API request.
 
     Returns:
-        (list or pandas.DataFrame): The list of connections.
-
-    Examples:
-        ```python
-        list_connections()
-        list_connections(df=True)
-        ```
+        list | pandas.DataFrame | None: A list of connections or a DataFrame if df is True.
     """
-    response = api_core_request(endpoint='/connections')
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-    else:
-        response = pagination_handler(response)
-        return response.data.get('value')
+    return _list_generic('connections', df=df, **kwargs)
 
 
 def resolve_connection(connection: str, *, silent: bool = False) -> str:

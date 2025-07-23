@@ -10,6 +10,12 @@ from ._core import api_core_request, lro_handler, pagination_handler
 from ._decorators import df
 from ._folders import resolve_folder
 from ._gateways import resolve_gateway
+from ._generic_endpoints import (
+    _post_generic,
+    _delete_generic,
+    _get_generic,
+    _list_generic,
+)
 from ._logging import get_logger
 from ._utils import (
     get_current_branch,
@@ -32,55 +38,20 @@ logger = get_logger(__name__)
 
 @df
 def list_semantic_models(
-    workspace: str,
-    excluded_starts: tuple = ('Staging', 'Lake', 'Ware'),
-    *,
-    df: bool = False,
-) -> list | pandas.DataFrame:
+    workspace_id: str, df: bool = True, **kwargs
+) -> list | pandas.DataFrame | None:
     """
-    Returns a list of semantic models from the specified workspace.
-    This API supports pagination.
+    Returns a list of semantic models in a specified workspace.
 
     Args:
-        workspace (str): The workspace name or ID.
-        excluded_starts (tuple): A tuple of prefixes to exclude from the list.
-        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
+        workspace_id (str): The ID of the workspace.
+        df (bool): If True, returns a pandas DataFrame. Defaults to True.
+        **kwargs: Additional keyword arguments for the API request.
 
     Returns:
-        (list|pandas.DataFrame): A list of semantic models, excluding those that start with the specified prefixes. If `df=True`, returns a DataFrame with flattened keys.
-
-    Examples:
-        ```python
-        list_semantic_models('MyProjectWorkspace')
-        list_semantic_models('MyProjectWorkspace', excluded_starts=('Staging', 'Lake'))
-        ```
-
+        list | pandas.DataFrame | None: A list of semantic models or a DataFrame if df is True.
     """
-    workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
-    response = api_core_request(
-        endpoint=f'/workspaces/{workspace_id}/semanticModels'
-    )
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-    else:
-        response = pagination_handler(response)
-
-    # Filter out semantic models that start with the excluded prefixes
-    semantic_models = [
-        sm
-        for sm in response.data.get('value')
-        if not sm['displayName'].startswith(excluded_starts)
-    ]
-    if not semantic_models:
-        logger.warning(
-            f"No valid semantic models found in workspace '{workspace}'."
-        )
-        return None
-    else:
-        return semantic_models
+    return _list_generic('semantic_models', workspace_id=workspace_id)
 
 
 def resolve_semantic_model(
@@ -123,7 +94,7 @@ def resolve_semantic_model(
 
 @df
 def get_semantic_model(
-    workspace: str, semantic_model: str, *, df: bool = False
+    workspace_id: str, semantic_model_id: str, *, df: bool = True
 ) -> dict | pandas.DataFrame:
     """
     Retrieves a semantic model by its name or ID from the specified workspace.
@@ -142,20 +113,9 @@ def get_semantic_model(
         get_semantic_model('123e4567-e89b-12d3-a456-426614174000', 'SalesDataModel', df=True)
         ```
     """
-    workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
-    semantic_model_id = resolve_semantic_model(workspace_id, semantic_model)
-    if not semantic_model_id:
-        return None
-    response = api_core_request(
-        endpoint=f'/workspaces/{workspace_id}/semanticModels/{semantic_model_id}'
+    return _get_generic(
+        'semantic_models', workspace_id=workspace_id, item_id=semantic_model_id
     )
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-    else:
-        return response.data
 
 
 @df
@@ -371,13 +331,15 @@ def update_semantic_model_definition(
     return response.data
 
 
+@df
 def create_semantic_model(
-    workspace: str,
+    workspace_id: str,
     display_name: str,
-    path: str,
+    item_defintion: dict,
     *,
     description: str = None,
-    folder: str = None,
+    folder_id: str = None,
+    df=True,
 ) -> None:
     """
     Creates a new semantic model in the specified workspace.
@@ -398,47 +360,17 @@ def create_semantic_model(
         create_semantic_model('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', 'path/to/definition/file', folder='Sales')
         ```
     """
-    workspace_id = resolve_workspace(workspace)
-
-    definition = pack_item_definition(path)
-
-    payload = {'displayName': display_name, 'definition': definition}
+    payload = {'displayName': display_name, 'definition': item_defintion}
 
     if description:
         payload['description'] = description
 
-    if folder:
-        folder_id = resolve_folder(workspace_id, folder)
-        if not folder_id:
-            logger.warning(
-                f"Folder '{folder}' not found in workspace {workspace_id}."
-            )
-        else:
-            payload['folderId'] = folder_id
+    if folder_id:
+        payload['folderId'] = folder_id
 
-    response = api_core_request(
-        endpoint=f'/workspaces/{workspace_id}/semanticModels',
-        method='post',
-        payload=payload,
+    return _post_generic(
+        'semantic_models', workspace_id=workspace_id, payload=payload
     )
-
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-
-    # Check if it's a long-running operation (status 202)
-    if response.status_code == 202:
-        logger.debug('Long-running operation detected, handling LRO...')
-        lro_response = lro_handler(response)
-        if not lro_response.success:
-            logger.warning(
-                f'{lro_response.status_code}: {lro_response.error}.'
-            )
-            return None
-        return lro_response.data
-
-    # For immediate success (status 200)
-    return response.data
 
 
 def export_semantic_model(

@@ -1,8 +1,11 @@
 import logging
 
+import pandas
+
 from ._core import api_core_request, pagination_handler
 from ._decorators import df
 from ._exceptions import ResourceNotFoundError
+from ._generic_endpoints import _list_generic
 from ._logging import get_logger
 from ._utils import is_valid_uuid
 
@@ -10,29 +13,20 @@ logger = get_logger(__name__)
 
 
 @df
-def list_capacities(*, df=True):
+def list_capacities(
+    df: bool = True, **kwargs
+) -> list | pandas.DataFrame | None:
     """
-    Lists all available capacities.
+    Returns a list of capacities.
 
     Args:
-        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
+        df (bool): If True, returns a pandas DataFrame. Defaults to True.
+        **kwargs: Additional keyword arguments for the API request.
 
     Returns:
-        (dict or pandas.DataFrame): The list of capacities. If `df=True`, returns a DataFrame with flattened keys.
-
-    Examples:
-        ```python
-        list_capacities()
-        list_capacities(df=True) # Returns a DataFrame with flattened keys
-        ```
+        list | pandas.DataFrame | None: A list of capacities or a DataFrame if df is True.
     """
-    response = api_core_request(endpoint='/capacities')
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-    else:
-        response = pagination_handler(response)
-    return response.data.get('value')
+    return _list_generic('capacities', df=df, **kwargs)
 
 
 @df
