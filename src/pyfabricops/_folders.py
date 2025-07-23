@@ -7,6 +7,13 @@ import pandas
 
 from ._core import api_core_request, pagination_handler
 from ._decorators import df
+from ._generic_endpoints import (
+    _list_generic,
+    _get_generic,
+    _post_generic,
+    _patch_generic,
+    _delete_generic,
+)
 from ._logging import get_logger
 from ._utils import (
     get_current_branch,
@@ -26,13 +33,13 @@ logger = get_logger(__name__)
 
 @df
 def list_folders(
-    workspace: str, *, df: bool = False
+    workspace_id: str, *, df: bool = True
 ) -> list | pandas.DataFrame | None:
     """
     List folders in a workspace
 
     Args:
-        workspace (str): The workspace to list folders from.
+        workspace_id (str): The workspace to list folders from.
         df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
 
     Returns:
@@ -43,14 +50,7 @@ def list_folders(
         list_folders('my_workspace')
         ```
     """
-    workspace_id = resolve_workspace(workspace)
-    response = api_core_request(endpoint=f'/workspaces/{workspace_id}/folders')
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-    else:
-        response = pagination_handler(response)
-        return response.data.get('value')
+    return _list_generic('folders', workspace_id)
 
 
 def resolve_folder(workspace: str, folder: str) -> str | None:
@@ -83,7 +83,7 @@ def resolve_folder(workspace: str, folder: str) -> str | None:
 
 @df
 def get_folder(
-    workspace: str, folder: str, *, df: bool = False
+    workspace_id: str, folder_id: str, *, df: bool = True
 ) -> dict | pandas.DataFrame | None:
     """
     Get a folder in a workspace.
@@ -101,35 +101,22 @@ def get_folder(
         get_folder('123e4567-e89b-12d3-a456-426614174000', 'SalesFolder')
         ```
     """
-    workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
-
-    folder_id = resolve_folder(workspace_id, folder)
-    if not folder_id:
-        return None
-
-    response = api_core_request(
-        endpoint=f'/workspaces/{workspace_id}/folders/{folder_id}'
+    return _get_generic(
+        'folders', workspace_id, item_id=folder_id
     )
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-    else:
-        return response.data
 
 
 @df
 def create_folder(
-    workspace: str, folder: str, *, parent_folder: str = None, df: bool = False
+    workspace_id: str, display_name: str, *, parent_folder_id: str = None, df: bool = True
 ) -> dict | pandas.DataFrame | None:
     """
     Create a new folder in the specified workspace.
 
     Args:
         workspace_id (str): The workspace where the folder will be created.
-        folder (str): The name of the folder to create.
-        parent_folder (str): The name or ID of the parent folder.
+        display_name (str): The name of the folder to create.
+        parent_folder_id (str): The ID of the parent folder.
         df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
 
     Returns:
@@ -141,38 +128,25 @@ def create_folder(
         create_folder('123e4567-e89b-12d3-a456-426614174000', 'NewFolder', 'ParentFolder')
         ```
     """
-    workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
-
-    payload = {'displayName': folder}
-
-    parent_folder_id = None
-    if parent_folder:
-        parent_folder_id = resolve_folder(workspace_id, parent_folder)
+    payload = {'displayName': display_name}
 
     if parent_folder_id:
         payload['parentFolderId'] = parent_folder_id
 
-    response = api_core_request(
-        endpoint=f'/workspaces/{workspace_id}/folders',
+    return _post_generic(
+        'folders',
+        workspace_id,
         payload=payload,
-        method='post',
     )
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-    else:
-        return response.data
 
 
-def delete_folder(workspace: str, folder: str) -> bool | None:
+def delete_folder(workspace_id: str, folder_id: str) -> bool | None:
     """
     Delete a folder in a workspace
 
     Args:
-        workspace (str): The workspace to delete the folder from.
-        folder (str): The folder to delete.
+        workspace_id (str): The workspace to delete the folder from.
+        folder_id (str): The folder to delete.
 
     Returns:
         (bool | None): True if the folder was deleted successfully, False if not found, None if workspace is invalid.
@@ -183,35 +157,21 @@ def delete_folder(workspace: str, folder: str) -> bool | None:
         delete_folder('123e4567-e89b-12d3-a456-426614174000', 'SalesFolder')
         ```
     """
-    workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
-
-    folder_id = resolve_folder(workspace_id, folder)
-    if not folder_id:
-        return None
-
-    response = api_core_request(
-        endpoint=f'/workspaces/{workspace_id}/folders/{folder_id}',
-        method='delete',
+    return _delete_generic(
+        'folders', workspace_id, item_id=folder_id
     )
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return response.success
-    else:
-        return response.success
 
 
 @df
 def update_folder(
-    workspace: str, folder: str, display_name: str, *, df: bool = False
+    workspace_id: str, folder_id: str, display_name: str, *, df: bool = True
 ) -> dict | pandas.DataFrame | None:
     """
     Update a existing folder in the specified workspace.
 
     Args:
-        workspace (str): The workspace where the folder will be updated.
-        folder (str): The folder to update.
+        workspace_id (str): The workspace where the folder will be updated.
+        folder_id (str): The folder to update.
         display_name (str): The name of the folder to update.
         df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
 
@@ -224,36 +184,23 @@ def update_folder(
         update_folder('123e4567-e89b-12d3-a456-426614174000', 'OldFolderName', 'NewFolderName')
         ```
     """
-    workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
-    folder_id = resolve_folder(workspace_id, folder)
-    if not folder_id:
-        return None
     payload = {'displayName': display_name}
-    response = api_core_request(
-        endpoint=f'/workspaces/{workspace_id}/folders/{folder_id}',
-        payload=payload,
-        method='patch',
+    return _patch_generic(
+        'folders', workspace_id, item_id=folder_id, payload=payload
     )
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-    else:
-        return response.data
 
 
 @df
 def move_folder(
-    workspace: str, folder: str, target_folder: str, *, df: bool = False
+    workspace_id: str, folder_id: str, target_folder_id: str, *, df: bool = True
 ) -> dict | pandas.DataFrame | None:
     """
     Move a existing folder into other or root folder.
 
     Args:
-        workspace (str): The workspace where the folder will be updated.
-        folder (str): The folder to be moved.
-        target_folder (str): The name of the parent folder will receive the moved folder.
+        workspace_id (str): The workspace where the folder will be updated.
+        folder_id (str): The folder to be moved.
+        target_folder_id (str): The name of the parent folder will receive the moved folder.
 
     Returns:
         (dict | pandas.DataFrame | None): The moved folder details if successful, otherwise None.
@@ -264,25 +211,10 @@ def move_folder(
         move_folder('123e4567-e89b-12d3-a456-426614174000', 'SalesFolder', 'Archive')
         ```
     """
-    workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
-    folder_id = resolve_folder(workspace_id, folder)
-    if not folder_id:
-        return None
-    target_folder_id = resolve_folder(workspace_id, target_folder)
-    if not target_folder_id:
-        return None
-    response = api_core_request(
-        endpoint=f'/workspaces/{workspace_id}/folders/{folder_id}/move',
-        payload={'targetFolderId': target_folder_id},
-        method='post',
+    payload = {'targetFolderId': target_folder_id}
+    return _post_generic(
+        'folders_move', workspace_id, item_id=folder_id, payload=payload
     )
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-    else:
-        return response.data
 
 
 def _get_folders_config(

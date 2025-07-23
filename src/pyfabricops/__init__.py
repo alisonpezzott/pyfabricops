@@ -230,6 +230,7 @@ from ._workspaces import (
 )
 from .cicd._support_files import create_support_files
 from .helpers._workspaces import get_workspace_id
+from .helpers._folders import get_folder_id
 from .orchestration._workspaces import export_full_workspace
 
 
@@ -338,6 +339,7 @@ __all__ = [
     'get_dataflow_gen1_transactions',
     'get_dataflows_gen1_datasources',
     'get_folder',
+    'get_folder_id',
     'get_gateway',
     'get_gateway_public_key',
     'get_git_connection',

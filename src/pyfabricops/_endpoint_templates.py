@@ -14,6 +14,7 @@ ENDPOINT_TEMPLATES = {
         'return_raw': False,
         'df': True,
         'requires_item_definition': False,
+        'endpoint_suffix': None,
     },
     'capacities': {
         'endpoint': '/capacities',
@@ -30,6 +31,7 @@ ENDPOINT_TEMPLATES = {
         'return_raw': False,
         'df': True,
         'requires_item_definition': False,
+        'endpoint_suffix': None,
     },
     'connections': {
         'endpoint': '/connections',
@@ -46,6 +48,7 @@ ENDPOINT_TEMPLATES = {
         'return_raw': False,
         'df': True,
         'requires_item_definition': False,
+        'endpoint_suffix': None,
     },
     'gateways': {
         'endpoint': '/gateways',
@@ -62,6 +65,7 @@ ENDPOINT_TEMPLATES = {
         'return_raw': False,
         'df': True,
         'requires_item_definition': False,
+        'endpoint_suffix': None,
     },
     'git': {
         'endpoint': '/git',
@@ -78,11 +82,12 @@ ENDPOINT_TEMPLATES = {
         'return_raw': False,
         'df': True,
         'requires_item_definition': False,
+        'endpoint_suffix': None,
     },
     'folders': {
         'endpoint': '/folders',
-        'requires_workspace_id': False,
-        'endpoint_prefix': None,
+        'requires_workspace_id': True,
+        'endpoint_prefix': '/workspaces/',
         'audience': 'fabric',
         'support_pagination': True,
         'credential_type': 'spn',
@@ -94,6 +99,7 @@ ENDPOINT_TEMPLATES = {
         'return_raw': False,
         'df': True,
         'requires_item_definition': False,
+        'endpoint_suffix': None,
     },
     'data_pipelines': {
         'endpoint': '/dataPipelines',
@@ -110,6 +116,7 @@ ENDPOINT_TEMPLATES = {
         'return_raw': False,
         'df': True,
         'requires_item_definition': True,
+        'endpoint_suffix': None,
     },
     'lakehouses': {
         'endpoint': '/lakehouses',
@@ -126,6 +133,7 @@ ENDPOINT_TEMPLATES = {
         'return_raw': False,
         'df': True,
         'requires_item_definition': False,
+        'endpoint_suffix': None,
     },
     'warehouses': {
         'endpoint': '/warehouses',
@@ -142,6 +150,7 @@ ENDPOINT_TEMPLATES = {
         'return_raw': False,
         'df': True,
         'requires_item_definition': False,
+        'endpoint_suffix': None,
     },
     'semantic_models': {
         'endpoint': '/semanticModels',
@@ -158,6 +167,7 @@ ENDPOINT_TEMPLATES = {
         'return_raw': False,
         'df': True,
         'requires_item_definition': True,
+        'endpoint_suffix': None,
     },
     'notebooks': {
         'endpoint': '/notebooks',
@@ -174,6 +184,7 @@ ENDPOINT_TEMPLATES = {
         'return_raw': False,
         'df': True,
         'requires_item_definition': True,
+        'endpoint_suffix': None,
     },
     'reports': {
         'endpoint': '/reports',
@@ -190,6 +201,7 @@ ENDPOINT_TEMPLATES = {
         'return_raw': False,
         'df': True,
         'requires_item_definition': True,
+        'endpoint_suffix': None,
     },
     'shortcuts': {
         'endpoint': '/shortcuts',
@@ -206,6 +218,7 @@ ENDPOINT_TEMPLATES = {
         'return_raw': False,
         'df': True,
         'requires_item_definition': True,
+        'endpoint_suffix': None,
     },
     'dataflows_gen1': {
         'endpoint': '/dataflows',
@@ -222,6 +235,7 @@ ENDPOINT_TEMPLATES = {
         'return_raw': False,
         'df': True,
         'requires_item_definition': True,
+        'endpoint_suffix': None,
     },
     'dataflows_gen2': {
         'endpoint': '/dataflows',
@@ -238,6 +252,7 @@ ENDPOINT_TEMPLATES = {
         'return_raw': False,
         'df': True,
         'requires_item_definition': True,
+        'endpoint_suffix': None,
     },
     'assign_to_capacity': {
         'endpoint': '/assignToCapacity',
@@ -254,6 +269,7 @@ ENDPOINT_TEMPLATES = {
         'return_raw': False,
         'df': True,
         'requires_item_definition': True,
+        'endpoint_suffix': None,
     },
     'unassign_from_capacity': {
         'endpoint': '/unassignFromCapacity',
@@ -270,6 +286,7 @@ ENDPOINT_TEMPLATES = {
         'return_raw': False,
         'df': True,
         'requires_item_definition': True,
+        'endpoint_suffix': None,
     },
     'role_assignments': {
         'endpoint': '/roleAssignments',
@@ -286,5 +303,23 @@ ENDPOINT_TEMPLATES = {
         'return_raw': False,
         'df': True,
         'requires_item_definition': True,
-    }
+        'endpoint_suffix': None,
+    },
+    'folders_move': {
+        'endpoint': '/folders',
+        'requires_workspace_id': True,
+        'endpoint_prefix': '/workspaces/',
+        'audience': 'fabric',
+        'support_pagination': True,
+        'credential_type': 'spn',
+        'content_type': 'application/json',
+        'payload': None,
+        'data': None,
+        'params': None,
+        'method': 'get',
+        'return_raw': False,
+        'df': True,
+        'requires_item_definition': False,
+        'endpoint_suffix': '/move',
+    },
 }

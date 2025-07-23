@@ -124,6 +124,7 @@ def _delete_generic(
 def _post_generic(
     endpoint: str,
     workspace_id: Optional[str] = None,
+    item_id: Optional[str] = None,
     payload: Optional[dict] = None,
 ):
     if endpoint not in ENDPOINT_TEMPLATES:
@@ -136,10 +137,16 @@ def _post_generic(
             f'Workspace ID is required for endpoint: {endpoint}'
         )
 
+    endpoint = template['endpoint'] if not template['requires_workspace_id'] else f"{template['endpoint_prefix']}{workspace_id}{template['endpoint']}"
+    
+    if not item_id is None:
+        endpoint += f"/{item_id}"
+
+    if not template['endpoint_suffix'] is None:
+        endpoint += template['endpoint_suffix']
+
     response = api_core_request(
-        endpoint=template['endpoint']
-        if not template['requires_workspace_id']
-        else f"{template['endpoint_prefix']}{workspace_id}{template['endpoint']}",
+        endpoint=endpoint,
         audience=template['audience'],
         content_type=template['content_type'],
         payload=payload or template['payload'],
