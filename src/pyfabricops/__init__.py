@@ -221,7 +221,7 @@ from ._workspaces import (
     delete_workspace_role_assignment,
     export_workspace_config,
     get_workspace,
-    get_workspace_role,
+    get_workspace_role_assignment,
     list_workspace_roles,
     list_workspaces,
     resolve_workspace,
@@ -229,7 +229,9 @@ from ._workspaces import (
     update_workspace,
 )
 from .cicd._support_files import create_support_files
+from .helpers._workspaces import get_workspace_id
 from .orchestration._workspaces import export_full_workspace
+
 
 __all__ = [
     'ApiResult',
@@ -354,7 +356,8 @@ __all__ = [
     'get_shortcut',
     'get_warehouse',
     'get_workspace',
-    'get_workspace_role',
+    'get_workspace_id',
+    'get_workspace_role_assignment',
     'get_workspace_suffix',
     'git_disconnect',
     'git_init',
