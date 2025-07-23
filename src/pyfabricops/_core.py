@@ -32,8 +32,7 @@ def api_core_request(
     credential_type: Literal['spn', 'user'] = 'spn',
     method: Literal['get', 'post', 'patch', 'delete', 'put'] = 'get',
     return_raw: bool = False,
-    timeout: int = 30,
-):
+) -> ApiResult:
     """
     Makes a request to the Microsoft Fabric or Power BI API.
     This function supports various HTTP methods and can handle both JSON payloads and form data.
@@ -52,7 +51,6 @@ def api_core_request(
         credential_type (Literal["spn", "user"]): The type of credentials to use for authentication. Defaults to "spn".
         method (Literal["get", "post", "patch", "delete", "put"]): The HTTP method to use for the request. Defaults to "get".
         return_raw (bool, optional): If True, returns the raw response object. Defaults to False.
-        timeout (int): Request timeout in seconds. Defaults to 30.
 
     Returns:
         ApiResult (NamedTuple): The response object from the request.
@@ -80,9 +78,6 @@ def api_core_request(
 
         # Makes a GET request to the Power BI API for dataflows in the specified group.
         api_core_request(audience="powerbi", endpoint=f"/groups/MyProject/dataflows")
-
-        # Makes a request with custom timeout.
-        api_core_request('capacities', timeout=60)
         ```
     """
     # Base URL selection based on audience
@@ -138,7 +133,6 @@ def api_core_request(
         'method': method.upper(),
         'url': url,
         'headers': headers,
-        'timeout': timeout,
     }
 
     # Handle data vs json
@@ -156,15 +150,6 @@ def api_core_request(
     # Request execution with proper error handling
     try:
         response = requests.request(**request_kwargs)
-    except requests.exceptions.Timeout:
-        return ApiResult(
-            success=False,
-            status_code=408,
-            data=None,
-            headers=None,
-            error=f'Request timeout after {timeout} seconds',
-            request_kwargs=request_kwargs,
-        )
     except requests.exceptions.ConnectionError as e:
         return ApiResult(
             success=False,
@@ -278,14 +263,13 @@ def lro_handler(api_result: NamedTuple) -> ApiResult:
     logger.debug(f'Long-running operation detected at {location_header}')
 
     headers = api_result.request_kwargs.get('headers')
-    timeout = api_result.request_kwargs.get('timeout', 30)
     logger.debug(f'Headers for LRO request: {headers}')
 
     def _get_lro_result(result_url: str) -> ApiResult:
         """Get the final result from LRO."""
         try:
             response = requests.request(
-                method='GET', url=result_url, headers=headers, timeout=timeout
+                method='GET', url=result_url, headers=headers
             )
             return ApiResult(
                 success=response.ok,
@@ -310,7 +294,7 @@ def lro_handler(api_result: NamedTuple) -> ApiResult:
     def _check_lro_status(status_url: str) -> tuple[str, requests.Response]:
         """Check LRO status and return status and response."""
         response = requests.request(
-            method='GET', url=status_url, headers=headers, timeout=timeout
+            method='GET', url=status_url, headers=headers
         )
         response.raise_for_status()
         status = response.json().get('status', 'Unknown')
@@ -400,7 +384,7 @@ def lro_handler(api_result: NamedTuple) -> ApiResult:
         # Max retries exceeded
         return ApiResult(
             success=False,
-            status_code=408,  # Timeout
+            status_code=500,  # Internal Server Error
             data=None,
             headers=None,
             error=f'LRO max retries ({MAX_RETRIES}) exceeded. Last status: {status}',
