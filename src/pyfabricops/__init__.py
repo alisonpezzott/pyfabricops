@@ -78,7 +78,6 @@ from .items.dataflows_gen1 import (
     get_dataflow_gen1_transactions,
     get_dataflows_gen1_datasources,
     list_dataflows_gen1,
-    refresh_dataflow_gen1,
     resolve_dataflow_gen1,
     takeover_dataflow_gen1,
     update_dataflow_gen1,
@@ -163,6 +162,12 @@ from .items.warehouses import (
     resolve_warehouse,
     update_warehouse,
 )
+from .utils.logging import setup_logging
+from .utils.utils import (
+    dataframe_to_list, 
+    generate_full_folders_path, 
+    read_json
+)
 
 __all__ = [
     'add_connection_role_assignment',
@@ -186,6 +191,7 @@ __all__ = [
     'create_support_files',
     'create_warehouse',
     'create_workspace',
+    'dataframe_to_list',
     'delete_connection',
     'delete_connection_role_assignment',
     'delete_data_pipeline',
@@ -201,6 +207,7 @@ __all__ = [
     'delete_warehouse',
     'delete_workspace',
     'delete_workspace_role_assignment',
+    'generate_full_folders_path',
     'get_capacity_id',
     'get_connection',
     'get_connection_id',
@@ -269,6 +276,7 @@ __all__ = [
     'list_workspace_role_assignments',
     'list_workspaces',
     'move_folder',
+    'read_json',
     'resolve_capacity',
     'resolve_connection',
     'resolve_data_pipeline',

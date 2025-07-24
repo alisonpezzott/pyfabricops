@@ -2,7 +2,6 @@ from typing import Dict, List, Optional, Union
 
 from pandas import DataFrame
 
-from ....fabric_items import _FABRIC_ITEMS
 from ..api.api import (
     _delete_request,
     _get_request,

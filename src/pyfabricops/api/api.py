@@ -559,6 +559,16 @@ ENDPOINT_TEMPLATES = {
         'content_type': 'application/json',
         'requires_item_definition': True,
     },
+    'items': {
+        'endpoint': '/items',
+        'requires_workspace_id': True,
+        'endpoint_prefix': '/workspaces/',
+        'audience': 'fabric',
+        'support_pagination': True,
+        'credential_type': 'spn',
+        'content_type': 'application/json',
+        'requires_item_definition': True,
+    },
 }
 
 
@@ -591,7 +601,7 @@ def _list_request(
         **kwargs,
     )
 
-    if kwargs['return_raw']:
+    if kwargs.get('return_raw'):
         return response
 
     if not response.success:
@@ -631,7 +641,7 @@ def _get_request(
         method='get',
     )
 
-    if kwargs['return_raw']:
+    if kwargs.get('return_raw'):
         return response
 
     if not response.success:
@@ -669,7 +679,7 @@ def _delete_request(
         method='delete',
     )
 
-    if kwargs['return_raw']:
+    if kwargs.get('return_raw'):
         return response
 
     if not response.success:
@@ -716,7 +726,7 @@ def _post_request(
         method='post',
     )
 
-    if kwargs['return_raw']:
+    if kwargs.get('return_raw'):
         return response
 
     if not response.success:
@@ -770,7 +780,7 @@ def _patch_request(
         method='patch',
     )
 
-    if kwargs['return_raw']:
+    if kwargs.get('return_raw'):
         return response
 
     if not response.success:

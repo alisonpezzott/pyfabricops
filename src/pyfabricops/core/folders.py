@@ -19,7 +19,9 @@ logger = get_logger(__name__)
 
 @df
 def list_folders(
-    workspace_id: str, *, df: Optional[bool] = True
+    workspace: str, 
+    *, 
+    df: Optional[bool] = True,
 ) -> Union[DataFrame, List[Dict[str, str]], None]:
     """
     List folders in a workspace
@@ -37,19 +39,60 @@ def list_folders(
         list_folders('123e4567-e89b-12d3-a456-426614174000')
         ```
     """
-    return _list_request('folders', workspace_id)
+    return _list_request('folders', workspace_id=resolve_workspace(workspace)) 
+
+
+
+def get_folder_id(workspace: str, folder_name: str) -> Union[str, None]:
+    """
+    Retrieves the ID of a folder by its name.
+
+    Args:
+        folder_name (str): The name of the folder.
+
+    Returns:
+        str | None: The ID of the folder if found, otherwise None.
+    """
+    folders = list_folders(
+        workspace_id=resolve_workspace(workspace),
+        df=False,
+    )
+    for _folder in folders:
+        if _folder['displayName'] == folder_name:
+            return _folder['id']
+    logger.warning(
+        f"Folder '{folder_name}' not found in workspace '{workspace}'."
+    )
+    return None
+
+
+def resolve_folder(workspace: str, folder: str) -> Union[str, None]:
+    """
+    Resolves a folder name to its ID.
+
+    Args:
+        workspace (str): The name or ID of the workspace.
+        folder (str): The name or ID of the folder.
+
+    Returns:
+        str | None: The ID of the folder if found, otherwise None.
+    """
+    if is_valid_uuid(folder):
+        return folder
+    else:
+        return get_folder_id(workspace, folder)
 
 
 @df
-def _get_folder(
-    workspace_id: str, folder_id: str, *, df: Optional[bool] = True
+def get_folder(
+    workspace: str, folder: str, *, df: Optional[bool] = True
 ) -> Union[DataFrame, Dict[str, str], None]:
     """
     Get a folder in a workspace.
 
     Args:
-        workspace_id (str): The name or id of the workspace to get the folder from.
-        folder_id (str): The name or id of the folder to get.
+        workspace (str): The name or id of the workspace to get the folder from.
+        folder (str): The name or id of the folder to get.
         df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
@@ -64,10 +107,11 @@ def _get_folder(
         )
         ```
     """
+    workspace_id = resolve_workspace(workspace)
     return _get_request(
         'folders',
         workspace_id=workspace_id,
-        item_id=folder_id,
+        item_id=resolve_folder(workspace_id, folder),
     )
 
 
@@ -226,69 +270,4 @@ def move_folder(
         item_id=resolve_folder(workspace_id, folder),
         payload=payload,
         endpoint_suffix='/move',
-    )
-
-
-def get_folder_id(workspace: str, folder_name: str) -> Union[str, None]:
-    """
-    Retrieves the ID of a folder by its name.
-
-    Args:
-        folder_name (str): The name of the folder.
-
-    Returns:
-        str | None: The ID of the folder if found, otherwise None.
-    """
-    folders = list_folders(
-        workspace_id=resolve_workspace(workspace),
-        df=False,
-    )
-    for _folder in folders:
-        if _folder['displayName'] == folder_name:
-            return _folder['id']
-    logger.warning(
-        f"Folder '{folder_name}' not found in workspace '{workspace}'."
-    )
-    return None
-
-
-def resolve_folder(workspace: str, folder: str) -> Union[str, None]:
-    """
-    Resolves a folder name to its ID.
-
-    Args:
-        workspace (str): The name or ID of the workspace.
-        folder (str): The name or ID of the folder.
-
-    Returns:
-        str | None: The ID of the folder if found, otherwise None.
-    """
-    if is_valid_uuid(folder):
-        return folder
-    else:
-        return get_folder_id(workspace, folder)
-
-
-def get_folder(
-    workspace: str, folder: str
-) -> Union[DataFrame, Dict[str, str], None]:
-    """
-    Retrieves the details of a folder by its ID.
-
-    Args:
-        workspace (str): The name or ID of the workspace.
-        folder (str): The name or ID of the folder to retrieve.
-
-    Returns:
-        (Union[DataFrame, Dict[str, str], None]): The folder details if found, otherwise None.
-
-    Examples:
-        ```python
-        get_folder('123e4567-e89b-12d3-a456-426614174000', '98f6b7c8-1234-5678-90ab-cdef12345678')
-        get_folder('my-workspace', 'my-folder')
-        ```
-    """
-    return _get_folder(
-        workspace_id=resolve_workspace(workspace),
-        folder_id=resolve_folder(workspace, folder),
     )

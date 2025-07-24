@@ -304,9 +304,9 @@ def add_workspace_role_assignment(
 
     return _post_request(
         'workspaces',
-        workspace_id=resolve_workspace(workspace),
+        item_id=resolve_workspace(workspace),
         payload=payload,
-        endpoint_suffix='roleAssignments',
+        endpoint_suffix='/roleAssignments',
     )
 
 
@@ -465,7 +465,8 @@ def get_workspace_id(workspace: str) -> Union[str, None]:
     for _workspace in workspaces:
         if _workspace['displayName'] == workspace:
             return _workspace['id']
-        logger.warning(f"Workspace '{workspace}' not found.")
+    
+    logger.warning(f"Workspace '{workspace}' not found.")
     return None
 
 
