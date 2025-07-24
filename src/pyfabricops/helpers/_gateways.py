@@ -1,4 +1,4 @@
-from .._gateways import get_gateway, list_gateways
+from ..core.gateways import get_gateway, list_gateways
 
 
 def get_gateway_id(gateway: str) -> str | None:

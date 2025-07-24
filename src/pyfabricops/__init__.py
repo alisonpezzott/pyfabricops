@@ -1,6 +1,6 @@
-from ._auth import set_auth_provider
-from ._capacities import get_capacity, list_capacities
-from ._connections import (
+from .api.auth import set_auth_provider
+from .core.capacities import get_capacity, list_capacities
+from .core.connections import (
     add_connection_role_assignment,
     add_connection_roles_assignments,
     create_github_source_control_connection,
@@ -15,8 +15,8 @@ from ._connections import (
     resolve_connection,
     update_connection_role_assignment,
 )
-from ._core import ApiResult, api_core_request, lro_handler, pagination_handler
-from ._data_pipelines import (
+from .api.api import ApiResult, _api_request, _lro_handler, _pagination_handler
+from .primitives.data_pipelines import (
     create_data_pipeline,
     delete_data_pipeline,
     deploy_all_data_pipelines,
@@ -30,7 +30,7 @@ from ._data_pipelines import (
     update_data_pipeline,
     update_data_pipeline_definition,
 )
-from ._dataflows_gen1 import (
+from .primitives.dataflows_gen1 import (
     deploy_dataflow_gen1,
     export_all_dataflows_gen1,
     export_dataflow_gen1,
@@ -43,7 +43,7 @@ from ._dataflows_gen1 import (
     resolve_dataflow_gen1,
     takeover_dataflow_gen1,
 )
-from ._dataflows_gen2 import (
+from .primitives.dataflows_gen2 import (
     create_dataflow,
     delete_dataflow,
     deploy_all_dataflows,
@@ -57,8 +57,8 @@ from ._dataflows_gen2 import (
     update_dataflow,
     update_dataflow_definition,
 )
-from ._decorators import df
-from ._exceptions import (
+from .utils.decorators import df
+from .utils.exceptions import (
     AuthenticationError,
     ConfigurationError,
     FileNotFoundError,
@@ -68,7 +68,7 @@ from ._exceptions import (
     RequestError,
     ResourceNotFoundError,
 )
-from ._folders import (
+from .core.folders import (
     create_folder,
     delete_folder,
     deploy_folders,
@@ -79,13 +79,13 @@ from ._folders import (
     resolve_folder,
     update_folder,
 )
-from ._gateways import (
+from .core.gateways import (
     get_gateway,
     get_gateway_public_key,
     list_gateways,
     resolve_gateway,
 )
-from ._git import (
+from .core.git import (
     ado_connect,
     commit_to_git,
     get_git_connection,
@@ -97,7 +97,7 @@ from ._git import (
     update_from_git,
     update_my_git_connection,
 )
-from ._items import (
+from .primitives.items import (
     create_item,
     delete_item,
     deploy_all_items,
@@ -111,7 +111,7 @@ from ._items import (
     update_item,
     update_item_definition,
 )
-from ._lakehouses import (
+from .primitives.lakehouses import (
     create_lakehouse,
     delete_lakehouse,
     export_all_lakehouses,
@@ -121,7 +121,7 @@ from ._lakehouses import (
     resolve_lakehouse,
     update_lakehouse,
 )
-from ._logging import (
+from .utils.logging import (
     PyFabricOpsFilter,
     PyFabricOpsFormatter,
     disable_logging,
@@ -130,7 +130,7 @@ from ._logging import (
     reset_logging,
     setup_logging,
 )
-from ._notebooks import (
+from .primitives.notebooks import (
     create_notebook,
     delete_notebook,
     deploy_all_notebooks,
@@ -144,7 +144,7 @@ from ._notebooks import (
     update_notebook,
     update_notebook_definition,
 )
-from ._reports import (
+from .primitives.reports import (
     convert_reports_to_local_references,
     create_report,
     delete_report,
@@ -160,7 +160,7 @@ from ._reports import (
     update_report,
     update_report_definition,
 )
-from ._semantic_models import (
+from .primitives.semantic_models import (
     bind_semantic_model_to_gateway,
     create_semantic_model,
     delete_semantic_model,
@@ -179,13 +179,13 @@ from ._semantic_models import (
     update_semantic_model,
     update_semantic_model_definition,
 )
-from ._shortcuts import (
+from .primitives.shortcuts import (
     create_shortcut,
     delete_shortcut,
     get_shortcut,
     list_shortcuts,
 )
-from ._utils import (
+from .utils.utils import (
     copy_to_staging,
     find_and_replace,
     get_current_branch,
@@ -203,7 +203,7 @@ from ._utils import (
     write_single_line_json,
 )
 from ._version import __version__
-from ._warehouses import (
+from .primitives.warehouses import (
     create_warehouse,
     delete_warehouse,
     export_all_warehouses,
@@ -213,7 +213,7 @@ from ._warehouses import (
     resolve_warehouse,
     update_warehouse,
 )
-from ._workspaces import (
+from .core.workspaces import (
     add_workspace_role_assignment,
     assign_to_capacity,
     create_workspace,
@@ -250,7 +250,7 @@ __all__ = [
     'add_connection_roles_assignments',
     'add_workspace_role_assignment',
     'ado_connect',
-    'api_core_request',
+    '_api_request',
     'assign_to_capacity',
     'bind_semantic_model_to_gateway',
     'commit_to_git',
@@ -385,10 +385,10 @@ __all__ = [
     'list_workspace_roles',
     'list_workspaces',
     'load_and_sanitize',
-    'lro_handler',
+    '_lro_handler',
     'move_folder',
     'pack_item_definition',
-    'pagination_handler',
+    '_pagination_handler',
     'parse_definition_report',
     'parse_tmdl_parameters',
     'read_json',

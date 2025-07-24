@@ -1,16 +1,15 @@
 import json
-import logging
 import os
 import uuid
 from typing import Literal
 
 import pandas
 
-from ._core import api_core_request
-from ._decorators import df
-from ._generic_endpoints import _list_generic
-from ._logging import get_logger
-from ._utils import (
+from ..api.api import _api_request
+from ..utils.decorators import df
+from ..api.api import _list_request
+from ..utils.logging import get_logger
+from ..utils.utils import (
     get_current_branch,
     is_valid_uuid,
     load_and_sanitize,
@@ -18,7 +17,7 @@ from ._utils import (
     write_json,
     write_single_line_json,
 )
-from ._workspaces import (
+from ..core.workspaces import (
     _resolve_workspace_path,
     get_workspace,
     get_workspace_suffix,
@@ -43,7 +42,7 @@ def list_dataflows_gen1(
     Returns:
         list | pandas.DataFrame | None: A list of Gen1 dataflows or a DataFrame if df is True.
     """
-    return _list_generic(
+    return _list_request(
         'dataflows_gen1', workspace_id=workspace_id, df=df, **kwargs
     )
 
@@ -147,7 +146,7 @@ def get_dataflow_gen1_definition(workspace: str, dataflow: str) -> dict | None:
     if not dataflow_id:
         return None
 
-    response = api_core_request(
+    response = _api_request(
         audience='powerbi',
         endpoint=f'/groups/{workspace_id}/dataflows/{dataflow_id}',
         method='get',
@@ -240,7 +239,7 @@ def deploy_dataflow_gen1(workspace: str, path: str) -> bool | None:
     if not workspace_id:
         return None
 
-    response = api_core_request(
+    response = _api_request(
         audience='powerbi',
         endpoint=f'/groups/{workspace_id}/imports',
         content_type=content_type,
@@ -282,7 +281,7 @@ def takeover_dataflow_gen1(workspace: str, dataflow: str) -> bool | None:
     if not dataflow_id:
         return None
 
-    response = api_core_request(
+    response = _api_request(
         audience='powerbi',
         endpoint=f'/groups/{workspace_id}/dataflows/{dataflow_id}/Default.Takeover',
         method='post',
@@ -518,7 +517,7 @@ def refresh_dataflow_gen1(
 
     params = {'processType': process_type}
 
-    response = api_core_request(
+    response = _api_request(
         endpoint=f'/groups/{workspace_id}/dataflows/{dataflow_id}/refreshes',
         method='post',
         params=params,
@@ -545,7 +544,7 @@ def get_dataflow_gen1_transactions(
     if not dataflow_id:
         return None
 
-    response = api_core_request(
+    response = _api_request(
         endpoint=f'/groups/{workspace_id}/dataflows/{dataflow_id}/transactions',
         audience='powerbi',
     )
@@ -572,7 +571,7 @@ def get_dataflows_gen1_datasources(
     if not dataflow_id:
         return None
 
-    response = api_core_request(
+    response = _api_request(
         endpoint=f'/groups/{workspace_id}/dataflows/{dataflow_id}/datasources',
         audience='powerbi',
     )

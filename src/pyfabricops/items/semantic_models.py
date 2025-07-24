@@ -2,14 +2,14 @@ from typing import Literal, Dict, List, Union, Optional
 
 from pandas import DataFrame
 
-from ._decorators import df
-from ._generic_endpoints import (
-    _post_generic,
-    _delete_generic,
-    _get_generic,
-    _list_generic,
+from ..utils.decorators import df
+from ..api.api import (
+    _post_request,
+    _delete_request,
+    _get_request,
+    _list_request,
 )
-from ._logging import get_logger
+from ..utils.logging import get_logger
 
 
 logger = get_logger(__name__)
@@ -31,7 +31,7 @@ def list_semantic_models(
     Returns:
         (Union[DataFrame, List[Dict[str, str]], None]): A list of semantic models or a DataFrame if df is True.
     """
-    return _list_generic('semantic_models', workspace_id=workspace_id)
+    return _list_request('semantic_models', workspace_id=workspace_id)
 
 
 @df
@@ -58,7 +58,7 @@ def get_semantic_model(
         get_semantic_model('123e4567-e89b-12d3-a456-426614174000', '123e4567-e89b-12d3-a456-426614174000')
         ```
     """
-    return _get_generic(
+    return _get_request(
         'semantic_models', workspace_id=workspace_id, item_id=semantic_model_id
     )
 
@@ -107,7 +107,7 @@ def create_semantic_model(
     if folder_id:
         payload['folderId'] = folder_id
 
-    return _post_generic(
+    return _post_request(
         'semantic_models', workspace_id=workspace_id, payload=payload
     )
 
@@ -159,7 +159,7 @@ def update_semantic_model(
     if description:
         payload['description'] = description
 
-    return _post_generic(
+    return _post_request(
         'semantic_models',
         workspace_id=workspace_id,
         item_id=semantic_model_id,
@@ -183,7 +183,7 @@ def delete_semantic_model(workspace_id: str, semantic_model_id: str) -> None:
         delete_semantic_model('123e4567-e89b-12d3-a456-426614174000', '456e7890-e12b-34d5-a678-9012345678901')
         ```
     """
-    return _delete_generic(
+    return _delete_request(
         'semantic_models', workspace_id=workspace_id, item_id=semantic_model_id
     )
 
@@ -210,7 +210,7 @@ def get_semantic_model_definition(
         ) 
         ```
     """
-    return _post_generic(
+    return _post_request(
         'semantic_models',
         workspace_id=workspace_id,
         item_id=semantic_model_id,
@@ -251,7 +251,7 @@ def update_semantic_model_definition(
     """
     params = {'updateMetadata': True}
     payload = {'definition': item_definition}
-    return _post_generic(
+    return _post_request(
         'semantic_models',
         workspace_id=workspace_id,
         item_id=semantic_model_id,

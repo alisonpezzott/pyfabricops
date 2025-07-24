@@ -1,14 +1,13 @@
-import logging
 from typing import Literal
 
 import pandas
 
-from ._core import api_core_request, pagination_handler
-from ._decorators import df
-from ._lakehouses import resolve_lakehouse
-from ._logging import get_logger
-from ._shortcuts_payloads import shortcuts_payloads_targets
-from ._workspaces import resolve_workspace
+from ..api.api import _api_request, _pagination_handler
+from ..utils.decorators import df
+from .lakehouses import resolve_lakehouse
+from ..utils.logging import get_logger
+from .shortcuts_payloads import shortcuts_payloads_targets
+from ..core.workspaces import resolve_workspace
 
 logger = get_logger(__name__)
 
@@ -40,14 +39,14 @@ def list_shortcuts(
     lakehouse_id = resolve_lakehouse(workspace_id, lakehouse)
     if not lakehouse_id:
         return None
-    response = api_core_request(
+    response = _api_request(
         endpoint=f'/workspaces/{workspace_id}/items/{lakehouse_id}/shortcuts'
     )
     if not response.success:
         logger.warning(f'{response.status_code}: {response.error}.')
         return None
     else:
-        response = pagination_handler(response)
+        response = _pagination_handler(response)
         return response.data.get('value')
 
 
@@ -85,7 +84,7 @@ def get_shortcut(
     lakehouse_id = resolve_lakehouse(workspace_id, lakehouse)
     if not lakehouse_id:
         return None
-    response = api_core_request(
+    response = _api_request(
         endpoint=f'/workspaces/{workspace_id}/items/{lakehouse_id}/shortcuts/{shortcut_path}/{shortcut_name}'
     )
     if not response.success:
@@ -122,7 +121,7 @@ def delete_shortcut(
     lakehouse_id = resolve_lakehouse(workspace_id, lakehouse)
     if not lakehouse_id:
         return False
-    response = api_core_request(
+    response = _api_request(
         endpoint=f'/workspaces/{workspace_id}/items/{lakehouse_id}/shortcuts/{shortcut_path}/{shortcut_name}',
         method='delete',
     )
@@ -275,7 +274,7 @@ def create_shortcut(
 
     params = {'shortcutConflictPolicy': conflict_policy}
 
-    response = api_core_request(
+    response = _api_request(
         endpoint=f'/workspaces/{workspace_id}/items/{lakehouse_id}/shortcuts',
         method='post',
         payload=payload,

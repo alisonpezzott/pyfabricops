@@ -1,8 +1,8 @@
-from .._connections import list_connections  
-from .._decorators import df
-from .._encrypt_gateway_credentials import _get_encrypt_gateway_credentials
-from .._generic_endpoints import _post_generic
-from .._logging import get_logger
+from ..core.connections import list_connections  
+from ..utils.decorators import df
+from ._encrypt_gateway_credentials import _get_encrypt_gateway_credentials
+from ..api.api import _post_request
+from ..utils.logging import get_logger
 
 import pandas
 
@@ -85,7 +85,7 @@ def create_github_source_control_connection(
         },
     }
 
-    return _post_generic(
+    return _post_request(
         'connections',
         payload=payload,
     )
@@ -158,7 +158,7 @@ def create_sql_cloud_connection(
             },
         },
     }
-    return _post_generic(
+    return _post_request(
         'connections',
         payload=payload,
     )
@@ -249,7 +249,7 @@ def create_sql_on_premises_connection(
             },
         },
     }
-    return _post_generic(
+    return _post_request(
         'connections',
         payload=payload,
     )

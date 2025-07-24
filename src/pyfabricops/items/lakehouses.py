@@ -6,20 +6,20 @@ from collections import OrderedDict
 
 import pandas
 
-from ._core import api_core_request, pagination_handler
-from ._decorators import df
-from ._folders import resolve_folder
-from ._items import list_items
-from ._logging import get_logger
-from ._scopes import PLATFORM_SCHEMA, PLATFORM_VERSION
-from ._utils import (
+from ..api.api import _api_request, _pagination_handler
+from ..utils.decorators import df
+from ..core.folders import resolve_folder
+from .items import list_items
+from ..utils.logging import get_logger
+from ..utils.schemas import PLATFORM_SCHEMA, PLATFORM_VERSION
+from ..utils.utils import (
     get_current_branch,
     get_workspace_suffix,
     is_valid_uuid,
     read_json,
     write_json,
 )
-from ._workspaces import (
+from ..core.workspaces import (
     _resolve_workspace_path,
     get_workspace,
     resolve_workspace,
@@ -54,14 +54,14 @@ def list_lakehouses(
     if not workspace_id:
         return None
 
-    response = api_core_request(
+    response = _api_request(
         endpoint=f'/workspaces/{workspace_id}/lakehouses'
     )
     if not response.success:
         logger.warning(f'{response.status_code}: {response.error}.')
         return None
     else:
-        response = pagination_handler(response)
+        response = _pagination_handler(response)
     lakehouses = [
         lk
         for lk in response.data.get('value', [])
@@ -143,7 +143,7 @@ def get_lakehouse(
     if not lakehouse_id:
         return None
 
-    response = api_core_request(
+    response = _api_request(
         endpoint=f'/workspaces/{workspace_id}/lakehouses/{lakehouse_id}',
         method='get',
     )
@@ -165,7 +165,7 @@ def get_lakehouse(
         RETRY_INTERVAL = 10
         logger.info(f'Checking lakehouse SQL endpoint...')
         for attempt in range(1, MAX_RETRIES + 1):
-            response = api_core_request(
+            response = _api_request(
                 endpoint=f'/workspaces/{workspace_id}/lakehouses/{lakehouse_id}',
                 method='get',
             )
@@ -231,7 +231,7 @@ def create_lakehouse(
     if lake_exists:
         logger.warning(f"Lakehouse with name '{display_name}' already exists.")
         return lake_exists
-    response = api_core_request(
+    response = _api_request(
         endpoint=f'/workspaces/{workspace_id}/lakehouses',
         method='post',
         payload=payload,
@@ -296,7 +296,7 @@ def update_lakehouse(
     if lakehouse_description != description and description:
         payload['description'] = description
 
-    response = api_core_request(
+    response = _api_request(
         endpoint=f'/workspaces/{workspace_id}/lakehouses/{lakehouse_id}',
         method='put',
         payload=payload,
@@ -333,7 +333,7 @@ def delete_lakehouse(workspace: str, lakehouse: str):
     if not lakehouse_id:
         return None
 
-    response = api_core_request(
+    response = _api_request(
         endpoint=f'/workspaces/{workspace_id}/lakehouses/{lakehouse_id}',
         method='delete',
         return_raw=True,
@@ -549,7 +549,7 @@ def export_lakehouse(
     # Check if shortcuts.metadata.json exists and create it if not
     shortcuts_path = f'{item_path}/{lakehouse_display_name}.Lakehouse/shortcuts.metadata.json'
     if not os.path.exists(shortcuts_path):
-        from ._shortcuts import list_shortcuts
+        from .shortcuts import list_shortcuts
 
         shortcuts_list = list_shortcuts(workspace_id, lakehouse_id)
 

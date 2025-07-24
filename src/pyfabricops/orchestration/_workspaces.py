@@ -1,16 +1,16 @@
 import inspect
 from typing import Optional, Sequence
 
-from .._data_pipelines import export_all_data_pipelines
-from .._dataflows_gen1 import export_all_dataflows_gen1
-from .._dataflows_gen2 import export_all_dataflows
-from .._folders import export_folders
-from .._lakehouses import export_all_lakehouses
-from .._notebooks import export_all_notebooks
-from .._reports import export_all_reports
-from .._semantic_models import export_all_semantic_models
-from .._warehouses import export_all_warehouses
-from .._workspaces import export_workspace_config
+from ..primitives.data_pipelines import export_all_data_pipelines
+from ..primitives.dataflows_gen1 import export_all_dataflows_gen1
+from ..primitives.dataflows_gen2 import export_all_dataflows
+from ..core.folders import export_folders
+from ..primitives.lakehouses import export_all_lakehouses
+from ..primitives.notebooks import export_all_notebooks
+from ..primitives.reports import export_all_reports
+from ..primitives.semantic_models import export_all_semantic_models
+from ..primitives.warehouses import export_all_warehouses
+from ..core.workspaces import export_workspace_config
 
 EXPORT_FUNCS = [
     export_workspace_config,

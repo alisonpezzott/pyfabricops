@@ -2,11 +2,11 @@ import os
 
 import pandas
 
-from ._core import api_core_request, lro_handler, pagination_handler
-from ._decorators import df
-from ._folders import resolve_folder
-from ._logging import get_logger
-from ._utils import (
+from ..api.api import _api_request, _lro_handler, _pagination_handler
+from ..utils.decorators import df
+from ..core.folders import resolve_folder
+from ..utils.logging import get_logger
+from ..utils.utils import (
     get_current_branch,
     get_workspace_suffix,
     is_valid_uuid,
@@ -15,7 +15,7 @@ from ._utils import (
     unpack_item_definition,
     write_json,
 )
-from ._workspaces import (
+from ..core.workspaces import (
     _resolve_workspace_path,
     get_workspace,
     resolve_workspace,
@@ -25,108 +25,103 @@ logger = get_logger(__name__)
 
 
 @df
-def list_notebooks(
+def list_dataflows(
     workspace: str, *, df: bool = False
 ) -> list | pandas.DataFrame | None:
     """
-    Lists all notebooks in the specified workspace.
+    Lists all dataflows in a workspace.
 
     Args:
         workspace (str): The workspace name or ID.
         df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
 
     Returns:
-        (list | pandas.DataFrame | None): A list of notebooks, a DataFrame with flattened keys, or None if not found.
-
-    Examples:
-        ```python
-        list_notebooks('MyProjectWorkspace')
-        list_notebooks('MyProjectWorkspace', df=True)
-        ```
+        list | pandas.DataFrame | None: A list of dataflows if successful, otherwise None.
     """
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return None
-    response = api_core_request(
-        endpoint=f'/workspaces/{workspace_id}/notebooks'
+    response = _api_request(
+        endpoint=f'/workspaces/{workspace_id}/dataflows'
     )
     if not response.success:
         logger.warning(f'{response.status_code}: {response.error}.')
         return None
     else:
-        response = pagination_handler(response)
+        response = _pagination_handler(response)
         return response.data.get('value')
 
 
-def resolve_notebook(
-    workspace: str, notebook: str, *, silent: bool = False
+def resolve_dataflow(
+    workspace: str, dataflow: str, *, silent: bool = False
 ) -> str | None:
     """
-    Resolves a notebook name to its ID.
+    Resolves a dataflow name to its ID.
 
     Args:
         workspace (str): The ID of the workspace.
-        notebook (str): The name of the notebook.
-        silent (bool): If True, suppresses warnings. Defaults to False.
+        dataflow (str): The name of the dataflow.
+        silent (bool, optional): If True, suppresses warnings. Defaults to False.
 
     Returns:
-        str | None: The ID of the notebook, or None if not found.
+        str|None: The ID of the dataflow, or None if not found.
 
     Examples:
         ```python
-        resolve_notebook('MyProjectWorkspace', 'SalesDataNotebook')
+        resolve_dataflow('MyProjectWorkspace', 'SalesDataflow')
+        resolve_dataflow('123e4567-e89b-12d3-a456-426614174000', 'SalesDataflow')
         ```
     """
-    if is_valid_uuid(notebook):
-        return notebook
+    if is_valid_uuid(dataflow):
+        return dataflow
 
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return None
 
-    notebooks = list_notebooks(workspace, df=False)
-    if not notebooks:
+    dataflows = list_dataflows(workspace, df=False)
+    if not dataflows:
         return None
 
-    for notebook_ in notebooks:
-        if notebook_['displayName'] == notebook:
-            return notebook_['id']
+    for dataflow_ in dataflows:
+        if dataflow_['displayName'] == dataflow:
+            return dataflow_['id']
     if not silent:
-        logger.warning(f"Notebook '{notebook}' not found.")
+        logger.warning(f"Dataflow '{dataflow}' not found.")
     return None
 
 
 @df
-def get_notebook(
-    workspace: str, notebook: str, *, df: bool = False
+def get_dataflow(
+    workspace: str, dataflow: str, *, df: bool = False
 ) -> dict | pandas.DataFrame | None:
     """
-    Retrieves a notebook by its name or ID from the specified workspace.
+    Gets a dataflow by its name or ID.
 
     Args:
         workspace (str): The workspace name or ID.
-        notebook (str): The name or ID of the notebook.
-        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
+        dataflow (str): The name or ID of the dataflow.
+        df (bool, optional): If True, returns a DataFrame with flattened keys. Defaults to False.
 
     Returns:
-        (dict or pandas.DataFrame): The notebook details if found. If `df=True`, returns a DataFrame with flattened keys.
+        dict | pandas.DataFrame | None: The dataflow details if found, otherwise None.
 
     Examples:
         ```python
-        get_notebook('MyProjectWorkspace', 'SalesDataNotebook')
-        get_notebook('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', df=True)
+        get_dataflow('MyProjectWorkspace', 'SalesDataflow')
+        get_dataflow('123e4567-e89b-12d3-a456-426614174000', 'SalesDataflow')
         ```
     """
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return None
 
-    notebook_id = resolve_notebook(workspace_id, notebook)
-    if not notebook_id:
+    dataflow_id = resolve_dataflow(workspace_id, dataflow)
+    if not dataflow_id:
         return None
 
-    response = api_core_request(
-        endpoint=f'/workspaces/{workspace_id}/notebooks/{notebook_id}'
+    response = _api_request(
+        endpoint=f'/workspaces/{workspace_id}/dataflows/{dataflow_id}'
     )
 
     if not response.success:
@@ -137,57 +132,58 @@ def get_notebook(
 
 
 @df
-def update_notebook(
+def update_dataflow(
     workspace: str,
-    notebook: str,
+    dataflow: str,
     *,
     display_name: str = None,
     description: str = None,
     df: bool = False,
 ) -> dict | pandas.DataFrame:
     """
-    Updates the properties of the specified notebook.
+    Updates the properties of the specified dataflow.
 
     Args:
         workspace (str): The workspace name or ID.
-        notebook (str): The name or ID of the notebook to update.
-        display_name (str, optional): The new display name for the notebook.
-        description (str, optional): The new description for the notebook.
+        dataflow (str): The name or ID of the dataflow to update.
+        display_name (str, optional): The new display name for the dataflow.
+        description (str, optional): The new description for the dataflow.
+        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
 
     Returns:
-        (dict or None): The updated notebook details if successful, otherwise None.
+        (dict or None): The updated dataflow details if successful, otherwise None.
 
     Examples:
         ```python
-        update_notebook('MyProjectWorkspace', 'SalesDataModel', display_name='UpdatedSalesDataModel')
-        update_notebook('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', description='Updated description')
+        update_dataflow('MyProjectWorkspace', 'SalesDataModel', display_name='UpdatedSalesDataModel')
+        update_dataflow('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', description='Updated description')
         ```
     """
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return None
 
-    notebook_id = resolve_notebook(workspace_id, notebook)
-    if not notebook_id:
+    dataflow_id = resolve_dataflow(workspace_id, dataflow)
+    if not dataflow_id:
         return None
 
-    notebook_ = get_notebook(workspace_id, notebook_id)
-    if not notebook_:
+    dataflow_ = get_dataflow(workspace_id, dataflow_id)
+    if not dataflow_:
         return None
 
-    notebook_description = notebook_['description']
-    notebook_display_name = notebook_['displayName']
+    dataflow_description = dataflow_['description']
+    dataflow_display_name = dataflow_['displayName']
 
     payload = {}
 
-    if notebook_display_name != display_name and display_name:
+    if dataflow_display_name != display_name and display_name:
         payload['displayName'] = display_name
 
-    if notebook_description != description and description:
+    if dataflow_description != description and description:
         payload['description'] = description
 
-    response = api_core_request(
-        endpoint=f'/workspaces/{workspace_id}/notebooks/{notebook_id}',
+    response = _api_request(
+        endpoint=f'/workspaces/{workspace_id}/dataflows/{dataflow_id}',
         method='put',
         payload=payload,
     )
@@ -199,36 +195,36 @@ def update_notebook(
         return response.data
 
 
-def delete_notebook(workspace: str, notebook: str) -> None:
+def delete_dataflow(workspace: str, dataflow: str) -> None:
     """
-    Delete a notebook from the specified workspace.
+    Delete a dataflow from the specified workspace.
 
     Args:
         workspace (str): The name or ID of the workspace to delete.
-        notebook (str): The name or ID of the notebook to delete.
+        dataflow (str): The name or ID of the dataflow to delete.
 
     Returns:
-        None: If the notebook is successfully deleted.
+        None: If the dataflow is successfully deleted.
 
     Raises:
         ResourceNotFoundError: If the specified workspace is not found.
 
     Examples:
         ```python
-        delete_notebook('MyProjectWorkspace', 'SalesDataNotebook')
-        delete_notebook('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000')
+        delete_dataflow('MyProjectWorkspace', 'SalesDataflow')
+        delete_dataflow('123e4567-e89b-12d3-a456-426614174000', 'SalesDataflow')
         ```
     """
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return None
 
-    notebook_id = resolve_notebook(workspace_id, notebook)
-    if not notebook_id:
+    dataflow_id = resolve_dataflow(workspace_id, dataflow)
+    if not dataflow_id:
         return None
 
-    response = api_core_request(
-        endpoint=f'/workspaces/{workspace_id}/notebooks/{notebook_id}',
+    response = _api_request(
+        endpoint=f'/workspaces/{workspace_id}/dataflows/{dataflow_id}',
         method='delete',
         return_raw=True,
     )
@@ -239,21 +235,21 @@ def delete_notebook(workspace: str, notebook: str) -> None:
         return True
 
 
-def get_notebook_definition(workspace: str, notebook: str) -> dict:
+def get_dataflow_definition(workspace: str, dataflow: str) -> dict:
     """
-    Retrieves the definition of a notebook by its name or ID from the specified workspace.
+    Retrieves the definition of a dataflow by its name or ID from the specified workspace.
 
     Args:
         workspace (str): The workspace name or ID.
-        notebook (str): The name or ID of the notebook.
+        dataflow (str): The name or ID of the dataflow.
 
     Returns:
-        (dict): The notebook definition if found, otherwise None.
+        (dict): The dataflow definition if found, otherwise None.
 
     Examples:
         ```python
-        get_notebook_definition('MyProjectWorkspace', 'Salesnotebook')
-        get_notebook_definition('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000')
+        get_dataflow_definition('MyProjectWorkspace', 'Salesdataflow')
+        get_dataflow_definition('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000')
         ```
     """
     # Resolving IDs
@@ -261,97 +257,95 @@ def get_notebook_definition(workspace: str, notebook: str) -> dict:
     if not workspace_id:
         return None
 
-    notebook_id = resolve_notebook(workspace_id, notebook)
-    if not notebook_id:
+    dataflow_id = resolve_dataflow(workspace_id, dataflow)
+    if not dataflow_id:
         return None
 
     # Requesting
-    response = api_core_request(
-        endpoint=f'/workspaces/{workspace_id}/notebooks/{notebook_id}/getDefinition',
+    response = _api_request(
+        endpoint=f'/workspaces/{workspace_id}/dataflows/{dataflow_id}/getDefinition',
         method='post',
     )
+
     if not response.success:
         logger.warning(f'{response.status_code}: {response.error}.')
         return None
-    elif response.status_code == 202:
-        # If the response is a long-running operation, handle it
-        lro_response = lro_handler(response)
+
+    # Check if it's a long-running operation (status 202)
+    if response.status_code == 202:
+        logger.debug('Long-running operation detected, handling LRO...')
+        lro_response = _lro_handler(response)
         if not lro_response.success:
             logger.warning(
                 f'{lro_response.status_code}: {lro_response.error}.'
             )
             return None
-        else:
-            return lro_response.data
-    elif response.status_code == 200:
-        # If the response is successful, we can process it
-        return response.data
-    else:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
+        return lro_response.data
+
+    # For immediate success (status 200)
+    return response.data
 
 
-def update_notebook_definition(
-    workspace: str, notebook: str, path: str
+def update_dataflow_definition(
+    workspace: str, dataflow: str, path: str
 ) -> dict | None:
     """
-    Updates the definition of an existing notebook in the specified workspace.
-    If the notebook does not exist, it returns None.
+    Updates the definition of an existing dataflow in the specified workspace.
+    If the dataflow does not exist, it returns None.
 
     Args:
         workspace (str): The workspace name or ID.
-        notebook (str): The name or ID of the notebook to update.
-        path (str): The path to the notebook definition.
+        dataflow (str): The name or ID of the dataflow to update.
+        path (str): The path to the dataflow definition.
 
     Returns:
-        (dict or None): The updated notebook details if successful, otherwise None.
+        (dict or None): The updated dataflow details if successful, otherwise None.
 
     Examples:
         ```python
-        update_notebook('MyProjectWorkspace', 'SalesDataModel', display_name='UpdatedSalesDataModel')
-        update_notebook('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', description='Updated description')
+        update_dataflow('MyProjectWorkspace', 'SalesDataModel', display_name='UpdatedSalesDataModel')
+        update_dataflow('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', description='Updated description')
         ```
     """
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return None
 
-    notebook_id = resolve_notebook(workspace_id, notebook)
-    if not notebook_id:
+    dataflow_id = resolve_dataflow(workspace_id, dataflow)
+    if not dataflow_id:
         return None
 
     definition = pack_item_definition(path)
 
     params = {'updateMetadata': True}
 
-    response = api_core_request(
-        endpoint=f'/workspaces/{workspace_id}/notebooks/{notebook_id}/updateDefinition',
+    response = _api_request(
+        endpoint=f'/workspaces/{workspace_id}/dataflows/{dataflow_id}/updateDefinition',
         method='post',
         payload={'definition': definition},
         params=params,
     )
+
     if not response.success:
         logger.warning(f'{response.status_code}: {response.error}.')
         return None
-    elif response.status_code == 202:
-        # If the response is a long-running operation, handle it
-        lro_response = lro_handler(response)
+
+    # Check if it's a long-running operation (status 202)
+    if response.status_code == 202:
+        logger.debug('Long-running operation detected, handling LRO...')
+        lro_response = _lro_handler(response)
         if not lro_response.success:
             logger.warning(
                 f'{lro_response.status_code}: {lro_response.error}.'
             )
             return None
-        else:
-            return lro_response.data
-    elif response.status_code == 200:
-        # If the response is successful, we can process it
-        return response.data
-    else:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
+        return lro_response.data
+
+    # For immediate success (status 200)
+    return response.data
 
 
-def create_notebook(
+def create_dataflow(
     workspace: str,
     display_name: str,
     path: str,
@@ -360,22 +354,22 @@ def create_notebook(
     folder: str = None,
 ) -> dict | None:
     """
-    Creates a new notebook in the specified workspace.
+    Creates a new dataflow in the specified workspace.
 
     Args:
         workspace (str): The workspace name or ID.
-        display_name (str): The display name of the notebook.
-        description (str, optional): A description for the notebook.
-        folder (str, optional): The folder to create the notebook in.
-        path (str): The path to the notebook definition file.
+        display_name (str): The display name of the dataflow.
+        description (str, optional): A description for the dataflow.
+        folder (str, optional): The folder to create the dataflow in.
+        path (str): The path to the dataflow definition file.
 
     Returns:
-        (dict): The created notebook details.
+        (dict): The created dataflow details.
 
     Examples:
         ```python
-        create_notebook('MyProjectWorkspace', 'SalesDataModel', 'path/to/definition.json')
-        create_notebook('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', 'path/to/definition.json')
+        create_dataflow('MyProjectWorkspace', 'SalesDataModel', 'path/to/definition.json')
+        create_dataflow('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', 'path/to/definition.json', description='Sales data model')
         ```
     """
     workspace_id = resolve_workspace(workspace)
@@ -396,8 +390,8 @@ def create_notebook(
         else:
             payload['folderId'] = folder_id
 
-    response = api_core_request(
-        endpoint=f'/workspaces/{workspace_id}/notebooks',
+    response = _api_request(
+        endpoint=f'/workspaces/{workspace_id}/dataflows',
         method='post',
         payload=payload,
     )
@@ -407,7 +401,7 @@ def create_notebook(
         return None
     elif response.status_code == 202:
         # If the response is a long-running operation, handle it
-        lro_response = lro_handler(response)
+        lro_response = _lro_handler(response)
         if not lro_response.success:
             logger.warning(
                 f'{lro_response.status_code}: {lro_response.error}.'
@@ -423,9 +417,9 @@ def create_notebook(
         return None
 
 
-def export_notebook(
+def export_dataflow(
     workspace: str,
-    notebook: str,
+    dataflow: str,
     project_path: str,
     *,
     workspace_path: str = None,
@@ -436,11 +430,11 @@ def export_notebook(
     branches_path: str = None,
 ) -> None:
     """
-    Exports a notebook definition to a specified folder structure.
+    Exports a dataflow definition to a specified folder structure.
 
     Args:
         workspace (str): The workspace name or ID.
-        notebook (str): The name of the notebook to export.
+        dataflow (str): The name of the dataflow to export.
         project_path (str): The root path of the project.
         workspace_path (str, optional): The path to the workspace folder. Defaults to "workspace".
         config_path (str): The path to the config file. Defaults to "config.json".
@@ -454,8 +448,8 @@ def export_notebook(
 
     Examples:
         ```python
-        export_notebook('MyProjectWorkspace', 'SalesDataModel', 'path/to/project')
-        export_notebook('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', 'path/to/project')
+        export_dataflow('MyProjectWorkspace', 'SalesDataModel', 'path/to/project')
+        export_dataflow('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', 'path/to/project', branch='feature-branch')
         ```
     """
     workspace_path = _resolve_workspace_path(
@@ -469,16 +463,16 @@ def export_notebook(
     if not workspace_id:
         return None
 
-    notebook_ = get_notebook(workspace_id, notebook)
-    if not notebook_:
+    dataflow_ = get_dataflow(workspace_id, dataflow)
+    if not dataflow_:
         return None
 
-    notebook_id = notebook_['id']
+    dataflow_id = dataflow_['id']
     folder_id = None
-    if 'folderId' in notebook_:
-        folder_id = notebook_['folderId']
+    if 'folderId' in dataflow_:
+        folder_id = dataflow_['folderId']
 
-    definition = get_notebook_definition(workspace_id, notebook_id)
+    definition = get_dataflow_definition(workspace_id, dataflow_id)
     if not definition:
         return None
 
@@ -510,9 +504,9 @@ def export_notebook(
 
         config = existing_config[branch][workspace_name_without_suffix]
 
-        notebook_id = notebook_['id']
-        notebook_name = notebook_['displayName']
-        notebook_descr = notebook_.get('description', '')
+        dataflow_id = dataflow_['id']
+        dataflow_name = dataflow_['displayName']
+        dataflow_descr = dataflow_.get('description', '')
 
         # Find the key in the folders dict whose value matches folder_id
         if folder_id:
@@ -525,26 +519,26 @@ def export_notebook(
             item_path = os.path.join(project_path, workspace_path)
 
         unpack_item_definition(
-            definition, f'{item_path}/{notebook_name}.Notebook'
+            definition, f'{item_path}/{dataflow_name}.Dataflow'
         )
 
-        if 'notebooks' not in config:
-            config['notebooks'] = {}
-        if notebook_name not in config['notebooks']:
-            config['notebooks'][notebook_name] = {}
-        if 'id' not in config['notebooks'][notebook_name]:
-            config['notebooks'][notebook_name]['id'] = notebook_id
-        if 'description' not in config['notebooks'][notebook_name]:
-            config['notebooks'][notebook_name]['description'] = notebook_descr
+        if 'dataflows' not in config:
+            config['dataflows'] = {}
+        if dataflow_name not in config['dataflows']:
+            config['dataflows'][dataflow_name] = {}
+        if 'id' not in config['dataflows'][dataflow_name]:
+            config['dataflows'][dataflow_name]['id'] = dataflow_id
+        if 'description' not in config['dataflows'][dataflow_name]:
+            config['dataflows'][dataflow_name]['description'] = dataflow_descr
 
         if folder_id:
-            if 'folder_id' not in config['notebooks'][notebook_name]:
-                config['notebooks'][notebook_name]['folder_id'] = folder_id
+            if 'folder_id' not in config['dataflows'][dataflow_name]:
+                config['dataflows'][dataflow_name]['folder_id'] = folder_id
 
-        # Update the config with the notebook details
-        config['notebooks'][notebook_name]['id'] = notebook_id
-        config['notebooks'][notebook_name]['description'] = notebook_descr
-        config['notebooks'][notebook_name]['folder_id'] = folder_id
+        # Update the config with the dataflow details
+        config['dataflows'][dataflow_name]['id'] = dataflow_id
+        config['dataflows'][dataflow_name]['description'] = dataflow_descr
+        config['dataflows'][dataflow_name]['folder_id'] = folder_id
 
         # Saving the updated config back to the config file
         existing_config[branch][workspace_name_without_suffix] = config
@@ -553,11 +547,11 @@ def export_notebook(
     else:
         unpack_item_definition(
             definition,
-            f'{project_path}/{workspace_path}/{notebook_name}.Notebook',
+            f'{project_path}/{workspace_path}/{dataflow_name}.Dataflow',
         )
 
 
-def export_all_notebooks(
+def export_all_dataflows(
     workspace: str,
     project_path: str,
     *,
@@ -569,7 +563,7 @@ def export_all_notebooks(
     branches_path: str = None,
 ) -> None:
     """
-    Exports all notebooks to the specified folder structure.
+    Exports all dataflows to the specified folder structure.
 
     Args:
         workspace (str): The workspace name or ID.
@@ -584,21 +578,20 @@ def export_all_notebooks(
 
     Examples:
         ```python
-        export_all_notebooks('MyProjectWorkspace', 'path/to/project')
-        export_all_notebooks('MyProjectWorkspace', 'path/to/project', branch='main')
-        export_all_notebooks('MyProjectWorkspace', 'path/to/project', workspace_suffix='Workspace')
+        export_all_dataflows('MyProjectWorkspace', 'path/to/project')
+        export_all_dataflows('MyProjectWorkspace', 'path/to/project', branch='feature-branch')
         ```
     """
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return None
 
-    notebooks = list_notebooks(workspace_id)
-    if notebooks:
-        for notebook in notebooks:
-            export_notebook(
+    dataflows = list_dataflows(workspace_id)
+    if dataflows:
+        for dataflow in dataflows:
+            export_dataflow(
                 workspace=workspace,
-                notebook=notebook['displayName'],
+                dataflow=dataflow['displayName'],
                 project_path=project_path,
                 workspace_path=workspace_path,
                 update_config=update_config,
@@ -609,7 +602,7 @@ def export_all_notebooks(
             )
 
 
-def deploy_notebook(
+def deploy_dataflow(
     workspace: str,
     display_name: str,
     project_path: str,
@@ -622,24 +615,28 @@ def deploy_notebook(
     branches_path: str = None,
 ) -> None:
     """
-    Creates or updates a notebook in Fabric based on local folder structure.
-    Automatically detects the folder_id based on where the notebook is located locally.
+    Creates or updates a dataflow in Fabric based on local folder structure.
+    Automatically detects the folder_id based on where the dataflow is located locally.
 
     Args:
         workspace (str): The workspace name or ID.
-        display_name (str): The display name of the notebook.
+        display_name (str): The display name of the dataflow.
         project_path (str): The root path of the project.
         workspace_path (str): The workspace folder name. Defaults to "workspace".
         config_path (str): The path to the config file. Defaults to "config.json".
-        description (str, optional): A description for the notebook.
+        description (str, optional): A description for the dataflow.
         branch (str, optional): The branch name. Will be auto-detected if not provided.
         workspace_suffix (str, optional): The workspace suffix. Will be read from config if not provided.
 
+    Returns:
+        None
+
     Examples:
         ```python
-        deploy_notebook('MyProjectWorkspace', 'SalesDataModel', 'path/to/project')
-        deploy_notebook('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', 'path/to/project')
+        deploy_dataflow('MyProjectWorkspace', 'SalesDataModel', 'path/to/project')
+        deploy_dataflow('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', 'path/to/project', description='Sales data model')
         ```
+
     """
     workspace_path = _resolve_workspace_path(
         workspace=workspace,
@@ -678,38 +675,38 @@ def deploy_notebook(
         )
         folders_mapping = {}
 
-    # Find where the notebook is located locally
-    notebook_folder_path = None
-    notebook_full_path = None
+    # Find where the dataflow is located locally
+    dataflow_folder_path = None
+    dataflow_full_path = None
 
-    # Check if notebook exists in workspace root
-    root_path = f'{project_path}/{workspace_path}/{display_name}.Notebook'
+    # Check if dataflow exists in workspace root
+    root_path = f'{project_path}/{workspace_path}/{display_name}.dataflow'
     if os.path.exists(root_path):
-        notebook_folder_path = workspace_path
-        notebook_full_path = root_path
-        logger.debug(f'Found notebook in workspace root: {root_path}')
+        dataflow_folder_path = workspace_path
+        dataflow_full_path = root_path
+        logger.debug(f'Found dataflow in workspace root: {root_path}')
     else:
-        # Search for the notebook in subfolders (only once)
+        # Search for the dataflow in subfolders (only once)
         base_search_path = f'{project_path}/{workspace_path}'
         logger.debug(
-            f'Searching for {display_name}.Notebook in: {base_search_path}'
+            f'Searching for {display_name}.dataflow in: {base_search_path}'
         )
 
         for root, dirs, files in os.walk(base_search_path):
-            if f'{display_name}.Notebook' in dirs:
-                notebook_full_path = os.path.join(
-                    root, f'{display_name}.Notebook'
+            if f'{display_name}.dataflow' in dirs:
+                dataflow_full_path = os.path.join(
+                    root, f'{display_name}.dataflow'
                 )
-                notebook_folder_path = os.path.relpath(
+                dataflow_folder_path = os.path.relpath(
                     root, project_path
                 ).replace('\\', '/')
-                logger.debug(f'Found notebook in: {notebook_full_path}')
-                logger.debug(f'Relative folder path: {notebook_folder_path}')
+                logger.debug(f'Found dataflow in: {dataflow_full_path}')
+                logger.debug(f'Relative folder path: {dataflow_folder_path}')
                 break
 
-    if not notebook_folder_path or not notebook_full_path:
+    if not dataflow_folder_path or not dataflow_full_path:
         logger.debug(
-            f'notebook {display_name}.Notebook not found in local structure'
+            f'dataflow {display_name}.dataflow not found in local structure'
         )
         logger.debug(f'Searched in: {project_path}/{workspace_path}')
         return None
@@ -717,15 +714,15 @@ def deploy_notebook(
     # Determine folder_id based on local path
     folder_id = None
 
-    # Para notebooks em subpastas, precisamos mapear o caminho da pasta pai
-    if notebook_folder_path != workspace_path:
-        # O notebook está em uma subpasta, precisamos encontrar o folder_id
+    # Para dataflows em subpastas, precisamos mapear o caminho da pasta pai
+    if dataflow_folder_path != workspace_path:
+        # O dataflow está em uma subpasta, precisamos encontrar o folder_id
         # Remover o "workspace/" do início do caminho para obter apenas a estrutura de pastas
-        folder_relative_path = notebook_folder_path.replace(
+        folder_relative_path = dataflow_folder_path.replace(
             f'{workspace_path}/', ''
         )
 
-        logger.debug(f'notebook located in subfolder: {folder_relative_path}')
+        logger.debug(f'dataflow located in subfolder: {folder_relative_path}')
 
         # Procurar nos mapeamentos de pastas
         if folder_relative_path in folders_mapping:
@@ -741,61 +738,61 @@ def deploy_notebook(
                 f'Available folder mappings: {list(folders_mapping.keys())}'
             )
     else:
-        logger.debug(f'notebook will be created in workspace root')
+        logger.debug(f'dataflow will be created in workspace root')
 
     # Create the definition
-    definition = pack_item_definition(notebook_full_path)
+    definition = pack_item_definition(dataflow_full_path)
 
-    # Check if notebook already exists (check only once)
-    notebook_id = resolve_notebook(workspace_id, display_name, silent=True)
+    # Check if dataflow already exists (check only once)
+    dataflow_id = resolve_dataflow(workspace_id, display_name, silent=True)
 
-    if notebook_id:
-        logger.info(f"notebook '{display_name}' already exists, updating...")
-        # Update existing notebook
+    if dataflow_id:
+        logger.info(f"dataflow '{display_name}' already exists, updating...")
+        # Update existing dataflow
         payload = {'definition': definition}
         if description:
             payload['description'] = description
 
-        response = api_core_request(
-            endpoint=f'/workspaces/{workspace_id}/notebooks/{notebook_id}/updateDefinition',
+        response = _api_request(
+            endpoint=f'/workspaces/{workspace_id}/dataflows/{dataflow_id}/updateDefinition',
             method='post',
             payload=payload,
             params={'updateMetadata': True},
         )
         if response and response.error:
             logger.warning(
-                f"Failed to update notebook '{display_name}': {response.error}"
+                f"Failed to update dataflow '{display_name}': {response.error}"
             )
             return None
 
-        logger.success(f"Successfully updated notebook '{display_name}'")
-        return get_notebook(workspace_id, notebook_id)
+        logger.success(f"Successfully updated dataflow '{display_name}'")
+        return get_dataflow(workspace_id, dataflow_id)
 
     else:
-        logger.info(f'Creating new notebook: {display_name}')
-        # Create new notebook
+        logger.info(f'Creating new dataflow: {display_name}')
+        # Create new dataflow
         payload = {'displayName': display_name, 'definition': definition}
         if description:
             payload['description'] = description
         if folder_id:
             payload['folderId'] = folder_id
 
-        response = api_core_request(
-            endpoint=f'/workspaces/{workspace_id}/notebooks',
+        response = _api_request(
+            endpoint=f'/workspaces/{workspace_id}/dataflows',
             method='post',
             payload=payload,
         )
         if response and response.error:
             logger.warning(
-                f"Failed to create notebook '{display_name}': {response.error}"
+                f"Failed to create dataflow '{display_name}': {response.error}"
             )
             return None
 
-        logger.success(f"Successfully created notebook '{display_name}'")
-        return get_notebook(workspace_id, display_name)
+        logger.success(f"Successfully created dataflow '{display_name}'")
+        return get_dataflow(workspace_id, display_name)
 
 
-def deploy_all_notebooks(
+def deploy_all_dataflows(
     workspace: str,
     project_path: str,
     *,
@@ -804,10 +801,10 @@ def deploy_all_notebooks(
     branch: str = None,
     workspace_suffix: str = None,
     branches_path: str = None,
-) -> list[str] | None:
+) -> None:
     """
-    Deploy all notebooks from a project path.
-    Searches recursively through all folders to find .Notebook directories.
+    Deploy all dataflows from a project path.
+    Searches recursively through all folders to find .Dataflow directories.
 
     Args:
         workspace (str): The workspace name or ID.
@@ -823,9 +820,8 @@ def deploy_all_notebooks(
 
     Examples:
         ```python
-        deploy_all_notebooks('MyProjectWorkspace', 'path/to/project')
-        deploy_all_notebooks('MyProjectWorkspace', 'path/to/project', branch='main')
-        deploy_all_notebooks('MyProjectWorkspace', 'path/to/project', workspace_suffix='Workspace')
+        deploy_all_dataflows('MyProjectWorkspace', 'path/to/project')
+        deploy_all_dataflows('MyProjectWorkspace', 'path/to/project', branch='feature-branch')
         ```
     """
     workspace_path = _resolve_workspace_path(
@@ -840,17 +836,17 @@ def deploy_all_notebooks(
         logger.error(f'Base path does not exist: {base_path}')
         return None
 
-    # Find all notebook folders recursively
-    notebook_folders = []
+    # Find all dataflow folders recursively
+    dataflow_folders = []
     for root, dirs, files in os.walk(base_path):
         for dir_name in dirs:
-            if dir_name.endswith('.Notebook'):
+            if dir_name.endswith('.dataflow'):
                 full_path = os.path.join(root, dir_name)
-                # Extract just the notebook name (without .Notebook suffix)
-                notebook_name = dir_name.replace('.Notebook', '')
-                notebook_folders.append(
+                # Extract just the dataflow name (without .dataflow suffix)
+                dataflow_name = dir_name.replace('.dataflow', '')
+                dataflow_folders.append(
                     {
-                        'name': notebook_name,
+                        'name': dataflow_name,
                         'path': full_path,
                         'relative_path': os.path.relpath(
                             full_path, project_path
@@ -858,22 +854,22 @@ def deploy_all_notebooks(
                     }
                 )
 
-    if not notebook_folders:
-        logger.warning(f'No notebook folders found in {base_path}')
+    if not dataflow_folders:
+        logger.warning(f'No dataflow folders found in {base_path}')
         return None
 
-    logger.debug(f'Found {len(notebook_folders)} notebooks to deploy:')
-    for notebook in notebook_folders:
-        logger.debug(f"  - {notebook['name']} at {notebook['relative_path']}")
+    logger.debug(f'Found {len(dataflow_folders)} dataflows to deploy:')
+    for dataflow in dataflow_folders:
+        logger.debug(f"  - {dataflow['name']} at {dataflow['relative_path']}")
 
-    # Deploy each notebook
-    deployed_notebooks = []
-    for notebook_info in notebook_folders:
+    # Deploy each dataflow
+    deployed_dataflows = []
+    for dataflow_info in dataflow_folders:
         try:
-            logger.debug(f"Deploying notebook: {notebook_info['name']}")
-            result = deploy_notebook(
+            logger.debug(f"Deploying dataflow: {dataflow_info['name']}")
+            result = deploy_dataflow(
                 workspace=workspace,
-                display_name=notebook_info['name'],
+                display_name=dataflow_info['name'],
                 project_path=project_path,
                 workspace_path=workspace_path,
                 config_path=config_path,
@@ -882,14 +878,14 @@ def deploy_all_notebooks(
                 branches_path=branches_path,
             )
             if result:
-                deployed_notebooks.append(notebook_info['name'])
-                logger.debug(f"Successfully deployed: {notebook_info['name']}")
+                deployed_dataflows.append(dataflow_info['name'])
+                logger.debug(f"Successfully deployed: {dataflow_info['name']}")
             else:
-                logger.debug(f"Failed to deploy: {notebook_info['name']}")
+                logger.debug(f"Failed to deploy: {dataflow_info['name']}")
         except Exception as e:
-            logger.error(f"Error deploying {notebook_info['name']}: {str(e)}")
+            logger.error(f"Error deploying {dataflow_info['name']}: {str(e)}")
 
     logger.success(
-        f'Deployment completed. Successfully deployed {len(deployed_notebooks)} notebooks.'
+        f'Deployment completed. Successfully deployed {len(deployed_dataflows)} dataflows.'
     )
-    return deployed_notebooks
+    return deployed_dataflows

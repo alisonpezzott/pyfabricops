@@ -11,12 +11,12 @@ from pathlib import Path
 import json5
 import pandas
 
-from ._exceptions import (
+from .exceptions import (
     ConfigurationError,
     FileNotFoundError,
     ResourceNotFoundError,
 )
-from ._logging import get_logger
+from .logging import get_logger
 
 logger = get_logger(__name__)
 

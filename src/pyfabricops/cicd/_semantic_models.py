@@ -371,7 +371,7 @@ def deploy_semantic_model(
         if description:
             payload['description'] = description
 
-        response = api_core_request(
+        response = _api_request(
             endpoint=f'/workspaces/{workspace_id}/semanticModels/{semantic_model_id}/updateDefinition',
             method='post',
             payload=payload,
@@ -395,7 +395,7 @@ def deploy_semantic_model(
         if folder_id:
             payload['folderId'] = folder_id
 
-        response = api_core_request(
+        response = _api_request(
             endpoint=f'/workspaces/{workspace_id}/semanticModels',
             method='post',
             payload=payload,
@@ -1051,7 +1051,7 @@ def bind_semantic_model_to_gateway(
     if datasource_ids:
         payload['datasourceObjectIds'] = datasource_ids
 
-    response = api_core_request(
+    response = _api_request(
         endpoint=f'/groups/{workspace}/datasets/{semantic_model}/Default.BindToGateway',
         method='post',
         payload=payload,
@@ -1156,7 +1156,7 @@ def refresh_semantic_model(
     if type:
         payload['type'] = type
 
-    response = api_core_request(
+    response = _api_request(
         endpoint=f'/groups/{workspace_id}/datasets/{semantic_model_id}/refreshes',
         method='post',
         payload=payload,

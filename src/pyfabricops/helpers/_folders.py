@@ -1,5 +1,5 @@
-from .._folders import list_folders
-from .._logging import get_logger
+from ..core.folders import list_folders
+from ..utils.logging import get_logger
 
 
 logger = get_logger(__name__)

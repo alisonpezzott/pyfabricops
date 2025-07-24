@@ -1,14 +1,12 @@
-import logging
 import os
 
 import pandas
 
-from ._core import api_core_request, lro_handler, pagination_handler
-from ._decorators import df
-from ._fabric_items import _FABRIC_ITEMS
-from ._folders import resolve_folder
-from ._logging import get_logger
-from ._utils import (
+from ..api.api import _api_request, _lro_handler, _pagination_handler
+from ..utils.decorators import df
+from ..core.folders import resolve_folder
+from ..utils.logging import get_logger
+from ..utils.utils import (
     get_current_branch,
     get_workspace_suffix,
     is_valid_uuid,
@@ -17,7 +15,7 @@ from ._utils import (
     unpack_item_definition,
     write_json,
 )
-from ._workspaces import (
+from ..core.workspaces import (
     _resolve_workspace_path,
     get_workspace,
     resolve_workspace,
@@ -27,141 +25,108 @@ logger = get_logger(__name__)
 
 
 @df
-def list_items(
-    workspace: str, *, excluded_starts: tuple = ('Staging'), df: bool = False
-) -> list | pandas.DataFrame:
+def list_notebooks(
+    workspace: str, *, df: bool = False
+) -> list | pandas.DataFrame | None:
     """
-    Returns a list of items from the specified workspace.
-    This API supports pagination.
+    Lists all notebooks in the specified workspace.
 
     Args:
         workspace (str): The workspace name or ID.
-        excluded_starts (tuple): A tuple of prefixes to exclude from the list.
         df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
 
     Returns:
-        (list|pandas.DataFrame): A list of items, excluding those that start with the specified prefixes. If `df=True`, returns a DataFrame with flattened keys.
+        (list | pandas.DataFrame | None): A list of notebooks, a DataFrame with flattened keys, or None if not found.
 
     Examples:
         ```python
-        list_items('MyProjectWorkspace')
-        list_items('MyProjectWorkspace', excluded_starts=('Staging', 'ware'))
+        list_notebooks('MyProjectWorkspace')
+        list_notebooks('MyProjectWorkspace', df=True)
         ```
     """
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return None
-
-    response = api_core_request(endpoint=f'/workspaces/{workspace_id}/items')
+    response = _api_request(
+        endpoint=f'/workspaces/{workspace_id}/notebooks'
+    )
     if not response.success:
         logger.warning(f'{response.status_code}: {response.error}.')
         return None
     else:
-        response = pagination_handler(response)
-    items = [
-        item
-        for item in response.data.get('value', [])
-        if not item['displayName'].startswith(excluded_starts)
-    ]
-    if not items:
-        logger.warning(f"No valid items found in workspace '{workspace}'.")
-        return None
-    else:
-        return items
+        response = _pagination_handler(response)
+        return response.data.get('value')
 
 
-def resolve_item(
-    workspace: str, item: str, *, silent: bool = False
+def resolve_notebook(
+    workspace: str, notebook: str, *, silent: bool = False
 ) -> str | None:
     """
-    Resolves a item name to its ID.
+    Resolves a notebook name to its ID.
 
     Args:
         workspace (str): The ID of the workspace.
-        item (str): The name of the item.
+        notebook (str): The name of the notebook.
         silent (bool): If True, suppresses warnings. Defaults to False.
 
     Returns:
-        str|None: The ID of the item, or None if not found.
+        str | None: The ID of the notebook, or None if not found.
 
     Examples:
         ```python
-        resolve_item('MyProjectWorkspace', 'SalesDataModel')
-        resolve_item('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000')
+        resolve_notebook('MyProjectWorkspace', 'SalesDataNotebook')
         ```
     """
-    if is_valid_uuid(item):
-        return item
+    if is_valid_uuid(notebook):
+        return notebook
 
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return None
 
-    items = list_items(workspace, df=False)
-    if not items:
+    notebooks = list_notebooks(workspace, df=False)
+    if not notebooks:
         return None
 
-    name = item.split('.')[0]
-    type = item.split('.')[-1]
-    if not name or not type:
-        if not silent:
-            logger.warning(
-                f"Invalid item format '{item}'. Expected 'Name.Type'."
-            )
-        return None
-
-    valid_types = _FABRIC_ITEMS.keys()
-    if type not in valid_types:
-        if not silent:
-            logger.warning(
-                f"Invalid item type '{type}'. Valid types are: {', '.join(valid_types)}."
-            )
-        return None
-
-    for item_ in items:
-        name_ = item_.get('displayName')
-        type_ = item_.get('type')
-        if name_ == name and type_ == type_:
-            return item_['id']
+    for notebook_ in notebooks:
+        if notebook_['displayName'] == notebook:
+            return notebook_['id']
     if not silent:
-        logger.warning(f"Item '{item}' not found.")
+        logger.warning(f"Notebook '{notebook}' not found.")
     return None
 
 
 @df
-def get_item(
-    workspace: str,
-    item: str,
-    *,
-    df: bool = False,
+def get_notebook(
+    workspace: str, notebook: str, *, df: bool = False
 ) -> dict | pandas.DataFrame | None:
     """
-    Retrieves a specific item from the workspace.
+    Retrieves a notebook by its name or ID from the specified workspace.
 
     Args:
         workspace (str): The workspace name or ID.
-        item (str): The name or ID of the item to retrieve.
+        notebook (str): The name or ID of the notebook.
         df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
 
     Returns:
-        (dict | pandas.DataFrame | None): The item details as a dictionary or DataFrame, or None if not found.
+        (dict or pandas.DataFrame): The notebook details if found. If `df=True`, returns a DataFrame with flattened keys.
 
     Examples:
         ```python
-        get_item('MyProjectWorkspace', 'SalesDataModel')
-        get_item('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', df=True)
+        get_notebook('MyProjectWorkspace', 'SalesDataNotebook')
+        get_notebook('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', df=True)
         ```
     """
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return None
 
-    item_id = resolve_item(workspace_id, item)
-    if not item_id:
+    notebook_id = resolve_notebook(workspace_id, notebook)
+    if not notebook_id:
         return None
 
-    response = api_core_request(
-        endpoint=f'/workspaces/{workspace_id}/items/{item_id}'
+    response = _api_request(
+        endpoint=f'/workspaces/{workspace_id}/notebooks/{notebook_id}'
     )
 
     if not response.success:
@@ -172,57 +137,57 @@ def get_item(
 
 
 @df
-def update_item(
+def update_notebook(
     workspace: str,
-    item: str,
+    notebook: str,
     *,
     display_name: str = None,
     description: str = None,
     df: bool = False,
 ) -> dict | pandas.DataFrame:
     """
-    Updates the properties of the specified semantic model.
+    Updates the properties of the specified notebook.
 
     Args:
         workspace (str): The workspace name or ID.
-        item (str): The name or ID of the item to update.
-        display_name (str, optional): The new display name for the item.
-        description (str, optional): The new description for the item.
+        notebook (str): The name or ID of the notebook to update.
+        display_name (str, optional): The new display name for the notebook.
+        description (str, optional): The new description for the notebook.
 
     Returns:
-        (dict or None): The updated semantic model details if successful, otherwise None.
+        (dict or None): The updated notebook details if successful, otherwise None.
 
     Examples:
         ```python
-        update_item('MyProjectWorkspace', 'SalesDataModel', display_name='UpdatedSalesDataModel')
-        update_item('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', description='Updated description')
+        update_notebook('MyProjectWorkspace', 'SalesDataModel', display_name='UpdatedSalesDataModel')
+        update_notebook('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', description='Updated description')
         ```
     """
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return None
 
-    item_id = resolve_item(workspace_id, item)
-    if not item_id:
+    notebook_id = resolve_notebook(workspace_id, notebook)
+    if not notebook_id:
         return None
 
-    item_ = get_item(workspace_id, item_id)
-    if not item_:
+    notebook_ = get_notebook(workspace_id, notebook_id)
+    if not notebook_:
         return None
 
-    item_description = item_['description']
-    item_display_name = item_['displayName']
+    notebook_description = notebook_['description']
+    notebook_display_name = notebook_['displayName']
 
     payload = {}
 
-    if item_display_name != display_name and display_name:
+    if notebook_display_name != display_name and display_name:
         payload['displayName'] = display_name
 
-    if item_description != description and description:
+    if notebook_description != description and description:
         payload['description'] = description
 
-    response = api_core_request(
-        endpoint=f'/workspaces/{workspace_id}/items/{item_id}',
+    response = _api_request(
+        endpoint=f'/workspaces/{workspace_id}/notebooks/{notebook_id}',
         method='put',
         payload=payload,
     )
@@ -234,36 +199,36 @@ def update_item(
         return response.data
 
 
-def delete_item(workspace: str, item: str) -> None:
+def delete_notebook(workspace: str, notebook: str) -> None:
     """
-    Delete a item from the specified workspace.
+    Delete a notebook from the specified workspace.
 
     Args:
         workspace (str): The name or ID of the workspace to delete.
-        item (str): The name or ID of the item to delete.
+        notebook (str): The name or ID of the notebook to delete.
 
     Returns:
-        None: If the item is successfully deleted.
+        None: If the notebook is successfully deleted.
 
     Raises:
         ResourceNotFoundError: If the specified workspace is not found.
 
     Examples:
         ```python
-        delete_item('MyProjectWorkspace', 'Salesitem')
-        delete_item('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000')
+        delete_notebook('MyProjectWorkspace', 'SalesDataNotebook')
+        delete_notebook('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000')
         ```
     """
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return None
 
-    item_id = resolve_item(workspace_id, item)
-    if not item_id:
+    notebook_id = resolve_notebook(workspace_id, notebook)
+    if not notebook_id:
         return None
 
-    response = api_core_request(
-        endpoint=f'/workspaces/{workspace_id}/items/{item_id}',
+    response = _api_request(
+        endpoint=f'/workspaces/{workspace_id}/notebooks/{notebook_id}',
         method='delete',
         return_raw=True,
     )
@@ -274,21 +239,21 @@ def delete_item(workspace: str, item: str) -> None:
         return True
 
 
-def get_item_definition(workspace: str, item: str) -> dict:
+def get_notebook_definition(workspace: str, notebook: str) -> dict:
     """
-    Retrieves the definition of a item by its name or ID from the specified workspace.
+    Retrieves the definition of a notebook by its name or ID from the specified workspace.
 
     Args:
         workspace (str): The workspace name or ID.
-        item (str): The name or ID of the item.
+        notebook (str): The name or ID of the notebook.
 
     Returns:
-        (dict): The item definition if found, otherwise None.
+        (dict): The notebook definition if found, otherwise None.
 
     Examples:
         ```python
-        get_item_definition('MyProjectWorkspace', 'Salesitem')
-        get_item_definition('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000')
+        get_notebook_definition('MyProjectWorkspace', 'Salesnotebook')
+        get_notebook_definition('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000')
         ```
     """
     # Resolving IDs
@@ -296,13 +261,13 @@ def get_item_definition(workspace: str, item: str) -> dict:
     if not workspace_id:
         return None
 
-    item_id = resolve_item(workspace_id, item)
-    if not item_id:
+    notebook_id = resolve_notebook(workspace_id, notebook)
+    if not notebook_id:
         return None
 
     # Requesting
-    response = api_core_request(
-        endpoint=f'/workspaces/{workspace_id}/items/{item_id}/getDefinition',
+    response = _api_request(
+        endpoint=f'/workspaces/{workspace_id}/notebooks/{notebook_id}/getDefinition',
         method='post',
     )
     if not response.success:
@@ -310,7 +275,7 @@ def get_item_definition(workspace: str, item: str) -> dict:
         return None
     elif response.status_code == 202:
         # If the response is a long-running operation, handle it
-        lro_response = lro_handler(response)
+        lro_response = _lro_handler(response)
         if not lro_response.success:
             logger.warning(
                 f'{lro_response.status_code}: {lro_response.error}.'
@@ -326,39 +291,41 @@ def get_item_definition(workspace: str, item: str) -> dict:
         return None
 
 
-def update_item_definition(workspace: str, item: str, path: str) -> dict:
+def update_notebook_definition(
+    workspace: str, notebook: str, path: str
+) -> dict | None:
     """
-    Updates the definition of an existing item in the specified workspace.
-    If the item does not exist, it returns None.
+    Updates the definition of an existing notebook in the specified workspace.
+    If the notebook does not exist, it returns None.
 
     Args:
         workspace (str): The workspace name or ID.
-        item (str): The name or ID of the item to update.
-        path (str): The path to the item definition.
+        notebook (str): The name or ID of the notebook to update.
+        path (str): The path to the notebook definition.
 
     Returns:
-        (dict or None): The updated item details if successful, otherwise None.
+        (dict or None): The updated notebook details if successful, otherwise None.
 
     Examples:
         ```python
-        update_item_definition('MyProjectWorkspace', 'SalesDataModel', '/path/to/updated/definition.json')
-        update_item_definition('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', '/path/to/updated/definition.json')
+        update_notebook('MyProjectWorkspace', 'SalesDataModel', display_name='UpdatedSalesDataModel')
+        update_notebook('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', description='Updated description')
         ```
     """
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return None
 
-    item_id = resolve_item(workspace_id, item)
-    if not item_id:
+    notebook_id = resolve_notebook(workspace_id, notebook)
+    if not notebook_id:
         return None
 
     definition = pack_item_definition(path)
 
     params = {'updateMetadata': True}
 
-    response = api_core_request(
-        endpoint=f'/workspaces/{workspace_id}/items/{item_id}/updateDefinition',
+    response = _api_request(
+        endpoint=f'/workspaces/{workspace_id}/notebooks/{notebook_id}/updateDefinition',
         method='post',
         payload={'definition': definition},
         params=params,
@@ -368,7 +335,7 @@ def update_item_definition(workspace: str, item: str, path: str) -> dict:
         return None
     elif response.status_code == 202:
         # If the response is a long-running operation, handle it
-        lro_response = lro_handler(response)
+        lro_response = _lro_handler(response)
         if not lro_response.success:
             logger.warning(
                 f'{lro_response.status_code}: {lro_response.error}.'
@@ -384,31 +351,31 @@ def update_item_definition(workspace: str, item: str, path: str) -> dict:
         return None
 
 
-def create_item(
+def create_notebook(
     workspace: str,
     display_name: str,
     path: str,
     *,
     description: str = None,
     folder: str = None,
-):
+) -> dict | None:
     """
-    Creates a new item in the specified workspace.
+    Creates a new notebook in the specified workspace.
 
     Args:
         workspace (str): The workspace name or ID.
-        display_name (str): The display name of the item.
-        description (str, optional): A description for the item.
-        folder (str, optional): The folder to create the item in.
-        path (str): The path to the item definition file.
+        display_name (str): The display name of the notebook.
+        description (str, optional): A description for the notebook.
+        folder (str, optional): The folder to create the notebook in.
+        path (str): The path to the notebook definition file.
 
     Returns:
-        (dict): The created item details.
+        (dict): The created notebook details.
 
     Examples:
         ```python
-        create_item('MyProjectWorkspace', 'SalesDataModel', '/path/to/definition.json')
-        create_item('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', '/path/to/definition.json')
+        create_notebook('MyProjectWorkspace', 'SalesDataModel', 'path/to/definition.json')
+        create_notebook('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', 'path/to/definition.json')
         ```
     """
     workspace_id = resolve_workspace(workspace)
@@ -429,8 +396,8 @@ def create_item(
         else:
             payload['folderId'] = folder_id
 
-    response = api_core_request(
-        endpoint=f'/workspaces/{workspace_id}/items',
+    response = _api_request(
+        endpoint=f'/workspaces/{workspace_id}/notebooks',
         method='post',
         payload=payload,
     )
@@ -440,7 +407,7 @@ def create_item(
         return None
     elif response.status_code == 202:
         # If the response is a long-running operation, handle it
-        lro_response = lro_handler(response)
+        lro_response = _lro_handler(response)
         if not lro_response.success:
             logger.warning(
                 f'{lro_response.status_code}: {lro_response.error}.'
@@ -456,9 +423,9 @@ def create_item(
         return None
 
 
-def export_item(
+def export_notebook(
     workspace: str,
-    item: str,
+    notebook: str,
     project_path: str,
     *,
     workspace_path: str = None,
@@ -467,13 +434,13 @@ def export_item(
     branch: str = None,
     workspace_suffix: str = None,
     branches_path: str = None,
-):
+) -> None:
     """
-    Exports a item definition to a specified folder structure.
+    Exports a notebook definition to a specified folder structure.
 
     Args:
         workspace (str): The workspace name or ID.
-        item (str): The name of the item to export.
+        notebook (str): The name of the notebook to export.
         project_path (str): The root path of the project.
         workspace_path (str, optional): The path to the workspace folder. Defaults to "workspace".
         config_path (str): The path to the config file. Defaults to "config.json".
@@ -487,26 +454,31 @@ def export_item(
 
     Examples:
         ```python
-        export_item('MyProjectWorkspace', 'SalesDataModel', '/path/to/project')
-        export_item('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', '/path/to/project')
+        export_notebook('MyProjectWorkspace', 'SalesDataModel', 'path/to/project')
+        export_notebook('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', 'path/to/project')
         ```
     """
+    workspace_path = _resolve_workspace_path(
+        workspace=workspace,
+        workspace_suffix=workspace_suffix,
+        project_path=project_path,
+        workspace_path=workspace_path,
+    )
     workspace_id = resolve_workspace(workspace)
     workspace_name = get_workspace(workspace_id).get('displayName')
     if not workspace_id:
         return None
 
-    item_ = get_item(workspace_id, item)
-    if not item_:
+    notebook_ = get_notebook(workspace_id, notebook)
+    if not notebook_:
         return None
 
-    item_id = item_['id']
-    item_type = item_['type']
+    notebook_id = notebook_['id']
     folder_id = None
-    if 'folderId' in item_:
-        folder_id = item_['folderId']
+    if 'folderId' in notebook_:
+        folder_id = notebook_['folderId']
 
-    definition = get_item_definition(workspace_id, item_id)
+    definition = get_notebook_definition(workspace_id, notebook_id)
     if not definition:
         return None
 
@@ -538,16 +510,9 @@ def export_item(
 
         config = existing_config[branch][workspace_name_without_suffix]
 
-        item_id = item_['id']
-        item_name = item_['displayName']
-        item_descr = item_.get('description', '')
-
-        workspace_path = _resolve_workspace_path(
-            workspace=workspace,
-            workspace_suffix=workspace_suffix,
-            project_path=project_path,
-            workspace_path=workspace_path,
-        )
+        notebook_id = notebook_['id']
+        notebook_name = notebook_['displayName']
+        notebook_descr = notebook_.get('description', '')
 
         # Find the key in the folders dict whose value matches folder_id
         if folder_id:
@@ -560,31 +525,26 @@ def export_item(
             item_path = os.path.join(project_path, workspace_path)
 
         unpack_item_definition(
-            definition, f'{item_path}/{item_name}.{item_type}'
+            definition, f'{item_path}/{notebook_name}.Notebook'
         )
 
-        for k, v in _FABRIC_ITEMS.items():
-            if item_type == k:
-                items_config_type = v
-                break
-
-        if items_config_type not in config:
-            config[items_config_type] = {}
-        if item_name not in config[items_config_type]:
-            config[items_config_type][item_name] = {}
-        if 'id' not in config[items_config_type][item_name]:
-            config[items_config_type][item_name]['id'] = item_id
-        if 'description' not in config[items_config_type][item_name]:
-            config[items_config_type][item_name]['description'] = item_descr
+        if 'notebooks' not in config:
+            config['notebooks'] = {}
+        if notebook_name not in config['notebooks']:
+            config['notebooks'][notebook_name] = {}
+        if 'id' not in config['notebooks'][notebook_name]:
+            config['notebooks'][notebook_name]['id'] = notebook_id
+        if 'description' not in config['notebooks'][notebook_name]:
+            config['notebooks'][notebook_name]['description'] = notebook_descr
 
         if folder_id:
-            if 'folder_id' not in config[items_config_type][item_name]:
-                config[items_config_type][item_name]['folder_id'] = folder_id
+            if 'folder_id' not in config['notebooks'][notebook_name]:
+                config['notebooks'][notebook_name]['folder_id'] = folder_id
 
-        # Update the config with the item details
-        config[items_config_type][item_name]['id'] = item_id
-        config[items_config_type][item_name]['description'] = item_descr
-        config[items_config_type][item_name]['folder_id'] = folder_id
+        # Update the config with the notebook details
+        config['notebooks'][notebook_name]['id'] = notebook_id
+        config['notebooks'][notebook_name]['description'] = notebook_descr
+        config['notebooks'][notebook_name]['folder_id'] = folder_id
 
         # Saving the updated config back to the config file
         existing_config[branch][workspace_name_without_suffix] = config
@@ -593,11 +553,11 @@ def export_item(
     else:
         unpack_item_definition(
             definition,
-            f'{project_path}/{workspace_path}/{item_name}.{item_type}',
+            f'{project_path}/{workspace_path}/{notebook_name}.Notebook',
         )
 
 
-def export_all_items(
+def export_all_notebooks(
     workspace: str,
     project_path: str,
     *,
@@ -607,9 +567,9 @@ def export_all_items(
     branch: str = None,
     workspace_suffix: str = None,
     branches_path: str = None,
-):
+) -> None:
     """
-    Exports all items to the specified folder structure.
+    Exports all notebooks to the specified folder structure.
 
     Args:
         workspace (str): The workspace name or ID.
@@ -624,21 +584,21 @@ def export_all_items(
 
     Examples:
         ```python
-        export_all_items('MyProjectWorkspace', '/path/to/project')
-        export_all_items('MyProjectWorkspace', '/path/to/project', branch='main')
-        export_all_items('MyProjectWorkspace', '/path/to/project', workspace_suffix='Workspace')
+        export_all_notebooks('MyProjectWorkspace', 'path/to/project')
+        export_all_notebooks('MyProjectWorkspace', 'path/to/project', branch='main')
+        export_all_notebooks('MyProjectWorkspace', 'path/to/project', workspace_suffix='Workspace')
         ```
     """
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return None
 
-    items = list_items(workspace_id)
-    if items:
-        for item in items:
-            export_item(
+    notebooks = list_notebooks(workspace_id)
+    if notebooks:
+        for notebook in notebooks:
+            export_notebook(
                 workspace=workspace,
-                item=item['displayName'] + '.' + item['type'],
+                notebook=notebook['displayName'],
                 project_path=project_path,
                 workspace_path=workspace_path,
                 update_config=update_config,
@@ -649,9 +609,9 @@ def export_all_items(
             )
 
 
-def deploy_item(
+def deploy_notebook(
     workspace: str,
-    item_name_dot_type: str,
+    display_name: str,
     project_path: str,
     *,
     workspace_path: str = None,
@@ -660,27 +620,33 @@ def deploy_item(
     branch: str = None,
     workspace_suffix: str = None,
     branches_path: str = None,
-):
+) -> None:
     """
-    Creates or updates a item in Fabric based on local folder structure.
-    Automatically detects the folder_id based on where the item is located locally.
+    Creates or updates a notebook in Fabric based on local folder structure.
+    Automatically detects the folder_id based on where the notebook is located locally.
 
     Args:
         workspace (str): The workspace name or ID.
-        item_name_dot_type (str): The name and type of the item, formatted as "name.type".
+        display_name (str): The display name of the notebook.
         project_path (str): The root path of the project.
         workspace_path (str): The workspace folder name. Defaults to "workspace".
         config_path (str): The path to the config file. Defaults to "config.json".
-        description (str, optional): A description for the item.
+        description (str, optional): A description for the notebook.
         branch (str, optional): The branch name. Will be auto-detected if not provided.
         workspace_suffix (str, optional): The workspace suffix. Will be read from config if not provided.
 
     Examples:
         ```python
-        deploy_item('MyProjectWorkspace', 'SalesDataModel', '/path/to/project')
-        deploy_item('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', '/path/to/project')
+        deploy_notebook('MyProjectWorkspace', 'SalesDataModel', 'path/to/project')
+        deploy_notebook('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', 'path/to/project')
         ```
     """
+    workspace_path = _resolve_workspace_path(
+        workspace=workspace,
+        workspace_suffix=workspace_suffix,
+        project_path=project_path,
+        workspace_path=workspace_path,
+    )
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return None
@@ -712,56 +678,54 @@ def deploy_item(
         )
         folders_mapping = {}
 
-    # Find where the item is located locally
-    item_folder_path = None
-    item_full_path = None
+    # Find where the notebook is located locally
+    notebook_folder_path = None
+    notebook_full_path = None
 
-    # Check if item exists in workspace root
-    workspace_path = _resolve_workspace_path(
-        workspace=workspace,
-        workspace_suffix=workspace_suffix,
-        project_path=project_path,
-        workspace_path=workspace_path,
-    )
-    root_path = f'{project_path}/{workspace_path}/{item_name_dot_type}'
+    # Check if notebook exists in workspace root
+    root_path = f'{project_path}/{workspace_path}/{display_name}.Notebook'
     if os.path.exists(root_path):
-        item_folder_path = workspace_path
-        item_full_path = root_path
-        logger.debug(f'Found item in workspace root: {root_path}')
+        notebook_folder_path = workspace_path
+        notebook_full_path = root_path
+        logger.debug(f'Found notebook in workspace root: {root_path}')
     else:
-        # Search for the item in subfolders (only once)
+        # Search for the notebook in subfolders (only once)
         base_search_path = f'{project_path}/{workspace_path}'
         logger.debug(
-            f'Searching for {item_name_dot_type}.item in: {base_search_path}'
+            f'Searching for {display_name}.Notebook in: {base_search_path}'
         )
 
         for root, dirs, files in os.walk(base_search_path):
-            if f'{item_name_dot_type}' in dirs:
-                item_full_path = os.path.join(root, f'{item_name_dot_type}')
-                item_folder_path = os.path.relpath(root, project_path).replace(
-                    '\\', '/'
+            if f'{display_name}.Notebook' in dirs:
+                notebook_full_path = os.path.join(
+                    root, f'{display_name}.Notebook'
                 )
-                logger.debug(f'Found item in: {item_full_path}')
-                logger.debug(f'Relative folder path: {item_folder_path}')
+                notebook_folder_path = os.path.relpath(
+                    root, project_path
+                ).replace('\\', '/')
+                logger.debug(f'Found notebook in: {notebook_full_path}')
+                logger.debug(f'Relative folder path: {notebook_folder_path}')
                 break
 
-    if not item_folder_path or not item_full_path:
-        logger.debug(f'item {item_name_dot_type} not found in local structure')
+    if not notebook_folder_path or not notebook_full_path:
+        logger.debug(
+            f'notebook {display_name}.Notebook not found in local structure'
+        )
         logger.debug(f'Searched in: {project_path}/{workspace_path}')
         return None
 
     # Determine folder_id based on local path
     folder_id = None
 
-    # Para items em subpastas, precisamos mapear o caminho da pasta pai
-    if item_folder_path != workspace_path:
-        # O item está em uma subpasta, precisamos encontrar o folder_id
+    # Para notebooks em subpastas, precisamos mapear o caminho da pasta pai
+    if notebook_folder_path != workspace_path:
+        # O notebook está em uma subpasta, precisamos encontrar o folder_id
         # Remover o "workspace/" do início do caminho para obter apenas a estrutura de pastas
-        folder_relative_path = item_folder_path.replace(
+        folder_relative_path = notebook_folder_path.replace(
             f'{workspace_path}/', ''
         )
 
-        logger.debug(f'item located in subfolder: {folder_relative_path}')
+        logger.debug(f'notebook located in subfolder: {folder_relative_path}')
 
         # Procurar nos mapeamentos de pastas
         if folder_relative_path in folders_mapping:
@@ -777,62 +741,61 @@ def deploy_item(
                 f'Available folder mappings: {list(folders_mapping.keys())}'
             )
     else:
-        logger.debug(f'item will be created in workspace root')
+        logger.debug(f'notebook will be created in workspace root')
 
     # Create the definition
-    definition = pack_item_definition(item_full_path)
+    definition = pack_item_definition(notebook_full_path)
 
-    # Check if item already exists (check only once)
-    item_id = resolve_item(workspace_id, item_name_dot_type, silent=True)
+    # Check if notebook already exists (check only once)
+    notebook_id = resolve_notebook(workspace_id, display_name, silent=True)
 
-    if item_id:
-        logger.info(f"item '{item_name_dot_type}' already exists, updating...")
-        # Update existing item
+    if notebook_id:
+        logger.info(f"notebook '{display_name}' already exists, updating...")
+        # Update existing notebook
         payload = {'definition': definition}
         if description:
             payload['description'] = description
 
-        response = api_core_request(
-            endpoint=f'/workspaces/{workspace_id}/items/{item_id}/updateDefinition',
+        response = _api_request(
+            endpoint=f'/workspaces/{workspace_id}/notebooks/{notebook_id}/updateDefinition',
             method='post',
             payload=payload,
             params={'updateMetadata': True},
         )
         if response and response.error:
             logger.warning(
-                f"Failed to update item '{item_name_dot_type}': {response.error}"
+                f"Failed to update notebook '{display_name}': {response.error}"
             )
             return None
 
-        logger.success(f"Successfully updated item '{item_name_dot_type}'")
-        return get_item(workspace_id, item_id)
+        logger.success(f"Successfully updated notebook '{display_name}'")
+        return get_notebook(workspace_id, notebook_id)
 
     else:
-        logger.info(f'Creating new item: {item_name_dot_type}')
-        display_name = item_name_dot_type.split('.')[0]
-        # Create new item
+        logger.info(f'Creating new notebook: {display_name}')
+        # Create new notebook
         payload = {'displayName': display_name, 'definition': definition}
         if description:
             payload['description'] = description
         if folder_id:
             payload['folderId'] = folder_id
 
-        response = api_core_request(
-            endpoint=f'/workspaces/{workspace_id}/items',
+        response = _api_request(
+            endpoint=f'/workspaces/{workspace_id}/notebooks',
             method='post',
             payload=payload,
         )
         if response and response.error:
             logger.warning(
-                f"Failed to create item '{item_name_dot_type}': {response.error}"
+                f"Failed to create notebook '{display_name}': {response.error}"
             )
             return None
 
-        logger.success(f"Successfully created item '{item_name_dot_type}'")
-        return get_item(workspace_id, item_name_dot_type)
+        logger.success(f"Successfully created notebook '{display_name}'")
+        return get_notebook(workspace_id, display_name)
 
 
-def deploy_all_items(
+def deploy_all_notebooks(
     workspace: str,
     project_path: str,
     *,
@@ -841,10 +804,10 @@ def deploy_all_items(
     branch: str = None,
     workspace_suffix: str = None,
     branches_path: str = None,
-):
+) -> list[str] | None:
     """
-    Deploy all semantic models from a project path.
-    Searches recursively through all folders to find .SemanticModel directories.
+    Deploy all notebooks from a project path.
+    Searches recursively through all folders to find .Notebook directories.
 
     Args:
         workspace (str): The workspace name or ID.
@@ -860,28 +823,34 @@ def deploy_all_items(
 
     Examples:
         ```python
-        deploy_all_items('MyProjectWorkspace', '/path/to/project')
-        deploy_all_items('MyProjectWorkspace', '/path/to/project', branch='main')
-        deploy_all_items('MyProjectWorkspace', '/path/to/project', workspace_suffix='Workspace')
+        deploy_all_notebooks('MyProjectWorkspace', 'path/to/project')
+        deploy_all_notebooks('MyProjectWorkspace', 'path/to/project', branch='main')
+        deploy_all_notebooks('MyProjectWorkspace', 'path/to/project', workspace_suffix='Workspace')
         ```
     """
+    workspace_path = _resolve_workspace_path(
+        workspace=workspace,
+        workspace_suffix=workspace_suffix,
+        project_path=project_path,
+        workspace_path=workspace_path,
+    )
     base_path = f'{project_path}/{workspace_path}'
 
     if not os.path.exists(base_path):
         logger.error(f'Base path does not exist: {base_path}')
         return None
 
-    # Find all item folders recursively
-    item_folders = []
+    # Find all notebook folders recursively
+    notebook_folders = []
     for root, dirs, files in os.walk(base_path):
         for dir_name in dirs:
-            if dir_name.endswith('.item'):
+            if dir_name.endswith('.Notebook'):
                 full_path = os.path.join(root, dir_name)
-                # Extract just the item name (without .item suffix)
-                item_name = dir_name.replace('.item', '')
-                item_folders.append(
+                # Extract just the notebook name (without .Notebook suffix)
+                notebook_name = dir_name.replace('.Notebook', '')
+                notebook_folders.append(
                     {
-                        'name': item_name,
+                        'name': notebook_name,
                         'path': full_path,
                         'relative_path': os.path.relpath(
                             full_path, project_path
@@ -889,22 +858,22 @@ def deploy_all_items(
                     }
                 )
 
-    if not item_folders:
-        logger.warning(f'No item folders found in {base_path}')
+    if not notebook_folders:
+        logger.warning(f'No notebook folders found in {base_path}')
         return None
 
-    logger.debug(f'Found {len(item_folders)} items to deploy:')
-    for item in item_folders:
-        logger.debug(f"  - {item['name']} at {item['relative_path']}")
+    logger.debug(f'Found {len(notebook_folders)} notebooks to deploy:')
+    for notebook in notebook_folders:
+        logger.debug(f"  - {notebook['name']} at {notebook['relative_path']}")
 
-    # Deploy each item
-    deployed_items = []
-    for item_info in item_folders:
+    # Deploy each notebook
+    deployed_notebooks = []
+    for notebook_info in notebook_folders:
         try:
-            logger.debug(f"Deploying item: {item_info['name']}")
-            result = deploy_item(
+            logger.debug(f"Deploying notebook: {notebook_info['name']}")
+            result = deploy_notebook(
                 workspace=workspace,
-                display_name=item_info['name'],
+                display_name=notebook_info['name'],
                 project_path=project_path,
                 workspace_path=workspace_path,
                 config_path=config_path,
@@ -913,14 +882,14 @@ def deploy_all_items(
                 branches_path=branches_path,
             )
             if result:
-                deployed_items.append(item_info['name'])
-                logger.debug(f"Successfully deployed: {item_info['name']}")
+                deployed_notebooks.append(notebook_info['name'])
+                logger.debug(f"Successfully deployed: {notebook_info['name']}")
             else:
-                logger.debug(f"Failed to deploy: {item_info['name']}")
+                logger.debug(f"Failed to deploy: {notebook_info['name']}")
         except Exception as e:
-            logger.error(f"Error deploying {item_info['name']}: {str(e)}")
+            logger.error(f"Error deploying {notebook_info['name']}: {str(e)}")
 
-    logger.info(
-        f'Deployment completed. Successfully deployed {len(deployed_items)} items.'
+    logger.success(
+        f'Deployment completed. Successfully deployed {len(deployed_notebooks)} notebooks.'
     )
-    return deployed_items
+    return deployed_notebooks

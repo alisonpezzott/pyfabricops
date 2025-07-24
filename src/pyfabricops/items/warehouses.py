@@ -6,24 +6,24 @@ from collections import OrderedDict
 
 import pandas
 
-from ._core import api_core_request, pagination_handler
-from ._decorators import df
-from ._folders import resolve_folder
-from ._logging import get_logger
-from ._scopes import PLATFORM_SCHEMA, PLATFORM_VERSION
-from ._utils import (
+from ..api.api import _api_request, _pagination_handler
+from ..utils.decorators import df
+from ..core.folders import resolve_folder
+from ..utils.logging import get_logger
+from ..utils.schemas import PLATFORM_SCHEMA, PLATFORM_VERSION
+from ..utils.utils import (
     get_current_branch,
     get_workspace_suffix,
     is_valid_uuid,
     read_json,
     write_json,
 )
-from ._warehouses_support import (
+from .warehouses_support import (
     WAREHOUSE_DEFAULT_SEMANTIC_MODEL_TXT,
     WAREHOUSE_SQL_PROJECT,
     WAREHOUSE_XMLA_JSON,
 )
-from ._workspaces import (
+from ..core.workspaces import (
     _resolve_workspace_path,
     get_workspace,
     resolve_workspace,
@@ -58,14 +58,14 @@ def list_warehouses(
     if not workspace_id:
         return None
 
-    response = api_core_request(
+    response = _api_request(
         endpoint=f'/workspaces/{workspace_id}/warehouses'
     )
     if not response.success:
         logger.warning(f'{response.status_code}: {response.error}.')
         return None
     else:
-        response = pagination_handler(response)
+        response = _pagination_handler(response)
     warehouses = [
         item
         for item in response.data.get('value', [])
@@ -147,7 +147,7 @@ def get_warehouse(
     if not warehouse_id:
         return None
 
-    response = api_core_request(
+    response = _api_request(
         endpoint=f'/workspaces/{workspace_id}/warehouses/{warehouse_id}',
         method='get',
     )
@@ -167,7 +167,7 @@ def get_warehouse(
         RETRY_INTERVAL = 10
         logger.info(f'Checking warehouse SQL endpoint...')
         for attempt in range(1, MAX_RETRIES + 1):
-            response = api_core_request(
+            response = _api_request(
                 endpoint=f'/workspaces/{workspace_id}/warehouses/{warehouse_id}',
                 method='get',
             )
@@ -233,7 +233,7 @@ def create_warehouse(
     if warehouse_exists:
         logger.warning(f"Warehouse with name '{display_name}' already exists.")
         return warehouse_exists
-    response = api_core_request(
+    response = _api_request(
         endpoint=f'/workspaces/{workspace_id}/warehouses',
         method='post',
         payload=payload,
@@ -298,7 +298,7 @@ def update_warehouse(
     if warehouse_description != description and description:
         payload['description'] = description
 
-    response = api_core_request(
+    response = _api_request(
         endpoint=f'/workspaces/{workspace_id}/warehouses/{warehouse_id}',
         method='put',
         payload=payload,
@@ -335,7 +335,7 @@ def delete_warehouse(workspace: str, warehouse: str) -> None:
     if not warehouse_id:
         return None
 
-    response = api_core_request(
+    response = _api_request(
         endpoint=f'/workspaces/{workspace_id}/warehouses/{warehouse_id}',
         method='delete',
         return_raw=True,

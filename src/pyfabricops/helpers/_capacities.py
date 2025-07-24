@@ -1,5 +1,5 @@
-from .._capacities import list_capacities
-from .._logging import get_logger
+from ..core.capacities import list_capacities
+from ..utils.logging import get_logger
 
 
 logger = get_logger(__name__)

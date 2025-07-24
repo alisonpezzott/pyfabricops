@@ -1,14 +1,13 @@
-import logging
 import os
 
 import pandas
 
-from ._core import api_core_request, lro_handler, pagination_handler
-from ._decorators import df
-from ._folders import resolve_folder
-from ._generic_endpoints import _list_generic
-from ._logging import get_logger
-from ._utils import (
+from ..api.api import _api_request, _lro_handler, _pagination_handler
+from ..utils.decorators import df
+from ..core.folders import resolve_folder
+from ..api.api import _list_request
+from ..utils.logging import get_logger
+from ..utils.utils import (
     get_current_branch,
     get_workspace_suffix,
     is_valid_uuid,
@@ -17,7 +16,7 @@ from ._utils import (
     unpack_item_definition,
     write_json,
 )
-from ._workspaces import (
+from ..core.workspaces import (
     _resolve_workspace_path,
     get_workspace,
     resolve_workspace,
@@ -46,7 +45,7 @@ def list_data_pipelines(
         list_data_pipelines('123e4567-e89b-12d3-a456-426614174000')
         ```
     """
-    return _list_generic('data_pipelines', workspace_id=workspace, df=df)
+    return _list_request('data_pipelines', workspace_id=workspace, df=df)
 
 
 def resolve_data_pipeline(
@@ -116,7 +115,7 @@ def get_data_pipeline(
     if not data_pipeline_id:
         return None
 
-    response = api_core_request(
+    response = _api_request(
         endpoint=f'/workspaces/{workspace_id}/dataPipelines/{data_pipeline_id}'
     )
 
@@ -178,7 +177,7 @@ def update_data_pipeline(
     if data_pipeline_description != description and description:
         payload['description'] = description
 
-    response = api_core_request(
+    response = _api_request(
         endpoint=f'/workspaces/{workspace_id}/dataPipelines/{data_pipeline_id}',
         method='put',
         payload=payload,
@@ -219,7 +218,7 @@ def delete_data_pipeline(workspace: str, data_pipeline: str) -> None:
     if not data_pipeline_id:
         return None
 
-    response = api_core_request(
+    response = _api_request(
         endpoint=f'/workspaces/{workspace_id}/dataPipelines/{data_pipeline_id}',
         method='delete',
         return_raw=True,
@@ -258,7 +257,7 @@ def get_data_pipeline_definition(workspace: str, data_pipeline: str) -> dict:
         return None
 
     # Requesting
-    response = api_core_request(
+    response = _api_request(
         endpoint=f'/workspaces/{workspace_id}/dataPipelines/{data_pipeline_id}/getDefinition',
         method='post',
     )
@@ -267,7 +266,7 @@ def get_data_pipeline_definition(workspace: str, data_pipeline: str) -> dict:
         return None
     elif response.status_code == 202:
         # If the response is a long-running operation, handle it
-        lro_response = lro_handler(response)
+        lro_response = _lro_handler(response)
         if not lro_response.success:
             logger.warning(
                 f'{lro_response.status_code}: {lro_response.error}.'
@@ -315,7 +314,7 @@ def update_data_pipeline_definition(
 
     params = {'updateMetadata': True}
 
-    response = api_core_request(
+    response = _api_request(
         endpoint=f'/workspaces/{workspace_id}/dataPipelines/{data_pipeline_id}/updateDefinition',
         method='post',
         payload={'definition': definition},
@@ -326,7 +325,7 @@ def update_data_pipeline_definition(
         return None
     elif response.status_code == 202:
         # If the response is a long-running operation, handle it
-        lro_response = lro_handler(response)
+        lro_response = _lro_handler(response)
         if not lro_response.success:
             logger.warning(
                 f'{lro_response.status_code}: {lro_response.error}.'
@@ -386,7 +385,7 @@ def create_data_pipeline(
         else:
             payload['folderId'] = folder_id
 
-    response = api_core_request(
+    response = _api_request(
         endpoint=f'/workspaces/{workspace_id}/dataPipelines',
         method='post',
         payload=payload,
@@ -397,7 +396,7 @@ def create_data_pipeline(
         return None
     elif response.status_code == 202:
         # If the response is a long-running operation, handle it
-        lro_response = lro_handler(response)
+        lro_response = _lro_handler(response)
         if not lro_response.success:
             logger.warning(
                 f'{lro_response.status_code}: {lro_response.error}.'
@@ -829,7 +828,7 @@ def deploy_data_pipeline(
         if description:
             payload['description'] = description
 
-        response = api_core_request(
+        response = _api_request(
             endpoint=f'/workspaces/{workspace_id}/dataPipelines/{data_pipeline_id}/updateDefinition',
             method='post',
             payload=payload,
@@ -853,7 +852,7 @@ def deploy_data_pipeline(
         if folder_id:
             payload['folderId'] = folder_id
 
-        response = api_core_request(
+        response = _api_request(
             endpoint=f'/workspaces/{workspace_id}/dataPipelines',
             method='post',
             payload=payload,

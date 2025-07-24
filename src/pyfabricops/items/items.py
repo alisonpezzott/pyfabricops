@@ -1,13 +1,13 @@
-import logging
 import os
 
 import pandas
 
-from ._core import api_core_request, lro_handler, pagination_handler
-from ._decorators import df
-from ._folders import resolve_folder
-from ._logging import get_logger
-from ._utils import (
+from ..api.api import _api_request, _lro_handler, _pagination_handler
+from ..utils.decorators import df
+from .fabric_items import _FABRIC_ITEMS
+from ..core.folders import resolve_folder
+from ..utils.logging import get_logger
+from ..utils.utils import (
     get_current_branch,
     get_workspace_suffix,
     is_valid_uuid,
@@ -16,7 +16,7 @@ from ._utils import (
     unpack_item_definition,
     write_json,
 )
-from ._workspaces import (
+from ..core.workspaces import (
     _resolve_workspace_path,
     get_workspace,
     resolve_workspace,
@@ -26,103 +26,141 @@ logger = get_logger(__name__)
 
 
 @df
-def list_dataflows(
-    workspace: str, *, df: bool = False
-) -> list | pandas.DataFrame | None:
+def list_items(
+    workspace: str, *, excluded_starts: tuple = ('Staging'), df: bool = False
+) -> list | pandas.DataFrame:
     """
-    Lists all dataflows in a workspace.
+    Returns a list of items from the specified workspace.
+    This API supports pagination.
 
     Args:
         workspace (str): The workspace name or ID.
+        excluded_starts (tuple): A tuple of prefixes to exclude from the list.
         df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
 
     Returns:
-        list | pandas.DataFrame | None: A list of dataflows if successful, otherwise None.
+        (list|pandas.DataFrame): A list of items, excluding those that start with the specified prefixes. If `df=True`, returns a DataFrame with flattened keys.
+
+    Examples:
+        ```python
+        list_items('MyProjectWorkspace')
+        list_items('MyProjectWorkspace', excluded_starts=('Staging', 'ware'))
+        ```
     """
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return None
-    response = api_core_request(
-        endpoint=f'/workspaces/{workspace_id}/dataflows'
-    )
+
+    response = _api_request(endpoint=f'/workspaces/{workspace_id}/items')
     if not response.success:
         logger.warning(f'{response.status_code}: {response.error}.')
         return None
     else:
-        response = pagination_handler(response)
-        return response.data.get('value')
+        response = _pagination_handler(response)
+    items = [
+        item
+        for item in response.data.get('value', [])
+        if not item['displayName'].startswith(excluded_starts)
+    ]
+    if not items:
+        logger.warning(f"No valid items found in workspace '{workspace}'.")
+        return None
+    else:
+        return items
 
 
-def resolve_dataflow(
-    workspace: str, dataflow: str, *, silent: bool = False
+def resolve_item(
+    workspace: str, item: str, *, silent: bool = False
 ) -> str | None:
     """
-    Resolves a dataflow name to its ID.
+    Resolves a item name to its ID.
 
     Args:
         workspace (str): The ID of the workspace.
-        dataflow (str): The name of the dataflow.
-        silent (bool, optional): If True, suppresses warnings. Defaults to False.
+        item (str): The name of the item.
+        silent (bool): If True, suppresses warnings. Defaults to False.
 
     Returns:
-        str|None: The ID of the dataflow, or None if not found.
+        str|None: The ID of the item, or None if not found.
 
     Examples:
         ```python
-        resolve_dataflow('MyProjectWorkspace', 'SalesDataflow')
-        resolve_dataflow('123e4567-e89b-12d3-a456-426614174000', 'SalesDataflow')
+        resolve_item('MyProjectWorkspace', 'SalesDataModel')
+        resolve_item('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000')
         ```
     """
-    if is_valid_uuid(dataflow):
-        return dataflow
+    if is_valid_uuid(item):
+        return item
 
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return None
 
-    dataflows = list_dataflows(workspace, df=False)
-    if not dataflows:
+    items = list_items(workspace, df=False)
+    if not items:
         return None
 
-    for dataflow_ in dataflows:
-        if dataflow_['displayName'] == dataflow:
-            return dataflow_['id']
+    name = item.split('.')[0]
+    type = item.split('.')[-1]
+    if not name or not type:
+        if not silent:
+            logger.warning(
+                f"Invalid item format '{item}'. Expected 'Name.Type'."
+            )
+        return None
+
+    valid_types = _FABRIC_ITEMS.keys()
+    if type not in valid_types:
+        if not silent:
+            logger.warning(
+                f"Invalid item type '{type}'. Valid types are: {', '.join(valid_types)}."
+            )
+        return None
+
+    for item_ in items:
+        name_ = item_.get('displayName')
+        type_ = item_.get('type')
+        if name_ == name and type_ == type_:
+            return item_['id']
     if not silent:
-        logger.warning(f"Dataflow '{dataflow}' not found.")
+        logger.warning(f"Item '{item}' not found.")
     return None
 
 
 @df
-def get_dataflow(
-    workspace: str, dataflow: str, *, df: bool = False
+def get_item(
+    workspace: str,
+    item: str,
+    *,
+    df: bool = False,
 ) -> dict | pandas.DataFrame | None:
     """
-    Gets a dataflow by its name or ID.
+    Retrieves a specific item from the workspace.
 
     Args:
         workspace (str): The workspace name or ID.
-        dataflow (str): The name or ID of the dataflow.
-        df (bool, optional): If True, returns a DataFrame with flattened keys. Defaults to False.
+        item (str): The name or ID of the item to retrieve.
+        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
 
     Returns:
-        dict | pandas.DataFrame | None: The dataflow details if found, otherwise None.
+        (dict | pandas.DataFrame | None): The item details as a dictionary or DataFrame, or None if not found.
 
     Examples:
         ```python
-        get_dataflow('MyProjectWorkspace', 'SalesDataflow')
-        get_dataflow('123e4567-e89b-12d3-a456-426614174000', 'SalesDataflow')
+        get_item('MyProjectWorkspace', 'SalesDataModel')
+        get_item('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', df=True)
         ```
     """
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return None
 
-    dataflow_id = resolve_dataflow(workspace_id, dataflow)
-    if not dataflow_id:
+    item_id = resolve_item(workspace_id, item)
+    if not item_id:
         return None
 
-    response = api_core_request(
-        endpoint=f'/workspaces/{workspace_id}/dataflows/{dataflow_id}'
+    response = _api_request(
+        endpoint=f'/workspaces/{workspace_id}/items/{item_id}'
     )
 
     if not response.success:
@@ -133,58 +171,57 @@ def get_dataflow(
 
 
 @df
-def update_dataflow(
+def update_item(
     workspace: str,
-    dataflow: str,
+    item: str,
     *,
     display_name: str = None,
     description: str = None,
     df: bool = False,
 ) -> dict | pandas.DataFrame:
     """
-    Updates the properties of the specified dataflow.
+    Updates the properties of the specified semantic model.
 
     Args:
         workspace (str): The workspace name or ID.
-        dataflow (str): The name or ID of the dataflow to update.
-        display_name (str, optional): The new display name for the dataflow.
-        description (str, optional): The new description for the dataflow.
-        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
+        item (str): The name or ID of the item to update.
+        display_name (str, optional): The new display name for the item.
+        description (str, optional): The new description for the item.
 
     Returns:
-        (dict or None): The updated dataflow details if successful, otherwise None.
+        (dict or None): The updated semantic model details if successful, otherwise None.
 
     Examples:
         ```python
-        update_dataflow('MyProjectWorkspace', 'SalesDataModel', display_name='UpdatedSalesDataModel')
-        update_dataflow('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', description='Updated description')
+        update_item('MyProjectWorkspace', 'SalesDataModel', display_name='UpdatedSalesDataModel')
+        update_item('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', description='Updated description')
         ```
     """
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return None
 
-    dataflow_id = resolve_dataflow(workspace_id, dataflow)
-    if not dataflow_id:
+    item_id = resolve_item(workspace_id, item)
+    if not item_id:
         return None
 
-    dataflow_ = get_dataflow(workspace_id, dataflow_id)
-    if not dataflow_:
+    item_ = get_item(workspace_id, item_id)
+    if not item_:
         return None
 
-    dataflow_description = dataflow_['description']
-    dataflow_display_name = dataflow_['displayName']
+    item_description = item_['description']
+    item_display_name = item_['displayName']
 
     payload = {}
 
-    if dataflow_display_name != display_name and display_name:
+    if item_display_name != display_name and display_name:
         payload['displayName'] = display_name
 
-    if dataflow_description != description and description:
+    if item_description != description and description:
         payload['description'] = description
 
-    response = api_core_request(
-        endpoint=f'/workspaces/{workspace_id}/dataflows/{dataflow_id}',
+    response = _api_request(
+        endpoint=f'/workspaces/{workspace_id}/items/{item_id}',
         method='put',
         payload=payload,
     )
@@ -196,36 +233,36 @@ def update_dataflow(
         return response.data
 
 
-def delete_dataflow(workspace: str, dataflow: str) -> None:
+def delete_item(workspace: str, item: str) -> None:
     """
-    Delete a dataflow from the specified workspace.
+    Delete a item from the specified workspace.
 
     Args:
         workspace (str): The name or ID of the workspace to delete.
-        dataflow (str): The name or ID of the dataflow to delete.
+        item (str): The name or ID of the item to delete.
 
     Returns:
-        None: If the dataflow is successfully deleted.
+        None: If the item is successfully deleted.
 
     Raises:
         ResourceNotFoundError: If the specified workspace is not found.
 
     Examples:
         ```python
-        delete_dataflow('MyProjectWorkspace', 'SalesDataflow')
-        delete_dataflow('123e4567-e89b-12d3-a456-426614174000', 'SalesDataflow')
+        delete_item('MyProjectWorkspace', 'Salesitem')
+        delete_item('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000')
         ```
     """
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return None
 
-    dataflow_id = resolve_dataflow(workspace_id, dataflow)
-    if not dataflow_id:
+    item_id = resolve_item(workspace_id, item)
+    if not item_id:
         return None
 
-    response = api_core_request(
-        endpoint=f'/workspaces/{workspace_id}/dataflows/{dataflow_id}',
+    response = _api_request(
+        endpoint=f'/workspaces/{workspace_id}/items/{item_id}',
         method='delete',
         return_raw=True,
     )
@@ -236,21 +273,21 @@ def delete_dataflow(workspace: str, dataflow: str) -> None:
         return True
 
 
-def get_dataflow_definition(workspace: str, dataflow: str) -> dict:
+def get_item_definition(workspace: str, item: str) -> dict:
     """
-    Retrieves the definition of a dataflow by its name or ID from the specified workspace.
+    Retrieves the definition of a item by its name or ID from the specified workspace.
 
     Args:
         workspace (str): The workspace name or ID.
-        dataflow (str): The name or ID of the dataflow.
+        item (str): The name or ID of the item.
 
     Returns:
-        (dict): The dataflow definition if found, otherwise None.
+        (dict): The item definition if found, otherwise None.
 
     Examples:
         ```python
-        get_dataflow_definition('MyProjectWorkspace', 'Salesdataflow')
-        get_dataflow_definition('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000')
+        get_item_definition('MyProjectWorkspace', 'Salesitem')
+        get_item_definition('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000')
         ```
     """
     # Resolving IDs
@@ -258,119 +295,119 @@ def get_dataflow_definition(workspace: str, dataflow: str) -> dict:
     if not workspace_id:
         return None
 
-    dataflow_id = resolve_dataflow(workspace_id, dataflow)
-    if not dataflow_id:
+    item_id = resolve_item(workspace_id, item)
+    if not item_id:
         return None
 
     # Requesting
-    response = api_core_request(
-        endpoint=f'/workspaces/{workspace_id}/dataflows/{dataflow_id}/getDefinition',
+    response = _api_request(
+        endpoint=f'/workspaces/{workspace_id}/items/{item_id}/getDefinition',
         method='post',
     )
-
     if not response.success:
         logger.warning(f'{response.status_code}: {response.error}.')
         return None
-
-    # Check if it's a long-running operation (status 202)
-    if response.status_code == 202:
-        logger.debug('Long-running operation detected, handling LRO...')
-        lro_response = lro_handler(response)
+    elif response.status_code == 202:
+        # If the response is a long-running operation, handle it
+        lro_response = _lro_handler(response)
         if not lro_response.success:
             logger.warning(
                 f'{lro_response.status_code}: {lro_response.error}.'
             )
             return None
-        return lro_response.data
+        else:
+            return lro_response.data
+    elif response.status_code == 200:
+        # If the response is successful, we can process it
+        return response.data
+    else:
+        logger.warning(f'{response.status_code}: {response.error}.')
+        return None
 
-    # For immediate success (status 200)
-    return response.data
 
-
-def update_dataflow_definition(
-    workspace: str, dataflow: str, path: str
-) -> dict | None:
+def update_item_definition(workspace: str, item: str, path: str) -> dict:
     """
-    Updates the definition of an existing dataflow in the specified workspace.
-    If the dataflow does not exist, it returns None.
+    Updates the definition of an existing item in the specified workspace.
+    If the item does not exist, it returns None.
 
     Args:
         workspace (str): The workspace name or ID.
-        dataflow (str): The name or ID of the dataflow to update.
-        path (str): The path to the dataflow definition.
+        item (str): The name or ID of the item to update.
+        path (str): The path to the item definition.
 
     Returns:
-        (dict or None): The updated dataflow details if successful, otherwise None.
+        (dict or None): The updated item details if successful, otherwise None.
 
     Examples:
         ```python
-        update_dataflow('MyProjectWorkspace', 'SalesDataModel', display_name='UpdatedSalesDataModel')
-        update_dataflow('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', description='Updated description')
+        update_item_definition('MyProjectWorkspace', 'SalesDataModel', '/path/to/updated/definition.json')
+        update_item_definition('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', '/path/to/updated/definition.json')
         ```
     """
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return None
 
-    dataflow_id = resolve_dataflow(workspace_id, dataflow)
-    if not dataflow_id:
+    item_id = resolve_item(workspace_id, item)
+    if not item_id:
         return None
 
     definition = pack_item_definition(path)
 
     params = {'updateMetadata': True}
 
-    response = api_core_request(
-        endpoint=f'/workspaces/{workspace_id}/dataflows/{dataflow_id}/updateDefinition',
+    response = _api_request(
+        endpoint=f'/workspaces/{workspace_id}/items/{item_id}/updateDefinition',
         method='post',
         payload={'definition': definition},
         params=params,
     )
-
     if not response.success:
         logger.warning(f'{response.status_code}: {response.error}.')
         return None
-
-    # Check if it's a long-running operation (status 202)
-    if response.status_code == 202:
-        logger.debug('Long-running operation detected, handling LRO...')
-        lro_response = lro_handler(response)
+    elif response.status_code == 202:
+        # If the response is a long-running operation, handle it
+        lro_response = _lro_handler(response)
         if not lro_response.success:
             logger.warning(
                 f'{lro_response.status_code}: {lro_response.error}.'
             )
             return None
-        return lro_response.data
+        else:
+            return lro_response.data
+    elif response.status_code == 200:
+        # If the response is successful, we can process it
+        return response.data
+    else:
+        logger.warning(f'{response.status_code}: {response.error}.')
+        return None
 
-    # For immediate success (status 200)
-    return response.data
 
-
-def create_dataflow(
+def create_item(
     workspace: str,
     display_name: str,
     path: str,
     *,
     description: str = None,
     folder: str = None,
-) -> dict | None:
+):
     """
-    Creates a new dataflow in the specified workspace.
+    Creates a new item in the specified workspace.
 
     Args:
         workspace (str): The workspace name or ID.
-        display_name (str): The display name of the dataflow.
-        description (str, optional): A description for the dataflow.
-        folder (str, optional): The folder to create the dataflow in.
-        path (str): The path to the dataflow definition file.
+        display_name (str): The display name of the item.
+        description (str, optional): A description for the item.
+        folder (str, optional): The folder to create the item in.
+        path (str): The path to the item definition file.
 
     Returns:
-        (dict): The created dataflow details.
+        (dict): The created item details.
 
     Examples:
         ```python
-        create_dataflow('MyProjectWorkspace', 'SalesDataModel', 'path/to/definition.json')
-        create_dataflow('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', 'path/to/definition.json', description='Sales data model')
+        create_item('MyProjectWorkspace', 'SalesDataModel', '/path/to/definition.json')
+        create_item('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', '/path/to/definition.json')
         ```
     """
     workspace_id = resolve_workspace(workspace)
@@ -391,8 +428,8 @@ def create_dataflow(
         else:
             payload['folderId'] = folder_id
 
-    response = api_core_request(
-        endpoint=f'/workspaces/{workspace_id}/dataflows',
+    response = _api_request(
+        endpoint=f'/workspaces/{workspace_id}/items',
         method='post',
         payload=payload,
     )
@@ -402,7 +439,7 @@ def create_dataflow(
         return None
     elif response.status_code == 202:
         # If the response is a long-running operation, handle it
-        lro_response = lro_handler(response)
+        lro_response = _lro_handler(response)
         if not lro_response.success:
             logger.warning(
                 f'{lro_response.status_code}: {lro_response.error}.'
@@ -418,9 +455,9 @@ def create_dataflow(
         return None
 
 
-def export_dataflow(
+def export_item(
     workspace: str,
-    dataflow: str,
+    item: str,
     project_path: str,
     *,
     workspace_path: str = None,
@@ -429,13 +466,13 @@ def export_dataflow(
     branch: str = None,
     workspace_suffix: str = None,
     branches_path: str = None,
-) -> None:
+):
     """
-    Exports a dataflow definition to a specified folder structure.
+    Exports a item definition to a specified folder structure.
 
     Args:
         workspace (str): The workspace name or ID.
-        dataflow (str): The name of the dataflow to export.
+        item (str): The name of the item to export.
         project_path (str): The root path of the project.
         workspace_path (str, optional): The path to the workspace folder. Defaults to "workspace".
         config_path (str): The path to the config file. Defaults to "config.json".
@@ -449,31 +486,26 @@ def export_dataflow(
 
     Examples:
         ```python
-        export_dataflow('MyProjectWorkspace', 'SalesDataModel', 'path/to/project')
-        export_dataflow('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', 'path/to/project', branch='feature-branch')
+        export_item('MyProjectWorkspace', 'SalesDataModel', '/path/to/project')
+        export_item('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', '/path/to/project')
         ```
     """
-    workspace_path = _resolve_workspace_path(
-        workspace=workspace,
-        workspace_suffix=workspace_suffix,
-        project_path=project_path,
-        workspace_path=workspace_path,
-    )
     workspace_id = resolve_workspace(workspace)
     workspace_name = get_workspace(workspace_id).get('displayName')
     if not workspace_id:
         return None
 
-    dataflow_ = get_dataflow(workspace_id, dataflow)
-    if not dataflow_:
+    item_ = get_item(workspace_id, item)
+    if not item_:
         return None
 
-    dataflow_id = dataflow_['id']
+    item_id = item_['id']
+    item_type = item_['type']
     folder_id = None
-    if 'folderId' in dataflow_:
-        folder_id = dataflow_['folderId']
+    if 'folderId' in item_:
+        folder_id = item_['folderId']
 
-    definition = get_dataflow_definition(workspace_id, dataflow_id)
+    definition = get_item_definition(workspace_id, item_id)
     if not definition:
         return None
 
@@ -505,9 +537,16 @@ def export_dataflow(
 
         config = existing_config[branch][workspace_name_without_suffix]
 
-        dataflow_id = dataflow_['id']
-        dataflow_name = dataflow_['displayName']
-        dataflow_descr = dataflow_.get('description', '')
+        item_id = item_['id']
+        item_name = item_['displayName']
+        item_descr = item_.get('description', '')
+
+        workspace_path = _resolve_workspace_path(
+            workspace=workspace,
+            workspace_suffix=workspace_suffix,
+            project_path=project_path,
+            workspace_path=workspace_path,
+        )
 
         # Find the key in the folders dict whose value matches folder_id
         if folder_id:
@@ -520,26 +559,31 @@ def export_dataflow(
             item_path = os.path.join(project_path, workspace_path)
 
         unpack_item_definition(
-            definition, f'{item_path}/{dataflow_name}.Dataflow'
+            definition, f'{item_path}/{item_name}.{item_type}'
         )
 
-        if 'dataflows' not in config:
-            config['dataflows'] = {}
-        if dataflow_name not in config['dataflows']:
-            config['dataflows'][dataflow_name] = {}
-        if 'id' not in config['dataflows'][dataflow_name]:
-            config['dataflows'][dataflow_name]['id'] = dataflow_id
-        if 'description' not in config['dataflows'][dataflow_name]:
-            config['dataflows'][dataflow_name]['description'] = dataflow_descr
+        for k, v in _FABRIC_ITEMS.items():
+            if item_type == k:
+                items_config_type = v
+                break
+
+        if items_config_type not in config:
+            config[items_config_type] = {}
+        if item_name not in config[items_config_type]:
+            config[items_config_type][item_name] = {}
+        if 'id' not in config[items_config_type][item_name]:
+            config[items_config_type][item_name]['id'] = item_id
+        if 'description' not in config[items_config_type][item_name]:
+            config[items_config_type][item_name]['description'] = item_descr
 
         if folder_id:
-            if 'folder_id' not in config['dataflows'][dataflow_name]:
-                config['dataflows'][dataflow_name]['folder_id'] = folder_id
+            if 'folder_id' not in config[items_config_type][item_name]:
+                config[items_config_type][item_name]['folder_id'] = folder_id
 
-        # Update the config with the dataflow details
-        config['dataflows'][dataflow_name]['id'] = dataflow_id
-        config['dataflows'][dataflow_name]['description'] = dataflow_descr
-        config['dataflows'][dataflow_name]['folder_id'] = folder_id
+        # Update the config with the item details
+        config[items_config_type][item_name]['id'] = item_id
+        config[items_config_type][item_name]['description'] = item_descr
+        config[items_config_type][item_name]['folder_id'] = folder_id
 
         # Saving the updated config back to the config file
         existing_config[branch][workspace_name_without_suffix] = config
@@ -548,11 +592,11 @@ def export_dataflow(
     else:
         unpack_item_definition(
             definition,
-            f'{project_path}/{workspace_path}/{dataflow_name}.Dataflow',
+            f'{project_path}/{workspace_path}/{item_name}.{item_type}',
         )
 
 
-def export_all_dataflows(
+def export_all_items(
     workspace: str,
     project_path: str,
     *,
@@ -562,9 +606,9 @@ def export_all_dataflows(
     branch: str = None,
     workspace_suffix: str = None,
     branches_path: str = None,
-) -> None:
+):
     """
-    Exports all dataflows to the specified folder structure.
+    Exports all items to the specified folder structure.
 
     Args:
         workspace (str): The workspace name or ID.
@@ -579,20 +623,21 @@ def export_all_dataflows(
 
     Examples:
         ```python
-        export_all_dataflows('MyProjectWorkspace', 'path/to/project')
-        export_all_dataflows('MyProjectWorkspace', 'path/to/project', branch='feature-branch')
+        export_all_items('MyProjectWorkspace', '/path/to/project')
+        export_all_items('MyProjectWorkspace', '/path/to/project', branch='main')
+        export_all_items('MyProjectWorkspace', '/path/to/project', workspace_suffix='Workspace')
         ```
     """
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return None
 
-    dataflows = list_dataflows(workspace_id)
-    if dataflows:
-        for dataflow in dataflows:
-            export_dataflow(
+    items = list_items(workspace_id)
+    if items:
+        for item in items:
+            export_item(
                 workspace=workspace,
-                dataflow=dataflow['displayName'],
+                item=item['displayName'] + '.' + item['type'],
                 project_path=project_path,
                 workspace_path=workspace_path,
                 update_config=update_config,
@@ -603,9 +648,9 @@ def export_all_dataflows(
             )
 
 
-def deploy_dataflow(
+def deploy_item(
     workspace: str,
-    display_name: str,
+    item_name_dot_type: str,
     project_path: str,
     *,
     workspace_path: str = None,
@@ -614,37 +659,27 @@ def deploy_dataflow(
     branch: str = None,
     workspace_suffix: str = None,
     branches_path: str = None,
-) -> None:
+):
     """
-    Creates or updates a dataflow in Fabric based on local folder structure.
-    Automatically detects the folder_id based on where the dataflow is located locally.
+    Creates or updates a item in Fabric based on local folder structure.
+    Automatically detects the folder_id based on where the item is located locally.
 
     Args:
         workspace (str): The workspace name or ID.
-        display_name (str): The display name of the dataflow.
+        item_name_dot_type (str): The name and type of the item, formatted as "name.type".
         project_path (str): The root path of the project.
         workspace_path (str): The workspace folder name. Defaults to "workspace".
         config_path (str): The path to the config file. Defaults to "config.json".
-        description (str, optional): A description for the dataflow.
+        description (str, optional): A description for the item.
         branch (str, optional): The branch name. Will be auto-detected if not provided.
         workspace_suffix (str, optional): The workspace suffix. Will be read from config if not provided.
 
-    Returns:
-        None
-
     Examples:
         ```python
-        deploy_dataflow('MyProjectWorkspace', 'SalesDataModel', 'path/to/project')
-        deploy_dataflow('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', 'path/to/project', description='Sales data model')
+        deploy_item('MyProjectWorkspace', 'SalesDataModel', '/path/to/project')
+        deploy_item('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', '/path/to/project')
         ```
-
     """
-    workspace_path = _resolve_workspace_path(
-        workspace=workspace,
-        workspace_suffix=workspace_suffix,
-        project_path=project_path,
-        workspace_path=workspace_path,
-    )
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return None
@@ -676,54 +711,56 @@ def deploy_dataflow(
         )
         folders_mapping = {}
 
-    # Find where the dataflow is located locally
-    dataflow_folder_path = None
-    dataflow_full_path = None
+    # Find where the item is located locally
+    item_folder_path = None
+    item_full_path = None
 
-    # Check if dataflow exists in workspace root
-    root_path = f'{project_path}/{workspace_path}/{display_name}.dataflow'
+    # Check if item exists in workspace root
+    workspace_path = _resolve_workspace_path(
+        workspace=workspace,
+        workspace_suffix=workspace_suffix,
+        project_path=project_path,
+        workspace_path=workspace_path,
+    )
+    root_path = f'{project_path}/{workspace_path}/{item_name_dot_type}'
     if os.path.exists(root_path):
-        dataflow_folder_path = workspace_path
-        dataflow_full_path = root_path
-        logger.debug(f'Found dataflow in workspace root: {root_path}')
+        item_folder_path = workspace_path
+        item_full_path = root_path
+        logger.debug(f'Found item in workspace root: {root_path}')
     else:
-        # Search for the dataflow in subfolders (only once)
+        # Search for the item in subfolders (only once)
         base_search_path = f'{project_path}/{workspace_path}'
         logger.debug(
-            f'Searching for {display_name}.dataflow in: {base_search_path}'
+            f'Searching for {item_name_dot_type}.item in: {base_search_path}'
         )
 
         for root, dirs, files in os.walk(base_search_path):
-            if f'{display_name}.dataflow' in dirs:
-                dataflow_full_path = os.path.join(
-                    root, f'{display_name}.dataflow'
+            if f'{item_name_dot_type}' in dirs:
+                item_full_path = os.path.join(root, f'{item_name_dot_type}')
+                item_folder_path = os.path.relpath(root, project_path).replace(
+                    '\\', '/'
                 )
-                dataflow_folder_path = os.path.relpath(
-                    root, project_path
-                ).replace('\\', '/')
-                logger.debug(f'Found dataflow in: {dataflow_full_path}')
-                logger.debug(f'Relative folder path: {dataflow_folder_path}')
+                logger.debug(f'Found item in: {item_full_path}')
+                logger.debug(f'Relative folder path: {item_folder_path}')
                 break
 
-    if not dataflow_folder_path or not dataflow_full_path:
-        logger.debug(
-            f'dataflow {display_name}.dataflow not found in local structure'
-        )
+    if not item_folder_path or not item_full_path:
+        logger.debug(f'item {item_name_dot_type} not found in local structure')
         logger.debug(f'Searched in: {project_path}/{workspace_path}')
         return None
 
     # Determine folder_id based on local path
     folder_id = None
 
-    # Para dataflows em subpastas, precisamos mapear o caminho da pasta pai
-    if dataflow_folder_path != workspace_path:
-        # O dataflow está em uma subpasta, precisamos encontrar o folder_id
+    # Para items em subpastas, precisamos mapear o caminho da pasta pai
+    if item_folder_path != workspace_path:
+        # O item está em uma subpasta, precisamos encontrar o folder_id
         # Remover o "workspace/" do início do caminho para obter apenas a estrutura de pastas
-        folder_relative_path = dataflow_folder_path.replace(
+        folder_relative_path = item_folder_path.replace(
             f'{workspace_path}/', ''
         )
 
-        logger.debug(f'dataflow located in subfolder: {folder_relative_path}')
+        logger.debug(f'item located in subfolder: {folder_relative_path}')
 
         # Procurar nos mapeamentos de pastas
         if folder_relative_path in folders_mapping:
@@ -739,61 +776,62 @@ def deploy_dataflow(
                 f'Available folder mappings: {list(folders_mapping.keys())}'
             )
     else:
-        logger.debug(f'dataflow will be created in workspace root')
+        logger.debug(f'item will be created in workspace root')
 
     # Create the definition
-    definition = pack_item_definition(dataflow_full_path)
+    definition = pack_item_definition(item_full_path)
 
-    # Check if dataflow already exists (check only once)
-    dataflow_id = resolve_dataflow(workspace_id, display_name, silent=True)
+    # Check if item already exists (check only once)
+    item_id = resolve_item(workspace_id, item_name_dot_type, silent=True)
 
-    if dataflow_id:
-        logger.info(f"dataflow '{display_name}' already exists, updating...")
-        # Update existing dataflow
+    if item_id:
+        logger.info(f"item '{item_name_dot_type}' already exists, updating...")
+        # Update existing item
         payload = {'definition': definition}
         if description:
             payload['description'] = description
 
-        response = api_core_request(
-            endpoint=f'/workspaces/{workspace_id}/dataflows/{dataflow_id}/updateDefinition',
+        response = _api_request(
+            endpoint=f'/workspaces/{workspace_id}/items/{item_id}/updateDefinition',
             method='post',
             payload=payload,
             params={'updateMetadata': True},
         )
         if response and response.error:
             logger.warning(
-                f"Failed to update dataflow '{display_name}': {response.error}"
+                f"Failed to update item '{item_name_dot_type}': {response.error}"
             )
             return None
 
-        logger.success(f"Successfully updated dataflow '{display_name}'")
-        return get_dataflow(workspace_id, dataflow_id)
+        logger.success(f"Successfully updated item '{item_name_dot_type}'")
+        return get_item(workspace_id, item_id)
 
     else:
-        logger.info(f'Creating new dataflow: {display_name}')
-        # Create new dataflow
+        logger.info(f'Creating new item: {item_name_dot_type}')
+        display_name = item_name_dot_type.split('.')[0]
+        # Create new item
         payload = {'displayName': display_name, 'definition': definition}
         if description:
             payload['description'] = description
         if folder_id:
             payload['folderId'] = folder_id
 
-        response = api_core_request(
-            endpoint=f'/workspaces/{workspace_id}/dataflows',
+        response = _api_request(
+            endpoint=f'/workspaces/{workspace_id}/items',
             method='post',
             payload=payload,
         )
         if response and response.error:
             logger.warning(
-                f"Failed to create dataflow '{display_name}': {response.error}"
+                f"Failed to create item '{item_name_dot_type}': {response.error}"
             )
             return None
 
-        logger.success(f"Successfully created dataflow '{display_name}'")
-        return get_dataflow(workspace_id, display_name)
+        logger.success(f"Successfully created item '{item_name_dot_type}'")
+        return get_item(workspace_id, item_name_dot_type)
 
 
-def deploy_all_dataflows(
+def deploy_all_items(
     workspace: str,
     project_path: str,
     *,
@@ -802,10 +840,10 @@ def deploy_all_dataflows(
     branch: str = None,
     workspace_suffix: str = None,
     branches_path: str = None,
-) -> None:
+):
     """
-    Deploy all dataflows from a project path.
-    Searches recursively through all folders to find .Dataflow directories.
+    Deploy all semantic models from a project path.
+    Searches recursively through all folders to find .SemanticModel directories.
 
     Args:
         workspace (str): The workspace name or ID.
@@ -821,33 +859,28 @@ def deploy_all_dataflows(
 
     Examples:
         ```python
-        deploy_all_dataflows('MyProjectWorkspace', 'path/to/project')
-        deploy_all_dataflows('MyProjectWorkspace', 'path/to/project', branch='feature-branch')
+        deploy_all_items('MyProjectWorkspace', '/path/to/project')
+        deploy_all_items('MyProjectWorkspace', '/path/to/project', branch='main')
+        deploy_all_items('MyProjectWorkspace', '/path/to/project', workspace_suffix='Workspace')
         ```
     """
-    workspace_path = _resolve_workspace_path(
-        workspace=workspace,
-        workspace_suffix=workspace_suffix,
-        project_path=project_path,
-        workspace_path=workspace_path,
-    )
     base_path = f'{project_path}/{workspace_path}'
 
     if not os.path.exists(base_path):
         logger.error(f'Base path does not exist: {base_path}')
         return None
 
-    # Find all dataflow folders recursively
-    dataflow_folders = []
+    # Find all item folders recursively
+    item_folders = []
     for root, dirs, files in os.walk(base_path):
         for dir_name in dirs:
-            if dir_name.endswith('.dataflow'):
+            if dir_name.endswith('.item'):
                 full_path = os.path.join(root, dir_name)
-                # Extract just the dataflow name (without .dataflow suffix)
-                dataflow_name = dir_name.replace('.dataflow', '')
-                dataflow_folders.append(
+                # Extract just the item name (without .item suffix)
+                item_name = dir_name.replace('.item', '')
+                item_folders.append(
                     {
-                        'name': dataflow_name,
+                        'name': item_name,
                         'path': full_path,
                         'relative_path': os.path.relpath(
                             full_path, project_path
@@ -855,22 +888,22 @@ def deploy_all_dataflows(
                     }
                 )
 
-    if not dataflow_folders:
-        logger.warning(f'No dataflow folders found in {base_path}')
+    if not item_folders:
+        logger.warning(f'No item folders found in {base_path}')
         return None
 
-    logger.debug(f'Found {len(dataflow_folders)} dataflows to deploy:')
-    for dataflow in dataflow_folders:
-        logger.debug(f"  - {dataflow['name']} at {dataflow['relative_path']}")
+    logger.debug(f'Found {len(item_folders)} items to deploy:')
+    for item in item_folders:
+        logger.debug(f"  - {item['name']} at {item['relative_path']}")
 
-    # Deploy each dataflow
-    deployed_dataflows = []
-    for dataflow_info in dataflow_folders:
+    # Deploy each item
+    deployed_items = []
+    for item_info in item_folders:
         try:
-            logger.debug(f"Deploying dataflow: {dataflow_info['name']}")
-            result = deploy_dataflow(
+            logger.debug(f"Deploying item: {item_info['name']}")
+            result = deploy_item(
                 workspace=workspace,
-                display_name=dataflow_info['name'],
+                display_name=item_info['name'],
                 project_path=project_path,
                 workspace_path=workspace_path,
                 config_path=config_path,
@@ -879,14 +912,14 @@ def deploy_all_dataflows(
                 branches_path=branches_path,
             )
             if result:
-                deployed_dataflows.append(dataflow_info['name'])
-                logger.debug(f"Successfully deployed: {dataflow_info['name']}")
+                deployed_items.append(item_info['name'])
+                logger.debug(f"Successfully deployed: {item_info['name']}")
             else:
-                logger.debug(f"Failed to deploy: {dataflow_info['name']}")
+                logger.debug(f"Failed to deploy: {item_info['name']}")
         except Exception as e:
-            logger.error(f"Error deploying {dataflow_info['name']}: {str(e)}")
+            logger.error(f"Error deploying {item_info['name']}: {str(e)}")
 
-    logger.success(
-        f'Deployment completed. Successfully deployed {len(deployed_dataflows)} dataflows.'
+    logger.info(
+        f'Deployment completed. Successfully deployed {len(deployed_items)} items.'
     )
-    return deployed_dataflows
+    return deployed_items

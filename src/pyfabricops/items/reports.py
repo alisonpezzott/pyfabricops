@@ -4,14 +4,13 @@ import os
 import re
 
 import pandas
-from requests import get
 
-from ._core import api_core_request, lro_handler, pagination_handler
-from ._decorators import df
-from ._folders import resolve_folder
-from ._logging import get_logger
-from ._reports_support import REPORT_DEFINITION
-from ._utils import (
+from ..api.api import _api_request, _lro_handler, _pagination_handler
+from ..utils.decorators import df
+from ..core.folders import resolve_folder
+from ..utils.logging import get_logger
+from .reports_support import REPORT_DEFINITION
+from ..utils.utils import (
     get_current_branch,
     get_root_path,
     get_workspace_suffix,
@@ -22,7 +21,7 @@ from ._utils import (
     unpack_item_definition,
     write_json,
 )
-from ._workspaces import (
+from ..core.workspaces import (
     _resolve_workspace_path,
     get_workspace,
     resolve_workspace,
@@ -54,12 +53,12 @@ def list_reports(
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return None
-    response = api_core_request(endpoint=f'/workspaces/{workspace_id}/reports')
+    response = _api_request(endpoint=f'/workspaces/{workspace_id}/reports')
     if not response.success:
         logger.warning(f'{response.status_code}: {response.error}.')
         return None
     else:
-        response = pagination_handler(response)
+        response = _pagination_handler(response)
         return response.data.get('value')
 
 
@@ -128,7 +127,7 @@ def get_report(
     if not report_id:
         return None
 
-    response = api_core_request(
+    response = _api_request(
         endpoint=f'/workspaces/{workspace_id}/reports/{report_id}'
     )
 
@@ -190,7 +189,7 @@ def update_report(
     if report_description != description and description:
         payload['description'] = description
 
-    response = api_core_request(
+    response = _api_request(
         endpoint=f'/workspaces/{workspace_id}/reports/{report_id}',
         method='put',
         payload=payload,
@@ -231,7 +230,7 @@ def delete_report(workspace: str, report: str) -> None:
     if not report_id:
         return None
 
-    response = api_core_request(
+    response = _api_request(
         endpoint=f'/workspaces/{workspace_id}/reports/{report_id}',
         method='delete',
     )
@@ -269,7 +268,7 @@ def get_report_definition(workspace: str, report: str) -> dict:
         return None
 
     # Requesting
-    response = api_core_request(
+    response = _api_request(
         endpoint=f'/workspaces/{workspace_id}/reports/{report_id}/getDefinition',
         method='post',
     )
@@ -280,7 +279,7 @@ def get_report_definition(workspace: str, report: str) -> dict:
     # Check if it's a long-running operation (status 202)
     if response.status_code == 202:
         logger.debug('Long-running operation detected, handling LRO...')
-        lro_response = lro_handler(response)
+        lro_response = _lro_handler(response)
         if not lro_response.success:
             logger.warning(
                 f'{lro_response.status_code}: {lro_response.error}.'
@@ -323,7 +322,7 @@ def update_report_definition(workspace: str, report: str, path: str):
 
     params = {'updateMetadata': True}
 
-    response = api_core_request(
+    response = _api_request(
         endpoint=f'/workspaces/{workspace_id}/reports/{report_id}/updateDefinition',
         method='post',
         payload={'definition': definition},
@@ -336,7 +335,7 @@ def update_report_definition(workspace: str, report: str, path: str):
     # Check if it's a long-running operation (status 202)
     if response.status_code == 202:
         logger.debug('Long-running operation detected, handling LRO...')
-        lro_response = lro_handler(response)
+        lro_response = _lro_handler(response)
         if not lro_response.success:
             logger.warning(
                 f'{lro_response.status_code}: {lro_response.error}.'
@@ -392,7 +391,7 @@ def create_report(
         else:
             payload['folderId'] = folder_id
 
-    response = api_core_request(
+    response = _api_request(
         endpoint=f'/workspaces/{workspace_id}/reports',
         method='post',
         payload=payload,
@@ -405,7 +404,7 @@ def create_report(
     # Check if it's a long-running operation (status 202)
     if response.status_code == 202:
         logger.debug('Long-running operation detected, handling LRO...')
-        lro_response = lro_handler(response)
+        lro_response = _lro_handler(response)
         if not lro_response.success:
             logger.warning(
                 f'{lro_response.status_code}: {lro_response.error}.'
@@ -754,7 +753,7 @@ def deploy_report(
         if description:
             payload['description'] = description
 
-        response = api_core_request(
+        response = _api_request(
             endpoint=f'/workspaces/{workspace_id}/reports/{report_id}/updateDefinition',
             method='post',
             payload=payload,
@@ -778,7 +777,7 @@ def deploy_report(
         if folder_id:
             payload['folderId'] = folder_id
 
-        response = api_core_request(
+        response = _api_request(
             endpoint=f'/workspaces/{workspace_id}/reports',
             method='post',
             payload=payload,
