@@ -3,7 +3,7 @@ from typing import Dict, List, Literal, Optional, Union
 from pandas import DataFrame
 
 from ._decorators import df
-from ._exceptions import OptionNotAvailableError
+from ._exceptions import OptionNotAvailableError, ResourceNotFoundError
 from ._generic_endpoints import (
     _post_generic,
     _delete_generic,
@@ -12,6 +12,7 @@ from ._generic_endpoints import (
     _patch_generic
 )
 from ._logging import get_logger
+
 
 logger = get_logger(__name__)
 
@@ -56,9 +57,11 @@ def get_workspace(
     Examples:
         ```python
         get_workspace('123e4567-e89b-12d3-a456-426614174000')
+        get_workspace('MyProjectWorkspace')
+        get_workspace('MyProjectWorkspace', df=False) # Returns as list
         ```
     """
-    return _get_generic('workspaces', item_id=workspace_id)
+    return _get_generic('workspaces', item_id=workspace_id)  
 
 
 @df

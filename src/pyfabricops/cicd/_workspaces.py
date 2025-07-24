@@ -272,35 +272,52 @@ def _resolve_workspace_path(
     return workspace_path
 
 
-def resolve_workspace(workspace: str, *, silent: bool = False) -> str:
+
+def get_workspace_id(workspace_name: str) -> str:
     """
-    Resolves a workspace name to its ID.
+    Returns a workspace ID for a given workspace name.
 
     Args:
-        workspace (str): The name of the workspace.
-        silent (bool, optional): If True, suppresses warnings. Defaults to False.
+        workspace_name (str): The name of the workspace.
 
     Returns:
         str: The ID of the workspace, or None if not found.
 
     Examples:
         ```python
-        resolve_workspace('123e4567-e89b-12d3-a456-426614174000')
-        resolve_workspace('MyProject')
+        get_workspace_id('MyProject')
         ```
     """
-    if is_valid_uuid(workspace):
-        return workspace
-
-    workspaces = list_workspaces(df=False)
+    workspaces = list_workspaces()
+    
     if not workspaces:
         raise ResourceNotFoundError(f'No workspaces found.')
 
-    for _workspace in workspaces:
-        if _workspace['displayName'] == workspace:
-            return _workspace['id']
+    try:
+        for _, _ws in workspaces.iterrows():
+            if _ws['displayName'] == workspace_name:
+                return _ws['id']
+    except Exception as e:
+        raise ResourceNotFoundError(f"Workspace '{workspace_name}' not found.")
 
-    # If we get here, workspace was not found
-    if not silent:
-        logger.warning(f"Workspace '{workspace}' not found.")
-    return None
+
+def resolve_workspace(
+    workspace: str
+) -> str | None:
+    """
+    Resolves a workspace name to its ID.
+
+    Args:
+        workspace (str): The name or ID of the workspace.
+
+    Returns:
+        str | None: The ID of the workspace if found, otherwise None.
+
+    Raises:
+        ResourceNotFoundError: If the workspace is not found and silent is False.
+    """
+    if is_valid_uuid(workspace):
+        return workspace
+    else:
+        return get_workspace_id(workspace)
+    
