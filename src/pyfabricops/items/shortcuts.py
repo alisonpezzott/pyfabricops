@@ -1,8 +1,12 @@
-from typing import Literal
+from typing import Literal, Dict, List, Union, Optional
+from pandas import DataFrame
 
-import pandas
-
-from ..api.api import _api_request, _pagination_handler
+from ..api.api import (
+    _list_request,
+    _get_request,
+    _post_request,
+    _delete_request,
+)
 from ..utils.decorators import df
 from .lakehouses import resolve_lakehouse
 from ..utils.logging import get_logger
@@ -14,18 +18,22 @@ logger = get_logger(__name__)
 
 @df
 def list_shortcuts(
-    workspace: str, lakehouse: str, *, df: bool = False
-) -> list | pandas.DataFrame | None:
+    workspace: str, 
+    lakehouse: str, 
+    *, 
+    df: Optional[bool] = True,
+) -> Union[DataFrame, List[Dict[str, str]], None]: 
     """
-    Lists all shortcuts in the specified workspace.
+    Lists all shortcuts in the specified workspace and lakehouse
 
     Args:
         workspace (str): The workspace name or ID.
         lakehouse (str): The lakehouse name or ID.
-        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
+        ddf (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+            If False, returns a list of dictionaries.
 
     Returns:
-        (list | pandas.DataFrame | None): A list of shortcuts, a DataFrame with flattened keys, or None if not found.
+        (Union[DataFrame, List[Dict[str, str]], None]): A list of shortcuts, a DataFrame with flattened keys, or None if not found.
 
     Examples:
         ```python
@@ -33,21 +41,16 @@ def list_shortcuts(
         list_shortcuts('MyProjectWorkspace', 'MyLakehouse', df=True)
         ```
     """
-    workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
-    lakehouse_id = resolve_lakehouse(workspace_id, lakehouse)
-    if not lakehouse_id:
-        return None
-    response = _api_request(
-        endpoint=f'/workspaces/{workspace_id}/items/{lakehouse_id}/shortcuts'
+    workspace_id = resolve_workspace(workspace) 
+
+    lakehouse_id = resolve_lakehouse(workspace_id, lakehouse) 
+
+    return _list_request(
+        endpoint='items',
+        workspace_id=workspace_id,
+        lakehouse_id=lakehouse_id,
+        endpoint_suffix='/shortcuts',
     )
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-    else:
-        response = _pagination_handler(response)
-        return response.data.get('value')
 
 
 @df
@@ -57,8 +60,8 @@ def get_shortcut(
     shortcut_path: str,
     shortcut_name: str,
     *,
-    df: bool = False,
-) -> dict | pandas.DataFrame | None:
+    df: Optional[bool] = True,
+) -> Union[DataFrame, Dict[str, str], None]:
     """
     Retrieves a specific shortcut in the specified workspace.
 
@@ -67,10 +70,11 @@ def get_shortcut(
         lakehouse (str): The lakehouse name or ID.
         shortcut_path (str): The shortcut path.
         shortcut_name (str): The shortcut name or ID.
-        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+            If False, returns a list of dictionaries.
 
     Returns:
-        (dict | pandas.DataFrame | None): The shortcut details, a DataFrame with flattened keys, or None if not found.
+        (Union[DataFrame, Dict[str, str], None]): The shortcut details, a DataFrame with flattened keys, or None if not found.
 
     Examples:
         ```python
@@ -78,25 +82,19 @@ def get_shortcut(
         get_shortcut('MyProjectWorkspace', 'MyLakehouse', 'Files/Raw', 'MyShortcut', df=True)
         ```
     """
-    workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
-    lakehouse_id = resolve_lakehouse(workspace_id, lakehouse)
-    if not lakehouse_id:
-        return None
-    response = _api_request(
-        endpoint=f'/workspaces/{workspace_id}/items/{lakehouse_id}/shortcuts/{shortcut_path}/{shortcut_name}'
+    workspace_id = resolve_workspace(workspace) 
+    lakehouse_id = resolve_lakehouse(workspace_id, lakehouse) 
+    return _get_request(
+        endpoint='items',
+        workspace_id=workspace_id,
+        lakehouse_id=lakehouse_id,
+        endpoint_suffix=f'/shortcuts/{shortcut_path}/{shortcut_name}',
     )
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-    else:
-        return response.data
 
 
 def delete_shortcut(
     workspace: str, lakehouse: str, shortcut_path: str, shortcut_name: str
-) -> bool:
+) -> None:
     """
     Deletes a specific shortcut in the specified workspace.
 
@@ -107,7 +105,7 @@ def delete_shortcut(
         shortcut_name (str): The shortcut name or ID.
 
     Returns:
-        bool: True if the shortcut was deleted successfully, False otherwise.
+        None
 
     Examples:
         ```python
@@ -116,21 +114,13 @@ def delete_shortcut(
         ```
     """
     workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return False
     lakehouse_id = resolve_lakehouse(workspace_id, lakehouse)
-    if not lakehouse_id:
-        return False
-    response = _api_request(
-        endpoint=f'/workspaces/{workspace_id}/items/{lakehouse_id}/shortcuts/{shortcut_path}/{shortcut_name}',
-        method='delete',
+    return _delete_request(
+        endpoint='items',
+        workspace_id=workspace_id,
+        lakehouse_id=lakehouse_id,
+        endpoint_suffix=f'/shortcuts/{shortcut_path}/{shortcut_name}',
     )
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return False
-    else:
-        logger.success(f'Successfully deleted shortcut: {shortcut_name}.')
-        return True
 
 
 @df
@@ -152,19 +142,19 @@ def create_shortcut(
         's3Compatible',
     ] = 'oneLake',
     *,
-    target_connection_id: str = None,
-    target_location: str = None,
-    target_subpath: str = None,
-    target_delta_lake_folder: str = None,
-    target_environment_domain: str = None,
-    target_table_name: str = None,
-    target_item_id: str = None,
-    target_path: str = None,
-    target_workspace_id: str = None,
-    target_bucket: str = None,
-    custom_target_payload: dict = None,
-    df: bool = False,
-) -> dict | pandas.DataFrame | None:
+    target_connection_id: Optional[str] = None,
+    target_location: Optional[str] = None,
+    target_subpath: Optional[str] = None,
+    target_delta_lake_folder: Optional[str] = None,
+    target_environment_domain: Optional[str] = None,
+    target_table_name: Optional[str] = None,
+    target_item_id: Optional[str] = None,
+    target_path: Optional[str] = None,
+    target_workspace_id: Optional[str] = None,
+    target_bucket: Optional[str] = None,
+    custom_target_payload: Optional[dict] = None,
+    df: Optional[bool] = True,
+) -> Union[DataFrame, Dict[str, str], None]:
     """
     Creates a new shortcut in the specified lakehouse.
 
@@ -186,9 +176,11 @@ def create_shortcut(
         target_workspace_id (str, optional): Workspace ID for OneLake targets.
         target_bucket (str, optional): Bucket name for S3-compatible targets.
         custom_target_payload (dict, optional): Custom target payload to override automatic generation.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+            If False, returns a list of dictionaries.
 
     Returns:
-        (dict or pandas.DataFrame or None): The created shortcut information or None if failed.
+        (Union[DataFrame, Dict[str, str], None]): The created shortcut information or None if failed.
 
     Examples:
         ```python
@@ -218,11 +210,8 @@ def create_shortcut(
         ```
     """
     workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
+
     lakehouse_id = resolve_lakehouse(workspace_id, lakehouse)
-    if not lakehouse_id:
-        return None
 
     available_conflict_policies = [
         'Abort',
@@ -274,16 +263,11 @@ def create_shortcut(
 
     params = {'shortcutConflictPolicy': conflict_policy}
 
-    response = _api_request(
-        endpoint=f'/workspaces/{workspace_id}/items/{lakehouse_id}/shortcuts',
-        method='post',
+    return _post_request(
+        endpoint='items',
+        workspace_id=workspace_id,
+        item_id=lakehouse_id,
+        endpoint_suffix='/shortcuts',
         payload=payload,
         params=params,
     )
-
-    if not response.status_code in [200, 201]:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-    else:
-        logger.success(f'Successfully created shortcut: {shortcut_name}.')
-        return response.data

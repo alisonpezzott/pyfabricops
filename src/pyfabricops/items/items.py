@@ -1,87 +1,96 @@
-import os
+from pandas import DataFrame
+from typing import Union, Dict, List, Optional
 
-import pandas
-
-from ..api.api import _api_request, _lro_handler, _pagination_handler
+from ..api.api import (
+    _list_request,
+    _get_request,
+    _post_request,
+    _patch_request,
+    _delete_request,
+)
 from ..utils.decorators import df
 from .fabric_items import _FABRIC_ITEMS
 from ..core.folders import resolve_folder
 from ..utils.logging import get_logger
-from ..utils.utils import (
-    get_current_branch,
-    get_workspace_suffix,
-    is_valid_uuid,
-    pack_item_definition,
-    read_json,
-    unpack_item_definition,
-    write_json,
-)
-from ..core.workspaces import (
-    _resolve_workspace_path,
-    get_workspace,
-    resolve_workspace,
-)
+from ..utils.utils import is_valid_uuid
+from ..core.workspaces import resolve_workspace
 
 logger = get_logger(__name__)
 
 
 @df
 def list_items(
-    workspace: str, *, excluded_starts: tuple = ('Staging'), df: bool = False
-) -> list | pandas.DataFrame:
+    workspace: str, 
+    *, 
+    df: Optional[bool] = True
+) -> Union[DataFrame, List[Dict[str, str]], None]:
     """
     Returns a list of items from the specified workspace.
     This API supports pagination.
 
     Args:
         workspace (str): The workspace name or ID.
-        excluded_starts (tuple): A tuple of prefixes to exclude from the list.
-        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+            If False, returns a list of dictionaries.
 
     Returns:
-        (list|pandas.DataFrame): A list of items, excluding those that start with the specified prefixes. If `df=True`, returns a DataFrame with flattened keys.
+        (Union[DataFrame, List[Dict[str, str]], None]): A list of items, excluding those that start with the specified prefixes. If `df=True`, returns a DataFrame with flattened keys.
 
     Examples:
         ```python
         list_items('MyProjectWorkspace')
-        list_items('MyProjectWorkspace', excluded_starts=('Staging', 'ware'))
+        list_items('MyProjectWorkspace', df=False)
         ```
     """
     workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
+    return _list_request(
+        endpoint = 'items',
+        workspace_id = workspace_id,
+    )
 
-    response = _api_request(endpoint=f'/workspaces/{workspace_id}/items')
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-    else:
-        response = _pagination_handler(response)
-    items = [
-        item
-        for item in response.data.get('value', [])
-        if not item['displayName'].startswith(excluded_starts)
-    ]
-    if not items:
-        logger.warning(f"No valid items found in workspace '{workspace}'.")
-        return None
-    else:
-        return items
+
+def get_item_id(workspace: str, item: str) -> str | None:
+    """
+    Retrieves the ID of a specific item in the workspace.
+
+    Args:
+        workspace (str): The workspace name or ID.
+        item (str): The name of the item.
+
+    Returns:
+        str|None: The ID of the item, or None if not found.
+
+    Examples:
+        ```python
+        get_item_id('MyProjectWorkspace', 'SalesDataModel')
+        get_item_id('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000')
+        ```
+    """
+    items = list_items(
+        workspace_id=resolve_workspace(workspace), 
+        df=False,
+    )
+
+    for _item in items:
+        if _item['displayName'] == item:
+            return _item['id']
+    logger.warning(f"Item '{item}' not found in workspace '{workspace}'.")
+    return None
 
 
 def resolve_item(
-    workspace: str, item: str, *, silent: bool = False
-) -> str | None:
+    workspace: str, 
+    item: str, 
+) -> Union[str, None]:
     """
     Resolves a item name to its ID.
 
     Args:
         workspace (str): The ID of the workspace.
         item (str): The name of the item.
-        silent (bool): If True, suppresses warnings. Defaults to False.
 
     Returns:
-        str|None: The ID of the item, or None if not found.
+        (Union[str, None]): The ID of the item, or None if not found.
 
     Examples:
         ```python
@@ -91,40 +100,8 @@ def resolve_item(
     """
     if is_valid_uuid(item):
         return item
-
-    workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
-
-    items = list_items(workspace, df=False)
-    if not items:
-        return None
-
-    name = item.split('.')[0]
-    type = item.split('.')[-1]
-    if not name or not type:
-        if not silent:
-            logger.warning(
-                f"Invalid item format '{item}'. Expected 'Name.Type'."
-            )
-        return None
-
-    valid_types = _FABRIC_ITEMS.keys()
-    if type not in valid_types:
-        if not silent:
-            logger.warning(
-                f"Invalid item type '{type}'. Valid types are: {', '.join(valid_types)}."
-            )
-        return None
-
-    for item_ in items:
-        name_ = item_.get('displayName')
-        type_ = item_.get('type')
-        if name_ == name and type_ == type_:
-            return item_['id']
-    if not silent:
-        logger.warning(f"Item '{item}' not found.")
-    return None
+    else:
+        return get_item_id(resolve_workspace(workspace), item) 
 
 
 @df
@@ -132,18 +109,19 @@ def get_item(
     workspace: str,
     item: str,
     *,
-    df: bool = False,
-) -> dict | pandas.DataFrame | None:
+    df: Optional[bool] = True,
+) -> Union[DataFrame, Dict[str, str], None]:
     """
     Retrieves a specific item from the workspace.
 
     Args:
         workspace (str): The workspace name or ID.
         item (str): The name or ID of the item to retrieve.
-        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+            If False, returns a list of dictionaries.
 
     Returns:
-        (dict | pandas.DataFrame | None): The item details as a dictionary or DataFrame, or None if not found.
+        (Union[DataFrame, Dict[str, str], None]): The item details as a dictionary or DataFrame, or None if not found.
 
     Examples:
         ```python
@@ -152,22 +130,14 @@ def get_item(
         ```
     """
     workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
-
+    
     item_id = resolve_item(workspace_id, item)
-    if not item_id:
-        return None
-
-    response = _api_request(
-        endpoint=f'/workspaces/{workspace_id}/items/{item_id}'
+    
+    return _get_request(
+        endpoint='items',
+        workspace_id=workspace_id,
+        item_id=item_id,
     )
-
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-    else:
-        return response.data
 
 
 @df
@@ -175,10 +145,10 @@ def update_item(
     workspace: str,
     item: str,
     *,
-    display_name: str = None,
-    description: str = None,
-    df: bool = False,
-) -> dict | pandas.DataFrame:
+    display_name: Optional[str] = None,
+    description: Optional[str] = None,
+    df: Optional[bool] = True,
+) -> Union[DataFrame, Dict[str, str], None]:
     """
     Updates the properties of the specified semantic model.
 
@@ -187,9 +157,11 @@ def update_item(
         item (str): The name or ID of the item to update.
         display_name (str, optional): The new display name for the item.
         description (str, optional): The new description for the item.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+            If False, returns a list of dictionaries.
 
     Returns:
-        (dict or None): The updated semantic model details if successful, otherwise None.
+        (Union[DataFrame, Dict[str, str], None]): The updated semantic model details if successful, otherwise None.
 
     Examples:
         ```python
@@ -198,39 +170,23 @@ def update_item(
         ```
     """
     workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
-
+    
     item_id = resolve_item(workspace_id, item)
-    if not item_id:
-        return None
-
-    item_ = get_item(workspace_id, item_id)
-    if not item_:
-        return None
-
-    item_description = item_['description']
-    item_display_name = item_['displayName']
 
     payload = {}
 
-    if item_display_name != display_name and display_name:
+    if display_name:
         payload['displayName'] = display_name
 
-    if item_description != description and description:
+    if description:
         payload['description'] = description
 
-    response = _api_request(
-        endpoint=f'/workspaces/{workspace_id}/items/{item_id}',
-        method='put',
+    return _patch_request(
+        endpoint='items',
+        workspace_id=workspace_id,
+        item_id=item_id,
         payload=payload,
     )
-
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-    else:
-        return response.data
 
 
 def delete_item(workspace: str, item: str) -> None:
@@ -254,26 +210,17 @@ def delete_item(workspace: str, item: str) -> None:
         ```
     """
     workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
 
     item_id = resolve_item(workspace_id, item)
-    if not item_id:
-        return None
 
-    response = _api_request(
-        endpoint=f'/workspaces/{workspace_id}/items/{item_id}',
-        method='delete',
-        return_raw=True,
+    return _delete_request(
+        endpoint='items',
+        workspace_id=workspace_id,
+        item_id=item_id,
     )
-    if not response.status_code == 200:
-        logger.warning(f'{response.status_code}: {response.text}.')
-        return False
-    else:
-        return True
 
 
-def get_item_definition(workspace: str, item: str) -> dict:
+def get_item_definition(workspace: str, item: str) -> Union[Dict[str, str], None]:
     """
     Retrieves the definition of a item by its name or ID from the specified workspace.
 
@@ -282,7 +229,7 @@ def get_item_definition(workspace: str, item: str) -> dict:
         item (str): The name or ID of the item.
 
     Returns:
-        (dict): The item definition if found, otherwise None.
+        (Union[Dict[str, str], None]): The item definition if found, otherwise None.
 
     Examples:
         ```python
@@ -290,42 +237,25 @@ def get_item_definition(workspace: str, item: str) -> dict:
         get_item_definition('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000')
         ```
     """
-    # Resolving IDs
     workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
 
     item_id = resolve_item(workspace_id, item)
-    if not item_id:
-        return None
 
-    # Requesting
-    response = _api_request(
-        endpoint=f'/workspaces/{workspace_id}/items/{item_id}/getDefinition',
-        method='post',
+    return _post_request(
+        endpoint='items',
+        workspace_id=workspace_id,
+        item_id=item_id,
+        endpoint_suffix='/getDefinition'
     )
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-    elif response.status_code == 202:
-        # If the response is a long-running operation, handle it
-        lro_response = _lro_handler(response)
-        if not lro_response.success:
-            logger.warning(
-                f'{lro_response.status_code}: {lro_response.error}.'
-            )
-            return None
-        else:
-            return lro_response.data
-    elif response.status_code == 200:
-        # If the response is successful, we can process it
-        return response.data
-    else:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
 
 
-def update_item_definition(workspace: str, item: str, path: str) -> dict:
+@df
+def update_item_definition(
+    workspace: str, 
+    item: str, 
+    item_definition: Dict[str, str],
+    df: Optional[bool] = True,
+) -> Union[DataFrame, Dict[str, str], None]:
     """
     Updates the definition of an existing item in the specified workspace.
     If the item does not exist, it returns None.
@@ -333,124 +263,112 @@ def update_item_definition(workspace: str, item: str, path: str) -> dict:
     Args:
         workspace (str): The workspace name or ID.
         item (str): The name or ID of the item to update.
-        path (str): The path to the item definition.
+        item_definition (Dict[str, str]): The updated item definition.
 
     Returns:
-        (dict or None): The updated item details if successful, otherwise None.
+        (Union[DataFrame, Dict[str, str], None]): The updated item details if successful, otherwise None.
 
     Examples:
         ```python
-        update_item_definition('MyProjectWorkspace', 'SalesDataModel', '/path/to/updated/definition.json')
-        update_item_definition('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', '/path/to/updated/definition.json')
+        update_item_definition(
+            'MyProjectWorkspace', 
+            'SalesDataModel', 
+            item_definition = {...}  # Updated item definition
+        )
         ```
     """
     workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
 
     item_id = resolve_item(workspace_id, item)
-    if not item_id:
-        return None
 
-    definition = pack_item_definition(path)
+    payload = {'definition': item_definition}
 
     params = {'updateMetadata': True}
 
-    response = _api_request(
-        endpoint=f'/workspaces/{workspace_id}/items/{item_id}/updateDefinition',
-        method='post',
-        payload={'definition': definition},
-        params=params,
+    return _post_request(
+        endpoint='items',
+        workspace_id=workspace_id,
+        item_id=item_id,
+        endpoint_suffix='/updateDefinition',
+        payload=payload,
+        params=params
     )
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-    elif response.status_code == 202:
-        # If the response is a long-running operation, handle it
-        lro_response = _lro_handler(response)
-        if not lro_response.success:
-            logger.warning(
-                f'{lro_response.status_code}: {lro_response.error}.'
-            )
-            return None
-        else:
-            return lro_response.data
-    elif response.status_code == 200:
-        # If the response is successful, we can process it
-        return response.data
-    else:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
 
 
+@df
 def create_item(
     workspace: str,
     display_name: str,
-    path: str,
+    item_definition: Dict[str, str],
     *,
-    description: str = None,
-    folder: str = None,
-):
+    description: Optional[str] = None,
+    folder: Optional[str] = None,
+    df: Optional[bool] = True
+) -> Union[DataFrame, Dict[str, str], None]:
     """
     Creates a new item in the specified workspace.
 
     Args:
         workspace (str): The workspace name or ID.
         display_name (str): The display name of the item.
+        item_definition (Dict[str, str]): The item definition.
         description (str, optional): A description for the item.
         folder (str, optional): The folder to create the item in.
-        path (str): The path to the item definition file.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+            If False, returns a list of dictionaries.
 
     Returns:
-        (dict): The created item details.
+        (Union[DataFrame, Dict[str, str], None]): The created item details.
 
     Examples:
         ```python
-        create_item('MyProjectWorkspace', 'SalesDataModel', '/path/to/definition.json')
-        create_item('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', '/path/to/definition.json')
+        create_item(
+            'MyProjectWorkspace', 'SalesDataModel', item_definition={...}
+        )
         ```
     """
     workspace_id = resolve_workspace(workspace)
 
-    definition = pack_item_definition(path)
-
-    payload = {'displayName': display_name, 'definition': definition}
+    payload = {'displayName': display_name, 'definition': item_definition}
 
     if description:
         payload['description'] = description
 
     if folder:
         folder_id = resolve_folder(workspace_id, folder)
-        if not folder_id:
-            logger.warning(
-                f"Folder '{folder}' not found in workspace {workspace_id}."
-            )
-        else:
+        if folder_id:
             payload['folderId'] = folder_id
 
-    response = _api_request(
-        endpoint=f'/workspaces/{workspace_id}/items',
-        method='post',
-        payload=payload,
+    return _post_request(
+        endpoint='items',
+        workspace_id=workspace_id,
+        payload=payload
     )
 
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-    elif response.status_code == 202:
-        # If the response is a long-running operation, handle it
-        lro_response = _lro_handler(response)
-        if not lro_response.success:
-            logger.warning(
-                f'{lro_response.status_code}: {lro_response.error}.'
-            )
-            return None
-        else:
-            return lro_response.data
-    elif response.status_code == 200:
-        # If the response is successful, we can process it
-        return response.data
-    else:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
 
+def delete_item(workspace: str, item: str) -> None:
+    """
+    Deletes an existing item in the specified workspace.
+    If the item does not exist, it returns None.
+
+    Args:
+        workspace (str): The workspace name or ID.
+        item (str): The name or ID of the item to delete.
+
+    Returns:
+        (Union[DataFrame, Dict[str, str], None]): The deleted item details if successful, otherwise None.
+
+    Examples:
+        ```python
+        delete_item('MyProjectWorkspace', 'SalesDataModel')
+        ```
+    """
+    workspace_id = resolve_workspace(workspace)
+
+    item_id = resolve_item(workspace_id, item)
+
+    return _delete_request(
+        endpoint='items',
+        workspace_id=workspace_id,
+        item_id=item_id,
+    )
