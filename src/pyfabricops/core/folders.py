@@ -232,8 +232,8 @@ def update_folder(
 def move_folder(
     workspace: str,
     folder: str,
-    target_folder: str,
     *,
+    target_folder: Optional[str] = None,
     df: Optional[bool] = True,
 ) -> Union[DataFrame, Dict[str, str], None]:
     """
@@ -261,7 +261,10 @@ def move_folder(
     """
     workspace_id = resolve_workspace(workspace)
 
-    payload = {'targetFolderId': resolve_folder(workspace_id, target_folder)}
+    payload = {}
+
+    if target_folder:
+        payload = {'targetFolderId': resolve_folder(workspace_id, target_folder)}
 
     return _post_request(
         'folders',

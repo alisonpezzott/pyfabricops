@@ -575,6 +575,7 @@ ENDPOINT_TEMPLATES = {
 def _list_request(
     endpoint: str,
     workspace_id: Optional[str] = None,
+    item_id: Optional[str] = None,
     **kwargs,
 ) -> Union[List[Dict[str, str]], Dict[str, str], None]:
 
@@ -591,7 +592,13 @@ def _list_request(
     if template['requires_workspace_id']:
         endpoint = f"{template['endpoint_prefix']}{workspace_id}{template['endpoint']}"
     else:
-        endpoint = template['endpoint']
+        endpoint = f"{template['endpoint']}"
+
+    if item_id is not None:
+        endpoint += f"/{item_id}"
+
+    if not kwargs.get('endpoint_suffix', '') is None:
+        endpoint += kwargs.get('endpoint_suffix', '')
 
     response = _api_request(
         endpoint=endpoint,
@@ -633,6 +640,9 @@ def _get_request(
         endpoint = f"{template['endpoint_prefix']}{workspace_id}{template['endpoint']}/{item_id}"
     else:
         endpoint = f"{template['endpoint']}/{item_id}"
+    
+    if not kwargs.get('endpoint_suffix', '') is None:
+        endpoint += kwargs.get('endpoint_suffix', '')
 
     response = _api_request(
         endpoint=endpoint,

@@ -245,8 +245,8 @@ def list_workspace_role_assignments(
     """
     return _list_request(
         'workspaces',
-        workspace_id=resolve_workspace(workspace),
-        endpoint_suffix='roleAssignments',
+        item_id=resolve_workspace(workspace),
+        endpoint_suffix='/roleAssignments',
     )
 
 
@@ -389,10 +389,9 @@ def update_workspace_role_assignment(
 
     return _patch_request(
         'workspaces',
-        workspace_id=workspace_id,
-        item_id=user_uuid,
+        item_id=workspace_id,
         payload=payload,
-        endpoint_suffix='roleAssignments',
+        endpoint_suffix=f'/roleAssignments/{user_uuid}',
     )
 
 
@@ -420,9 +419,8 @@ def delete_workspace_role_assignment(
     """
     return _delete_request(
         'workspaces',
-        workspace_id=resolve_workspace(workspace),
-        item_id=user_uuid,
-        endpoint_suffix='roleAssignments',
+        item_id=resolve_workspace(workspace),
+        endpoint_suffix=f'/roleAssignments/{user_uuid}',
     )
 
 
@@ -448,9 +446,9 @@ def assign_to_capacity(workspace: str, capacity: str) -> None:
     payload = {'capacityId': resolve_capacity(capacity)}
     response = _post_request(
         'workspaces',
-        workspace_id=resolve_workspace(workspace),
+        item_id=resolve_workspace(workspace),
         payload=payload,
-        endpoint_suffix='assignToCapacity',
+        endpoint_suffix='/assignToCapacity',
     )
     if not response:
         logger.success(
@@ -476,8 +474,8 @@ def unassign_from_capacity(workspace: str) -> None:
     """
     response = _post_request(
         'workspaces',
-        workspace_id=resolve_workspace(workspace),
-        endpoint_suffix='unassignFromCapacity',
+        item_id=resolve_workspace(workspace),
+        endpoint_suffix='/unassignFromCapacity',
     )
     if not response:
         logger.success(
