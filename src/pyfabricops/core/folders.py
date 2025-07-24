@@ -53,7 +53,7 @@ def get_folder_id(workspace: str, folder_name: str) -> Union[str, None]:
         str | None: The ID of the folder if found, otherwise None.
     """
     folders = list_folders(
-        workspace_id=resolve_workspace(workspace),
+        workspace=resolve_workspace(workspace),
         df=False,
     )
     for _folder in folders:
