@@ -1,416 +1,312 @@
-import glob
-import json
-import os
-import re
+from typing import Dict, List, Union, Optional
 
-import pandas
+from pandas import DataFrame
 
-from ..api.api import _api_request, _lro_handler, _pagination_handler
 from ..utils.decorators import df
-from ..core.folders import resolve_folder
+from ..api.api import (
+    _post_request,
+    _delete_request,
+    _get_request,
+    _list_request,
+)
 from ..utils.logging import get_logger
-from ..cicd.reports_support import REPORT_DEFINITION
-from ..utils.utils import (
-    get_current_branch,
-    get_root_path,
-    get_workspace_suffix,
-    is_valid_uuid,
-    pack_item_definition,
-    parse_definition_report,
-    read_json,
-    unpack_item_definition,
-    write_json,
-)
-from ..core.workspaces import (
-    _resolve_workspace_path,
-    get_workspace,
-    resolve_workspace,
-)
+from ..core.workspaces import resolve_workspace
+from ..core.folders import resolve_folder
+from ..utils.utils import is_valid_uuid
+
 
 logger = get_logger(__name__)
 
 
 @df
 def list_reports(
-    workspace: str, *, df: bool = False
-) -> list | pandas.DataFrame | None:
+    workspace: str, 
+    df: Optional[bool] = True, 
+) -> Union[DataFrame, List[Dict[str, str]], None]:
     """
-    Lists all reports in the specified workspace.
+    Returns a list of semantic models in a specified workspace.
+
+    Args:
+        workspace_id (str): The ID of the workspace.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+            If False, returns a list of dictionaries.
+
+    Returns:
+        (Union[DataFrame, List[Dict[str, str]], None]): A list of semantic models or a DataFrame if df is True.
+    """
+    return _list_request('reports', workspace_id=resolve_workspace(workspace))
+
+
+def get_report_id(
+    workspace: str, 
+    report_name: str
+) -> Union[str, None]:
+    """
+    Retrieves the ID of a semantic model by its name from the specified workspace.
 
     Args:
         workspace (str): The workspace name or ID.
-        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
+        report_name (str): The name of the semantic model.
 
     Returns:
-        (list | pandas.DataFrame | None): A list of reports, a DataFrame with flattened keys, or None if not found.
+        (Optional[str]): The ID of the semantic model if found, otherwise None.
 
     Examples:
         ```python
-        list_reports('MyProjectWorkspace')
-        list_reports('MyProjectWorkspace', df=True)
+        get_report_id('123e4567-e89b-12d3-a456-426614174000', 'SalesDataModel')
         ```
     """
-    workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
-    response = _api_request(endpoint=f'/workspaces/{workspace_id}/reports')
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-    else:
-        response = _pagination_handler(response)
-        return response.data.get('value')
+    models = list_reports(workspace_id=resolve_workspace(workspace), df=False)
+    for model in models:
+        if model.get('displayName') == report_name:
+            return model.get('id')
+    return None
 
 
 def resolve_report(
-    workspace: str, report: str, *, silent: bool = False
-) -> str | None:
-    """
-    Resolves a report name to its ID.
-
-    Args:
-        workspace (str): The ID of the workspace.
-        report (str): The name of the report.
-
-    Returns:
-        str|None: The ID of the report, or None if not found.
-
-    Examples:
-        ```python
-        resolve_report('MyProjectWorkspace', 'SalesReport')
-        ```
-    """
+    workspace: str,
+    report: str,
+) -> Union[str, None]:
     if is_valid_uuid(report):
         return report
-    workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
-
-    reports = list_reports(workspace, df=False)
-    if not reports:
-        return None
-
-    for report_ in reports:
-        if report_['displayName'] == report:
-            return report_['id']
-    if not silent:
-        logger.warning(f"Report '{report}' not found.")
-    return None
+    else:
+        return get_report_id(workspace, report)
 
 
 @df
 def get_report(
-    workspace: str, report: str, *, df: bool = False
-) -> dict | pandas.DataFrame | None:
+    workspace: str, 
+    report: str, 
+    *, 
+    df: Optional[bool] = True
+) -> Union[DataFrame, Dict[str, str], None]:
     """
-    Retrieves a report by its name or ID from the specified workspace.
+    Retrieves a semantic model by its name or ID from the specified workspace.
 
     Args:
-        workspace (str): The workspace name or ID.
-        report (str): The name or ID of the report.
-        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
+        workspace_id (str): The workspace ID.
+        report_id (str): The ID of the semantic model.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+            If False, returns a list of dictionaries.
 
     Returns:
-        (dict or pandas.DataFrame): The report details if found. If `df=True`, returns a DataFrame with flattened keys.
+        (Union[DataFrame, Dict[str, str], None]): The semantic model details if found. If `df=True`, returns a DataFrame with flattened keys.
 
     Examples:
         ```python
-        get_report('MyProjectWorkspace', 'SalesReport')
-        get_report('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', df=True)
+        get_report('123e4567-e89b-12d3-a456-426614174000', '123e4567-e89b-12d3-a456-426614174000')
         ```
     """
     workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
-
-    report_id = resolve_report(workspace_id, report)
-    if not report_id:
-        return None
-
-    response = _api_request(
-        endpoint=f'/workspaces/{workspace_id}/reports/{report_id}'
+    report_id = resolve_report(workspace, report)
+    return _get_request(
+        'reports', workspace_id=workspace_id, item_id=report_id
     )
 
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-    else:
-        return response.data
+
+@df
+def create_report(
+    workspace: str,
+    display_name: str,
+    item_definition: Dict[str, str],
+    *,
+    description: Optional[str] = None,
+    folder: Optional[str] = None,
+    df: Optional[bool] = True,
+) -> Union[DataFrame, Dict[str, str], None]:
+    """
+    Creates a new semantic model in the specified workspace.
+
+    Args:
+        workspace (str): The workspace name or ID.
+        display_name (str): The display name of the semantic model.
+        item_definition (Dict[str, str]): The definition of the semantic model.
+        description (Optional[str]): A description for the semantic model.
+        folder (Optional[str]): The ID of the folder to create the semantic model in.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+            If False, returns a list of dictionaries.
+
+    Returns:
+        (Union[DataFrame, Dict[str, str], None]): The created semantic model details.
+
+    Examples:
+        ```python
+        create_report(
+            workspace_id='123e4567-e89b-12d3-a456-426614174000',
+            display_name='SalesDataModel',
+            item_definition= {}, # Definition dict of the semantic model
+            description='A semantic model for sales data',
+            folder_id='456e7890-e12b-34d5-a678-9012345678901',
+        )
+        ```
+    """
+    workspace_id = resolve_workspace(workspace)
+    
+    payload = {'displayName': display_name, 'definition': item_definition}
+
+    if description:
+        payload['description'] = description
+
+    if folder:
+        folder_id = resolve_folder(folder, workspace_id=workspace_id)
+        if folder_id:
+            payload['folderId'] = folder_id
+
+    return _post_request(
+        'reports', workspace_id=workspace_id, payload=payload
+    )
 
 
 @df
 def update_report(
     workspace: str,
     report: str,
-    display_name: str = None,
-    description: str = None,
     *,
-    df: bool = False,
-) -> dict | pandas.DataFrame:
+    display_name: Optional[str] = None,
+    description: Optional[str] = None,
+    df: Optional[bool] = False,
+) -> Union[DataFrame, Dict[str, str], None]:
     """
-    Updates the properties of the specified report.
+    Updates the properties of the specified semantic model.
 
     Args:
         workspace (str): The workspace name or ID.
-        report (str): The name or ID of the report to update.
-        display_name (str, optional): The new display name for the report.
-        description (str, optional): The new description for the report.
-        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
+        report (str): The ID of the semantic model to update.
+        display_name (str, optional): The new display name for the semantic model.
+        description (str, optional): The new description for the semantic model.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+            If False, returns a list of dictionaries.
 
     Returns:
-        (dict or None): The updated report details if successful, otherwise None.
+        (Union[DataFrame, Dict[str, str], None]): The updated semantic model details if successful, otherwise None.
 
     Examples:
         ```python
-        update_report('MyProjectWorkspace', 'SalesDataModel', display_name='UpdatedSalesDataModel')
-        update_report('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', description='Updated description')
+        update_report(
+            workspace_id='123e4567-e89b-12d3-a456-426614174000',
+            report_id='456e7890-e12b-34d5-a678-9012345678901',
+            display_name='UpdatedDisplayName',
+            description='Updated description'
+        )
         ```
     """
     workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
-
-    report_id = resolve_report(workspace_id, report)
-    if not report_id:
-        return None
-
-    report_ = get_report(workspace_id, report_id)
-    if not report_:
-        return None
-
-    report_description = report_['description']
-    report_display_name = report_['displayName']
+    report_id = resolve_report(workspace, report)
 
     payload = {}
 
-    if report_display_name != display_name and display_name:
+    if display_name:
         payload['displayName'] = display_name
-
-    if report_description != description and description:
-        payload['description'] = description
-
-    response = _api_request(
-        endpoint=f'/workspaces/{workspace_id}/reports/{report_id}',
-        method='put',
-        payload=payload,
-    )
-
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-    else:
-        return response.data
-
-
-def delete_report(workspace: str, report: str) -> None:
-    """
-    Delete a report from the specified workspace.
-
-    Args:
-        workspace (str): The name or ID of the workspace to delete.
-        report (str): The name or ID of the report to delete.
-
-    Returns:
-        None: If the report is successfully deleted.
-
-    Raises:
-        ResourceNotFoundError: If the specified workspace is not found.
-
-    Examples:
-        ```python
-        delete_report('MyProjectWorkspace', 'SalesReport')
-        delete_report('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000')
-        ```
-    """
-    workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
-
-    report_id = resolve_report(workspace_id, report)
-    if not report_id:
-        return None
-
-    response = _api_request(
-        endpoint=f'/workspaces/{workspace_id}/reports/{report_id}',
-        method='delete',
-    )
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return response.success
-    else:
-        return response.success
-
-
-def get_report_definition(workspace: str, report: str) -> dict:
-    """
-    Retrieves the definition of a report by its name or ID from the specified workspace.
-
-    Args:
-        workspace (str): The workspace name or ID.
-        report (str): The name or ID of the report.
-
-    Returns:
-        (dict): The report definition if found, otherwise None.
-
-    Examples:
-        ```python
-        get_report_definition('MyProjectWorkspace', 'SalesReport')
-        get_report_definition('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000')
-        ```
-    """
-    # Resolving IDs
-    workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
-
-    report_id = resolve_report(workspace_id, report)
-    if not report_id:
-        return None
-
-    # Requesting
-    response = _api_request(
-        endpoint=f'/workspaces/{workspace_id}/reports/{report_id}/getDefinition',
-        method='post',
-    )
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-
-    # Check if it's a long-running operation (status 202)
-    if response.status_code == 202:
-        logger.debug('Long-running operation detected, handling LRO...')
-        lro_response = _lro_handler(response)
-        if not lro_response.success:
-            logger.warning(
-                f'{lro_response.status_code}: {lro_response.error}.'
-            )
-            return None
-        return lro_response.data
-
-    # For immediate success (status 200)
-    return response.data
-
-
-def update_report_definition(workspace: str, report: str, path: str):
-    """
-    Updates the definition of an existing report in the specified workspace.
-    If the report does not exist, it returns None.
-
-    Args:
-        workspace (str): The workspace name or ID.
-        report (str): The name or ID of the report to update.
-        path (str): The path to the report definition.
-
-    Returns:
-        (dict or None): The updated report details if successful, otherwise None.
-
-    Examples:
-        ```python
-        update_report_definition('MyProjectWorkspace', 'SalesReport', '/path/to/new/definition')
-        update_report_definition('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', '/path/to/new/definition')
-        ```
-    """
-    workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
-
-    report_id = resolve_report(workspace_id, report)
-    if not report_id:
-        return None
-
-    definition = pack_item_definition(path)
-
-    params = {'updateMetadata': True}
-
-    response = _api_request(
-        endpoint=f'/workspaces/{workspace_id}/reports/{report_id}/updateDefinition',
-        method='post',
-        payload={'definition': definition},
-        params=params,
-    )
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-
-    # Check if it's a long-running operation (status 202)
-    if response.status_code == 202:
-        logger.debug('Long-running operation detected, handling LRO...')
-        lro_response = _lro_handler(response)
-        if not lro_response.success:
-            logger.warning(
-                f'{lro_response.status_code}: {lro_response.error}.'
-            )
-            return None
-        return lro_response.data
-
-    # For immediate success (status 200)
-    return response.data
-
-
-def create_report(
-    workspace: str,
-    display_name: str,
-    path: str,
-    description: str = None,
-    folder: str = None,
-):
-    """
-    Creates a new report in the specified workspace.
-
-    Args:
-        workspace (str): The workspace name or ID.
-        display_name (str): The display name of the report.
-        description (str, optional): A description for the report.
-        folder (str, optional): The folder to create the report in.
-        path (str): The path to the report definition file.
-
-    Returns:
-        (dict): The created report details.
-
-    Examples:
-        ```python
-        create_report('MyProjectWorkspace', 'SalesReport', '/path/to/definition')
-        create_report('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', '/path/to/definition')
-        ```
-    """
-    workspace_id = resolve_workspace(workspace)
-
-    definition = pack_item_definition(path)
-
-    payload = {'displayName': display_name, 'definition': definition}
 
     if description:
         payload['description'] = description
 
-    if folder:
-        folder_id = resolve_folder(workspace_id, folder)
-        if not folder_id:
-            logger.warning(
-                f"Folder '{folder}' not found in workspace {workspace_id}."
-            )
-        else:
-            payload['folderId'] = folder_id
-
-    response = _api_request(
-        endpoint=f'/workspaces/{workspace_id}/reports',
-        method='post',
+    return _post_request(
+        'reports',
+        workspace_id=workspace_id,
+        item_id=report_id,
         payload=payload,
     )
 
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
 
-    # Check if it's a long-running operation (status 202)
-    if response.status_code == 202:
-        logger.debug('Long-running operation detected, handling LRO...')
-        lro_response = _lro_handler(response)
-        if not lro_response.success:
-            logger.warning(
-                f'{lro_response.status_code}: {lro_response.error}.'
-            )
-            return None
-        return lro_response.data
+def delete_report(workspace: str, report: str) -> None:
+    """
+    Delete a semantic model from the specified workspace.
 
-    # For immediate success (status 200)
-    return response.data
+    Args:
+        workspace (str): The workspace name or ID.
+        report (str): The name or ID of the semantic model to delete.
+
+    Returns:
+        None
+
+    Examples:
+        ```python
+        delete_report('123e4567-e89b-12d3-a456-426614174000', '456e7890-e12b-34d5-a678-9012345678901')
+        ```
+    """
+    workspace_id = resolve_workspace(workspace)
+    report_id = resolve_report(workspace, report)
+
+    return _delete_request(
+        'reports', workspace_id=workspace_id, item_id=report_id
+    )
+
+
+def get_report_definition(
+        workspace: str, 
+        report: str
+    ) -> Union[Dict[str, str], None]:
+    """
+    Retrieves the definition of a semantic model by its name or ID from the specified workspace.
+
+    Args:
+        workspace (str): The workspace name or ID.
+        report (str): The name or ID of the semantic model.
+
+    Returns:
+        ( Union[Dict[str, str], None]): The semantic model definition if found, otherwise None.
+
+    Examples:
+        ```python
+        get_report_definition(
+            workspace_id='123e4567-e89b-12d3-a456-426614174000',
+            report_id='456e7890-e12b-34d5-a678-9012345678901', 
+        ) 
+        ```
+    """
+    workspace_id = resolve_workspace(workspace)
+
+    report_id = resolve_report(workspace, report)
+
+    return _post_request(
+        'reports',
+        workspace_id=workspace_id,
+        item_id=report_id,
+        endpoint_suffix='/getDefinition',
+    )  
+    
+
+@df
+def update_report_definition(
+    workspace: str, 
+    report: str, 
+    item_definition: Dict[str, str],
+    *,
+    df: Optional[bool] = True,
+) -> Union[Dict[str, str], None]:
+    """
+    Updates the definition of an existing semantic model in the specified workspace.
+    If the semantic model does not exist, it returns None.
+
+    Args:
+        workspace (str): The workspace name or ID.
+        report (str): The name or ID of the semantic model to update.
+        item_definition (Dict[str, str]): The new definition for the semantic model.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+            If False, returns a list of dictionaries.
+
+    Returns:
+        (Union[Dict[str, str], None]): The updated semantic model details if successful, otherwise None.
+
+    Examples:
+        ```python
+        update_report(
+            workspace_id='123e4567-e89b-12d3-a456-426614174000',
+            report_id='456e7890-e12b-34d5-a678-9012345678901',
+            item_definition={...} # New definition dict of the semantic model
+        ) 
+        ```
+    """
+    workspace_id = resolve_workspace(workspace)
+    report_id = resolve_report(workspace, report)
+    params = {'updateMetadata': True}
+    payload = {'definition': item_definition}
+    return _post_request(
+        'reports',
+        workspace_id=workspace_id,
+        item_id=report_id,
+        payload=payload,
+        params=params,
+        endpoint_suffix='/updateDefinition',
+    )

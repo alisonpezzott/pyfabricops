@@ -9,7 +9,7 @@ from ..api.api import (
     _delete_request,
 )
 from ..utils.decorators import df
-from .fabric_items import _FABRIC_ITEMS
+from ....fabric_items import _FABRIC_ITEMS
 from ..core.folders import resolve_folder
 from ..utils.logging import get_logger
 from ..utils.utils import is_valid_uuid
