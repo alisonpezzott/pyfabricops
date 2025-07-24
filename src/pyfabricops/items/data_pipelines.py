@@ -1,13 +1,13 @@
-from typing import Optional, List, Dict, Union
+from typing import Dict, List, Optional, Union
 
 from pandas import DataFrame
 
 from ..api.api import (
-    _list_request,
-    _get_request,
-    _post_request,
-    _patch_request,
     _delete_request,
+    _get_request,
+    _list_request,
+    _patch_request,
+    _post_request,
 )
 from ..core.folders import resolve_folder
 from ..core.workspaces import resolve_workspace
@@ -20,16 +20,14 @@ logger = get_logger(__name__)
 
 @df
 def list_data_pipelines(
-    workspace: str, 
-    *, 
-    df: Optional[bool] = True
+    workspace: str, *, df: Optional[bool] = True
 ) -> Union[DataFrame, List[Dict[str, str]], None]:
     """
     Lists all data_pipelines in the specified workspace.
 
     Args:
         workspace (str): The name or ID of the workspace.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
@@ -42,17 +40,14 @@ def list_data_pipelines(
         ```
     """
     return _list_request(
-        'data_pipelines', 
+        'data_pipelines',
         workspace_id=resolve_workspace(workspace),
-    ) 
+    )
 
 
 @df
 def _get_data_pipeline(
-    workspace_id: str, 
-    data_pipeline_id: str, 
-    *, 
-    df: bool = True
+    workspace_id: str, data_pipeline_id: str, *, df: bool = True
 ) -> Union[DataFrame, Dict[str, str], None]:
     """
     Retrieves the details of a specific data pipeline.
@@ -72,13 +67,15 @@ def _get_data_pipeline(
         ```
     """
     return _get_request(
-        'data_pipelines', 
+        'data_pipelines',
         workspace_id=workspace_id,
         data_pipeline_id=data_pipeline_id,
     )
 
 
-def get_data_pipeline_id(workspace: str, data_pipeline_name: str) -> Union[str, None]:
+def get_data_pipeline_id(
+    workspace: str, data_pipeline_name: str
+) -> Union[str, None]:
     """
     Retrieves the ID of a data pipeline by its name.
 
@@ -89,17 +86,21 @@ def get_data_pipeline_id(workspace: str, data_pipeline_name: str) -> Union[str, 
         str | None: The ID of the data pipeline if found, otherwise None.
     """
     data_pipelines = list_data_pipelines(
-        workspace_id=resolve_workspace(workspace), 
+        workspace_id=resolve_workspace(workspace),
         df=False,
     )
     for _data_pipeline in data_pipelines:
         if _data_pipeline['displayName'] == data_pipeline_name:
             return _data_pipeline['id']
-    logger.warning(f"DataPipeline '{data_pipeline_name}' not found in workspace '{workspace}'.")
+    logger.warning(
+        f"DataPipeline '{data_pipeline_name}' not found in workspace '{workspace}'."
+    )
     return None
 
 
-def resolve_data_pipeline(workspace: str, data_pipeline: str) -> Union[str, None]:
+def resolve_data_pipeline(
+    workspace: str, data_pipeline: str
+) -> Union[str, None]:
     """
     Resolves a data pipeline name to its ID.
 
@@ -117,14 +118,16 @@ def resolve_data_pipeline(workspace: str, data_pipeline: str) -> Union[str, None
 
 
 @df
-def get_data_pipeline(workspace: str, data_pipeline: str) -> Union[DataFrame, Dict[str, str], None]:
+def get_data_pipeline(
+    workspace: str, data_pipeline: str
+) -> Union[DataFrame, Dict[str, str], None]:
     """
     Retrieves the details of a data pipeline by its ID.
 
     Args:
         workspace (str): The name or ID of the workspace.
         data_pipeline (str): The name or ID of the data pipeline.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
 
@@ -139,7 +142,7 @@ def get_data_pipeline(workspace: str, data_pipeline: str) -> Union[DataFrame, Di
     """
     workspace_id = resolve_workspace(workspace)
     return _get_data_pipeline(
-        workspace_id=workspace_id, 
+        workspace_id=workspace_id,
         data_pipeline_id=resolve_data_pipeline(workspace_id, data_pipeline),
     )
 
@@ -185,9 +188,9 @@ def update_data_pipeline(
         payload['description'] = description
 
     return _patch_request(
-        'data_pipelines', 
-        workspace_id=workspace_id, 
-        item_id=data_pipeline_id, 
+        'data_pipelines',
+        workspace_id=workspace_id,
+        item_id=data_pipeline_id,
         payload=payload,
     )
 
@@ -213,12 +216,12 @@ def delete_data_pipeline(workspace: str, data_pipeline: str) -> None:
         ```
     """
     workspace_id = resolve_workspace(workspace)
-    
+
     data_pipeline_id = resolve_data_pipeline(workspace_id, data_pipeline)
-    
+
     return _delete_request(
-        'data_pipelines', 
-        workspace_id=workspace_id, 
+        'data_pipelines',
+        workspace_id=workspace_id,
         item_id=data_pipeline_id,
     )
 
@@ -250,7 +253,7 @@ def get_data_pipeline_definition(workspace: str, data_pipeline: str) -> dict:
         workspace_id=workspace_id,
         item_id=data_pipeline_id,
         endpoint_suffix='/getDefinition',
-    ) 
+    )
 
 
 @df
@@ -265,7 +268,7 @@ def update_data_pipeline_definition(
         workspace (str): The workspace name or ID.
         data_pipeline (str): The name or ID of the data_pipeline to update.
         item_definition (Dict[str, str]): The item_definition of the data_pipeline.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
@@ -274,10 +277,10 @@ def update_data_pipeline_definition(
     Examples:
         ```python
         update_data_pipeline_definition(
-            workspace='MyProjectWorkspace', 
-            data_pipeline='SalesDataPipeline', 
+            workspace='MyProjectWorkspace',
+            data_pipeline='SalesDataPipeline',
             item_definition={...} # The definition of the data_pipeline
-        )  
+        )
         ```
     """
     workspace_id = resolve_workspace(workspace)
@@ -315,7 +318,7 @@ def create_data_pipeline(
         description (str, optional): A description for the data_pipeline.
         folder (str, optional): The folder to create the data_pipeline in.
         item_definition (Dict[str, str]): The definition of the data_pipeline.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
@@ -324,12 +327,12 @@ def create_data_pipeline(
     Examples:
         ```python
         create_data_pipeline(
-            workspace='MyProjectWorkspace', 
-            display_name='SalesDataPipeline', 
+            workspace='MyProjectWorkspace',
+            display_name='SalesDataPipeline',
             item_definition={...},
             description='This is a sales data pipeline',
             folder='SalesDataPipelinesFolder'
-        )  
+        )
         ```
     """
     workspace_id = resolve_workspace(workspace)
@@ -343,7 +346,7 @@ def create_data_pipeline(
         folder_id = resolve_folder(workspace_id, folder)
         if folder_id:
             payload['folderId'] = folder_id
-     
+
     if description:
         payload['description'] = description
 
@@ -351,12 +354,10 @@ def create_data_pipeline(
         'data_pipelines',
         workspace_id=workspace_id,
         payload=payload,
-    ) 
+    )
 
 
-def delete_data_pipeline(
-    workspace: str, data_pipeline: str
-) -> None:
+def delete_data_pipeline(workspace: str, data_pipeline: str) -> None:
     """
     Deletes a data_pipeline from the specified workspace.
 
@@ -374,11 +375,11 @@ def delete_data_pipeline(
         ```
     """
     workspace_id = resolve_workspace(workspace)
-    
+
     data_pipeline_id = resolve_data_pipeline(workspace_id, data_pipeline)
-    
+
     return _delete_request(
-        'data_pipelines', 
-        workspace_id=workspace_id, 
+        'data_pipelines',
+        workspace_id=workspace_id,
         item_id=data_pipeline_id,
     )

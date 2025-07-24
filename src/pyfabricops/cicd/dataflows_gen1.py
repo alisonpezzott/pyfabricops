@@ -95,6 +95,7 @@ def deploy_dataflow_gen1(workspace: str, path: str) -> bool | None:
     logger.success(f'Dataflow deployed successfully.')
     return True
 
+
 def export_dataflow_gen1(
     workspace: str,
     dataflow: str,

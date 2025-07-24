@@ -1,5 +1,3 @@
-
-
 def export_lakehouse(
     workspace: str,
     lakehouse: str,

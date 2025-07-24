@@ -1,12 +1,11 @@
-from typing import List, Optional, Union, Dict
+from typing import Dict, List, Optional, Union
+
 from pandas import DataFrame
 
-
-from ..utils.decorators import df
 from ..api.api import _list_request
+from ..utils.decorators import df
 from ..utils.logging import get_logger
 from ..utils.utils import is_valid_uuid
-
 
 logger = get_logger(__name__)
 
@@ -19,11 +18,11 @@ def list_capacities(
     Returns a list of capacities.
 
     Args:
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, List[Dict[str, str]], None]): A DataFrame with the list of capacities.  
+        (Union[DataFrame, List[Dict[str, str]], None]): A DataFrame with the list of capacities.
         If `df=False`, returns a list of dictionaries. If no capacities are found, returns None.
     """
     return _list_request('capacities')

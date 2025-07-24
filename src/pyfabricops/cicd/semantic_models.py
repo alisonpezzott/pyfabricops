@@ -1,4 +1,3 @@
-
 def export_semantic_model(
     workspace: str,
     semantic_model: str,

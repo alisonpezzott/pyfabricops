@@ -2,35 +2,36 @@ from typing import Dict, List, Literal, Optional, Union
 
 from pandas import DataFrame
 
-from ..utils.decorators import df
-from ..utils.exceptions import OptionNotAvailableError
-from ..utils.utils import is_valid_uuid
 from ..api.api import (
-    _post_request,
     _delete_request,
     _get_request,
     _list_request,
-    _patch_request
+    _patch_request,
+    _post_request,
 )
 from ..core.capacities import resolve_capacity
+from ..utils.decorators import df
+from ..utils.exceptions import OptionNotAvailableError
 from ..utils.logging import get_logger
-
+from ..utils.utils import is_valid_uuid
 
 logger = get_logger(__name__)
 
 
 @df
-def list_workspaces(df: Optional[bool] = True) -> Union[DataFrame, List[Dict[str, str]], None]:
+def list_workspaces(
+    df: Optional[bool] = True,
+) -> Union[DataFrame, List[Dict[str, str]], None]:
     """
     Returns a list of workspaces.
 
     Args:
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
         (DataFrame | list | None): A list of workspaces or a DataFrame if df is True.
-    
+
     Examples:
         ```python
         list_workspaces() # Returns as DataFrame
@@ -42,16 +43,15 @@ def list_workspaces(df: Optional[bool] = True) -> Union[DataFrame, List[Dict[str
 
 @df
 def _get_workspace(
-    workspace_id: str, 
-    df: Optional[bool] = True
+    workspace_id: str, df: Optional[bool] = True
 ) -> Union[DataFrame, List[Dict[str, str]], None]:
     """
     Returns the specified workspace.
 
     Args:
         workspace_id (str): The ID of the workspace to retrieve.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
-	        If False, returns a list of dictionaries.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
+                If False, returns a list of dictionaries.
 
     Returns:
         (Union[DataFrame, List[Dict[str, str]], None]) The details of the workspace if found, otherwise None. If `df=True`, returns a DataFrame with flattened keys.
@@ -63,7 +63,7 @@ def _get_workspace(
         get_workspace('MyProjectWorkspace', df=False) # Returns as list
         ```
     """
-    return _get_request('workspaces', item_id=workspace_id)  
+    return _get_request('workspaces', item_id=workspace_id)
 
 
 @df
@@ -81,7 +81,7 @@ def create_workspace(
         display_name (str): The name of the workspace to create.
         capacity (str, optional): The ID or name of the capacity to assign to the workspace. Defaults to None.
         description (str, optional): A description for the workspace. Defaults to None.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
@@ -90,8 +90,8 @@ def create_workspace(
     Examples:
         ```python
         create_workspace(
-            'MyProject', 
-            capacity_id='85974fbf-2c3b-4d5e-8f6a-7b8c9d0e1f2g',     
+            'MyProject',
+            capacity_id='85974fbf-2c3b-4d5e-8f6a-7b8c9d0e1f2g',
             description='My new project workspace',
         )
         ```
@@ -122,7 +122,7 @@ def update_workspace(
         workspace (str): The workspace name or ID to update.
         display_name (str, optional): The new name for the workspace.
         description (str, optional): The new description for the workspace.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
@@ -131,18 +131,18 @@ def update_workspace(
     Examples:
         ```python
         update_workspace(
-            '123e4567-e89b-12d3-a456-426614174000', 
+            '123e4567-e89b-12d3-a456-426614174000',
             display_name='New Workspace Name',
         )
-        
+
         update_workspace(
-            'MyProjectWorkspace', 
+            'MyProjectWorkspace',
             description='Updated description',
         )
 
         update_workspace(
-            '123e4567-e89b-12d3-a456-426614174000', 
-            display_name='New Workspace Name', 
+            '123e4567-e89b-12d3-a456-426614174000',
+            display_name='New Workspace Name',
             description='Updated description',
         )
         ```
@@ -152,14 +152,16 @@ def update_workspace(
             'No changes provided. Please specify at least one property to update.'
         )
         return None
-    
+
     payload = {}
     if display_name:
         payload['displayName'] = display_name
     if description:
         payload['description'] = description
-    
-    return _patch_request('workspaces', item_id=resolve_workspace(workspace), payload=payload)
+
+    return _patch_request(
+        'workspaces', item_id=resolve_workspace(workspace), payload=payload
+    )
 
 
 def delete_workspace(workspace: str) -> None:
@@ -185,8 +187,8 @@ def delete_workspace(workspace: str) -> None:
 
 @df
 def list_workspace_role_assignments(
-    workspace: str, 
-    *, 
+    workspace: str,
+    *,
     df: Optional[bool] = True,
 ) -> Union[DataFrame, List[Dict[str, str]], None]:
     """
@@ -194,7 +196,7 @@ def list_workspace_role_assignments(
 
     Args:
         workspace (str): The name or ID of the workspace to list role assignments for.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
@@ -207,17 +209,17 @@ def list_workspace_role_assignments(
         ```
     """
     return _list_request(
-        'workspaces', 
-        workspace_id=resolve_workspace(workspace), 
+        'workspaces',
+        workspace_id=resolve_workspace(workspace),
         endpoint_suffix='roleAssignments',
     )
 
 
 @df
 def get_workspace_role_assignment(
-    workspace: str, 
-    user_uuid: str, 
-    *, 
+    workspace: str,
+    user_uuid: str,
+    *,
     df: Optional[bool] = True,
 ) -> Union[DataFrame, Dict[str, str], None]:
     """
@@ -226,7 +228,7 @@ def get_workspace_role_assignment(
     Args:
         workspace (str): The name or id of the workspace to get role assignment for.
         user_uuid (str): The UUID of the user to check.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
@@ -235,17 +237,17 @@ def get_workspace_role_assignment(
     Examples:
         ```python
         get_workspace_role_assignment(
-            '123e4567-e89b-12d3-a456-426614174000', 
+            '123e4567-e89b-12d3-a456-426614174000',
             'FefEFewf-feF-1234-5678-9abcdef01234'
         )
         ```
     """
     return _get_request(
-        'workspaces', 
-        workspace_id=resolve_workspace(workspace), 
-        item_id=user_uuid, 
+        'workspaces',
+        workspace_id=resolve_workspace(workspace),
+        item_id=user_uuid,
         endpoint_suffix='roleAssignments',
-    )  
+    )
 
 
 @df
@@ -267,7 +269,7 @@ def add_workspace_role_assignment(
         user_uuid (str): The UUID of the user.
         user_type (str): The type of user (options: User, Group, ServicePrincipal, ServicePrincipalProfile).
         role (str): The role to assign (options: admin, member, contributor, viewer).
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
@@ -301,29 +303,29 @@ def add_workspace_role_assignment(
     payload = {'principal': {'id': user_uuid, 'type': user_type}, 'role': role}
 
     return _post_request(
-        'workspaces', 
-        workspace_id=resolve_workspace(workspace), 
-        payload=payload, 
+        'workspaces',
+        workspace_id=resolve_workspace(workspace),
+        payload=payload,
         endpoint_suffix='roleAssignments',
-    )  
+    )
 
 
 @df
 def update_workspace_role_assignment(
-    workspace: str, 
-    user_uuid: str, 
-    role: Literal['Admin', 'Contributor', 'Member', 'Viewer'] = 'Admin', 
+    workspace: str,
+    user_uuid: str,
+    role: Literal['Admin', 'Contributor', 'Member', 'Viewer'] = 'Admin',
     *,
     df: Optional[bool] = True,
 ) -> Union[DataFrame, Dict[str, str], None]:
     """
     Update a role to a existing workspace role assignment.
 
-    Args: 
+    Args:
         workspace (str): The ID or name of the workspace.
         user_uuid (str): The UUID of the user.
         role (str): The new role to assign (options: admin, member, contributor, viewer).
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
@@ -336,8 +338,8 @@ def update_workspace_role_assignment(
     Examples:
         ```python
         update_workspace_role_assignment(
-            '123e4567-e89b-12d3-a456-426614174000', 
-            'FefEFewf-feF-1234-5678-9abcdef01234', 
+            '123e4567-e89b-12d3-a456-426614174000',
+            'FefEFewf-feF-1234-5678-9abcdef01234',
             role='Contributor'
         )
     """
@@ -345,22 +347,22 @@ def update_workspace_role_assignment(
         raise OptionNotAvailableError(
             f'Invalid role: {role}. Must be one of: Admin, Contributor, Member, Viewer'
         )
-    
+
     payload = {'role': role}
-    
+
     workspace_id = resolve_workspace(workspace)
-    
+
     return _patch_request(
-        'workspaces', 
-        workspace_id=workspace_id, 
-        item_id=user_uuid, 
-        payload=payload, 
-        endpoint_suffix='roleAssignments'
-    ) 
+        'workspaces',
+        workspace_id=workspace_id,
+        item_id=user_uuid,
+        payload=payload,
+        endpoint_suffix='roleAssignments',
+    )
 
 
 def delete_workspace_role_assignment(
-    workspace: str, 
+    workspace: str,
     user_uuid: str,
 ) -> None:
     """
@@ -376,17 +378,17 @@ def delete_workspace_role_assignment(
     Examples:
     ```python
         delete_workspace_role_assignment(
-            '123e4567-e89b-12d3-a456-426614174000', 
+            '123e4567-e89b-12d3-a456-426614174000',
             'FefEFewf-feF-1234-5678-9abcdef01234',
         )
     ```
-    """    
+    """
     return _delete_request(
-        'workspaces', 
-        workspace_id=resolve_workspace(workspace), 
-        item_id=user_uuid, 
+        'workspaces',
+        workspace_id=resolve_workspace(workspace),
+        item_id=user_uuid,
         endpoint_suffix='roleAssignments',
-    ) 
+    )
 
 
 def assign_to_capacity(workspace: str, capacity: str) -> None:
@@ -403,20 +405,22 @@ def assign_to_capacity(workspace: str, capacity: str) -> None:
     Examples:
         ```python
         assign_to_capacity(
-            '123e4567-e89b-12d3-a456-426614174000', 
+            '123e4567-e89b-12d3-a456-426614174000',
             'b7e2c1a4-8f3e-4c2a-9d2e-7b1e5f6a8c9d'
         )
         ```
     """
     payload = {'capacityId': resolve_capacity(capacity)}
     response = _post_request(
-        'workspaces', 
-        workspace_id=resolve_workspace(workspace), 
-        payload=payload, 
-        endpoint_suffix='assignToCapacity'
+        'workspaces',
+        workspace_id=resolve_workspace(workspace),
+        payload=payload,
+        endpoint_suffix='assignToCapacity',
     )
     if not response:
-        logger.success(f'Workspace {workspace} assigned to capacity {capacity} successfully.')
+        logger.success(
+            f'Workspace {workspace} assigned to capacity {capacity} successfully.'
+        )
     return response
 
 
@@ -436,12 +440,14 @@ def unassign_from_capacity(workspace: str) -> None:
         ```
     """
     response = _post_request(
-        'workspaces', 
-        workspace_id=resolve_workspace(workspace), 
+        'workspaces',
+        workspace_id=resolve_workspace(workspace),
         endpoint_suffix='unassignFromCapacity',
-    )  
+    )
     if not response:
-        logger.success(f'Workspace {workspace} unassigned from capacity successfully.')
+        logger.success(
+            f'Workspace {workspace} unassigned from capacity successfully.'
+        )
     return response
 
 
@@ -477,20 +483,19 @@ def resolve_workspace(workspace: str) -> Union[str, None]:
         return workspace
     else:
         return get_workspace_id(workspace)
-    
+
 
 @df
 def get_workspace(
-    workspace: str, 
-    df: Optional[bool] = True
+    workspace: str, df: Optional[bool] = True
 ) -> Union[DataFrame, List[Dict[str, str]], None]:
     """
     Returns the specified workspace.
 
     Args:
         workspace (str): The name or ID of the workspace to retrieve.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
-	        If False, returns a list of dictionaries.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
+                If False, returns a list of dictionaries.
 
     Returns:
         (Union[DataFrame, List[Dict[str, str]], None]) The details of the workspace if found, otherwise None. If `df=True`, returns a DataFrame with flattened keys.
@@ -503,4 +508,4 @@ def get_workspace(
         ```
     """
     workspace_id = resolve_workspace(workspace)
-    return _get_request('workspaces', item_id=workspace_id)  
+    return _get_request('workspaces', item_id=workspace_id)

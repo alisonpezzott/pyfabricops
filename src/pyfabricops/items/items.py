@@ -1,28 +1,27 @@
-from pandas import DataFrame
-from typing import Union, Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
-from ..api.api import (
-    _list_request,
-    _get_request,
-    _post_request,
-    _patch_request,
-    _delete_request,
-)
-from ..utils.decorators import df
+from pandas import DataFrame
+
 from ....fabric_items import _FABRIC_ITEMS
+from ..api.api import (
+    _delete_request,
+    _get_request,
+    _list_request,
+    _patch_request,
+    _post_request,
+)
 from ..core.folders import resolve_folder
+from ..core.workspaces import resolve_workspace
+from ..utils.decorators import df
 from ..utils.logging import get_logger
 from ..utils.utils import is_valid_uuid
-from ..core.workspaces import resolve_workspace
 
 logger = get_logger(__name__)
 
 
 @df
 def list_items(
-    workspace: str, 
-    *, 
-    df: Optional[bool] = True
+    workspace: str, *, df: Optional[bool] = True
 ) -> Union[DataFrame, List[Dict[str, str]], None]:
     """
     Returns a list of items from the specified workspace.
@@ -30,7 +29,7 @@ def list_items(
 
     Args:
         workspace (str): The workspace name or ID.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
@@ -44,8 +43,8 @@ def list_items(
     """
     workspace_id = resolve_workspace(workspace)
     return _list_request(
-        endpoint = 'items',
-        workspace_id = workspace_id,
+        endpoint='items',
+        workspace_id=workspace_id,
     )
 
 
@@ -67,7 +66,7 @@ def get_item_id(workspace: str, item: str) -> str | None:
         ```
     """
     items = list_items(
-        workspace_id=resolve_workspace(workspace), 
+        workspace_id=resolve_workspace(workspace),
         df=False,
     )
 
@@ -79,8 +78,8 @@ def get_item_id(workspace: str, item: str) -> str | None:
 
 
 def resolve_item(
-    workspace: str, 
-    item: str, 
+    workspace: str,
+    item: str,
 ) -> Union[str, None]:
     """
     Resolves a item name to its ID.
@@ -101,7 +100,7 @@ def resolve_item(
     if is_valid_uuid(item):
         return item
     else:
-        return get_item_id(resolve_workspace(workspace), item) 
+        return get_item_id(resolve_workspace(workspace), item)
 
 
 @df
@@ -117,7 +116,7 @@ def get_item(
     Args:
         workspace (str): The workspace name or ID.
         item (str): The name or ID of the item to retrieve.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
@@ -130,9 +129,9 @@ def get_item(
         ```
     """
     workspace_id = resolve_workspace(workspace)
-    
+
     item_id = resolve_item(workspace_id, item)
-    
+
     return _get_request(
         endpoint='items',
         workspace_id=workspace_id,
@@ -157,7 +156,7 @@ def update_item(
         item (str): The name or ID of the item to update.
         display_name (str, optional): The new display name for the item.
         description (str, optional): The new description for the item.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
@@ -170,7 +169,7 @@ def update_item(
         ```
     """
     workspace_id = resolve_workspace(workspace)
-    
+
     item_id = resolve_item(workspace_id, item)
 
     payload = {}
@@ -220,7 +219,9 @@ def delete_item(workspace: str, item: str) -> None:
     )
 
 
-def get_item_definition(workspace: str, item: str) -> Union[Dict[str, str], None]:
+def get_item_definition(
+    workspace: str, item: str
+) -> Union[Dict[str, str], None]:
     """
     Retrieves the definition of a item by its name or ID from the specified workspace.
 
@@ -245,14 +246,14 @@ def get_item_definition(workspace: str, item: str) -> Union[Dict[str, str], None
         endpoint='items',
         workspace_id=workspace_id,
         item_id=item_id,
-        endpoint_suffix='/getDefinition'
+        endpoint_suffix='/getDefinition',
     )
 
 
 @df
 def update_item_definition(
-    workspace: str, 
-    item: str, 
+    workspace: str,
+    item: str,
     item_definition: Dict[str, str],
     df: Optional[bool] = True,
 ) -> Union[DataFrame, Dict[str, str], None]:
@@ -271,8 +272,8 @@ def update_item_definition(
     Examples:
         ```python
         update_item_definition(
-            'MyProjectWorkspace', 
-            'SalesDataModel', 
+            'MyProjectWorkspace',
+            'SalesDataModel',
             item_definition = {...}  # Updated item definition
         )
         ```
@@ -291,7 +292,7 @@ def update_item_definition(
         item_id=item_id,
         endpoint_suffix='/updateDefinition',
         payload=payload,
-        params=params
+        params=params,
     )
 
 
@@ -303,7 +304,7 @@ def create_item(
     *,
     description: Optional[str] = None,
     folder: Optional[str] = None,
-    df: Optional[bool] = True
+    df: Optional[bool] = True,
 ) -> Union[DataFrame, Dict[str, str], None]:
     """
     Creates a new item in the specified workspace.
@@ -314,7 +315,7 @@ def create_item(
         item_definition (Dict[str, str]): The item definition.
         description (str, optional): A description for the item.
         folder (str, optional): The folder to create the item in.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
@@ -340,9 +341,7 @@ def create_item(
             payload['folderId'] = folder_id
 
     return _post_request(
-        endpoint='items',
-        workspace_id=workspace_id,
-        payload=payload
+        endpoint='items', workspace_id=workspace_id, payload=payload
     )
 
 

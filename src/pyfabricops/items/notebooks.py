@@ -1,26 +1,27 @@
+from typing import Dict, List, Optional, Union
+
 from pandas import DataFrame
-from typing import Union, List, Dict, Optional
 
 from ..api.api import (
-    _list_request,
-    _get_request,
-    _post_request,
-    _patch_request,
     _delete_request,
+    _get_request,
+    _list_request,
+    _patch_request,
+    _post_request,
 )
-from ..utils.decorators import df
 from ..core.folders import resolve_folder
+from ..core.workspaces import resolve_workspace
+from ..utils.decorators import df
 from ..utils.logging import get_logger
 from ..utils.utils import is_valid_uuid
-from ..core.workspaces import resolve_workspace
 
 logger = get_logger(__name__)
 
 
 @df
 def list_notebooks(
-    workspace: str, 
-    *, 
+    workspace: str,
+    *,
     df: Optional[bool] = True,
 ) -> Union[DataFrame, List[Dict[str, str]], None]:
     """
@@ -28,7 +29,7 @@ def list_notebooks(
 
     Args:
         workspace (str): The workspace name or ID.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
@@ -41,14 +42,12 @@ def list_notebooks(
         ```
     """
     return _list_request(
-        endpoint = 'notebooks',
-        workspace_id = resolve_workspace(workspace),
+        endpoint='notebooks',
+        workspace_id=resolve_workspace(workspace),
     )
 
 
-def get_notebook_id(
-    workspace: str, notebook: str
-) -> Union[str, None]:
+def get_notebook_id(workspace: str, notebook: str) -> Union[str, None]:
     """
     Retrieves the ID of a notebook by its name or ID from the specified workspace.
 
@@ -69,11 +68,11 @@ def get_notebook_id(
     for nb in notebooks:
         if nb['displayName'] == notebook or nb['id'] == notebook:
             return nb['id']
-    return None  
+    return None
 
 
 def resolve_notebook(
-    workspace: str, 
+    workspace: str,
     notebook: str,
 ) -> Union[str, None]:
     """
@@ -101,9 +100,9 @@ def resolve_notebook(
 
 @df
 def get_notebook(
-    workspace: str, 
-    notebook: str, 
-    *, 
+    workspace: str,
+    notebook: str,
+    *,
     df: Optional[bool] = True,
 ) -> Union[DataFrame, Dict[str, str], None]:
     """
@@ -112,7 +111,7 @@ def get_notebook(
     Args:
         workspace (str): The workspace name or ID.
         notebook (str): The name or ID of the notebook.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
@@ -124,10 +123,10 @@ def get_notebook(
         get_notebook('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', df=True)
         ```
     """
-    workspace_id = resolve_workspace(workspace)        
+    workspace_id = resolve_workspace(workspace)
 
     notebook_id = resolve_notebook(workspace_id, notebook)
-    
+
     return _get_request(
         endpoint='notebooks',
         workspace_id=workspace_id,
@@ -152,7 +151,7 @@ def update_notebook(
         notebook (str): The name or ID of the notebook to update.
         display_name (Optional[str]): The new display name for the notebook.
         description (Optional[str]): The new description for the notebook.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
@@ -212,10 +211,12 @@ def delete_notebook(workspace: str, notebook: str) -> None:
         endpoint='notebooks',
         workspace_id=workspace_id,
         item_id=notebook_id,
-    )  
+    )
 
 
-def get_notebook_definition(workspace: str, notebook: str) -> Union[Dict[str, str], None]:
+def get_notebook_definition(
+    workspace: str, notebook: str
+) -> Union[Dict[str, str], None]:
     """
     Retrieves the definition of a notebook by its name or ID from the specified workspace.
 
@@ -235,19 +236,19 @@ def get_notebook_definition(workspace: str, notebook: str) -> Union[Dict[str, st
     workspace_id = resolve_workspace(workspace)
 
     notebook_id = resolve_notebook(workspace_id, notebook)
-    
+
     return _post_request(
         endpoint='notebooks',
         workspace_id=workspace_id,
         item_id=notebook_id,
-        endpoint_suffix='/getDefinition'
+        endpoint_suffix='/getDefinition',
     )
 
 
 @df
 def update_notebook_definition(
-    workspace: str, 
-    notebook: str, 
+    workspace: str,
+    notebook: str,
     item_definition: str,
     *,
     df: Optional[bool] = True,
@@ -274,7 +275,7 @@ def update_notebook_definition(
 
     notebook_id = resolve_notebook(workspace_id, notebook)
 
-    payload={'definition': item_definition}
+    payload = {'definition': item_definition}
 
     params = {'updateMetadata': True}
 
@@ -284,7 +285,7 @@ def update_notebook_definition(
         item_id=notebook_id,
         payload=payload,
         params=params,
-    ) 
+    )
 
 
 @df

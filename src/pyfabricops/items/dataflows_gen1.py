@@ -1,48 +1,49 @@
-from typing import Literal, Dict, List, Union, Optional
+from typing import Dict, List, Literal, Optional, Union
 
 from pandas import DataFrame
 
-from ..api.api import _api_request
-from ..utils.decorators import df
 from ..api.api import (
-    _list_request,
-    _get_request,
-    _post_request,
-    _patch_request,
+    _api_request,
     _delete_request,
-)  
+    _get_request,
+    _list_request,
+    _patch_request,
+    _post_request,
+)
+from ..core.folders import resolve_folder
+from ..core.workspaces import resolve_workspace
+from ..utils.decorators import df
 from ..utils.logging import get_logger
 from ..utils.utils import is_valid_uuid
-from ..core.folders import resolve_folder
-from ..core.workspaces import resolve_workspace  
 
 logger = get_logger(__name__)
 
 
 @df
 def list_dataflows_gen1(
-    workspace: str, 
+    workspace: str,
     *,
-    df: Optional[bool] = True, 
+    df: Optional[bool] = True,
 ) -> Union[DataFrame, List[Dict[str, str]], None]:
     """
     Returns a list of Gen1 dataflows in a specified workspace.
 
     Args:
         workspace (str): The name or ID of the workspace.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
-            If False, returns a list of dictionaries. 
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
+            If False, returns a list of dictionaries.
 
     Returns:
         (Union[DataFrame, List[Dict[str, str]], None]): A list of Gen1 dataflows or a DataFrame if df is True.
     """
     return _list_request(
-        'dataflows_gen1', 
-        workspace_id=resolve_workspace(workspace)
+        'dataflows_gen1', workspace_id=resolve_workspace(workspace)
     )
 
 
-def get_dataflow_gen1_id(workspace: str, dataflow_name: str) -> Union[str, None]:
+def get_dataflow_gen1_id(
+    workspace: str, dataflow_name: str
+) -> Union[str, None]:
     """
     Retrieves the ID of a Gen1 dataflow by its name.
 
@@ -53,15 +54,16 @@ def get_dataflow_gen1_id(workspace: str, dataflow_name: str) -> Union[str, None]
         str | None: The ID of the dataflow if found, otherwise None.
     """
     dataflows = list_dataflows_gen1(
-        workspace_id=resolve_workspace(workspace), 
+        workspace_id=resolve_workspace(workspace),
         df=False,
     )
     for _dataflow in dataflows:
         if _dataflow['displayName'] == dataflow_name:
             return _dataflow['id']
-    logger.warning(f"Dataflow '{dataflow_name}' not found in workspace '{workspace}'.")
+    logger.warning(
+        f"Dataflow '{dataflow_name}' not found in workspace '{workspace}'."
+    )
     return None
-
 
 
 def resolve_dataflow_gen1(workspace: str, dataflow: str) -> Union[str, None]:
@@ -83,9 +85,9 @@ def resolve_dataflow_gen1(workspace: str, dataflow: str) -> Union[str, None]:
 
 @df
 def get_dataflow_gen1(
-    workspace: str, 
-    dataflow: str, 
-    *, 
+    workspace: str,
+    dataflow: str,
+    *,
     df: Optional[bool] = True,
 ) -> Union[DataFrame, Dict[str, str], None]:
     """
@@ -94,7 +96,7 @@ def get_dataflow_gen1(
     Args:
         workspace (str): The workspace name or ID.
         dataflow (str): The name of the dataflow.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
@@ -111,8 +113,8 @@ def get_dataflow_gen1(
     return _get_request(
         'dataflows_gen1',
         workspace_id=workspace_id,
-        item_id=resolve_dataflow_gen1(workspace_id, dataflow)
-    )  
+        item_id=resolve_dataflow_gen1(workspace_id, dataflow),
+    )
 
 
 def get_dataflow_gen1_definition(workspace: str, dataflow: str) -> dict | None:
@@ -133,13 +135,11 @@ def get_dataflow_gen1_definition(workspace: str, dataflow: str) -> dict | None:
         ```
     """
     workspace_id = resolve_workspace(workspace)
-    
+
     dataflow_id = resolve_dataflow_gen1(workspace_id, dataflow)
 
     return _get_request(
-        'dataflows_gen1',
-        workspace_id=workspace_id,
-        item_id=dataflow_id
+        'dataflows_gen1', workspace_id=workspace_id, item_id=dataflow_id
     )
 
 
@@ -155,7 +155,7 @@ def update_dataflow_gen1_definition(
         workspace (str): The workspace name or ID.
         dataflow (str): The name or ID of the dataflow to update.
         item_definition (Dict[str, str]): The item_definition of the dataflow.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
@@ -164,10 +164,10 @@ def update_dataflow_gen1_definition(
     Examples:
         ```python
         update_dataflow_gen1_definition(
-            workspace='MyProjectWorkspace', 
-            dataflow='SalesDataflowGen1', 
+            workspace='MyProjectWorkspace',
+            dataflow='SalesDataflowGen1',
             item_definition={...} # The definition of the dataflow
-        )  
+        )
         ```
     """
     workspace_id = resolve_workspace(workspace)
@@ -205,7 +205,7 @@ def create_dataflow_gen1(
         description (str, optional): A description for the dataflow.
         folder (str, optional): The folder to create the dataflow in.
         item_definition (Dict[str, str]): The definition of the dataflow.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
@@ -233,7 +233,7 @@ def create_dataflow_gen1(
         folder_id = resolve_folder(workspace_id, folder)
         if folder_id:
             payload['folderId'] = folder_id
-     
+
     if description:
         payload['description'] = description
 
@@ -241,7 +241,7 @@ def create_dataflow_gen1(
         'data_pipelines',
         workspace_id=workspace_id,
         payload=payload,
-    ) 
+    )
 
 
 @df
@@ -292,9 +292,7 @@ def update_dataflow_gen1(
     )
 
 
-def delete_dataflow_gen1(
-    workspace: str, dataflow: str
-) -> None:
+def delete_dataflow_gen1(workspace: str, dataflow: str) -> None:
     """
     Deletes a dataflow from the specified workspace.
 
@@ -314,7 +312,7 @@ def delete_dataflow_gen1(
     workspace_id = resolve_workspace(workspace)
 
     dataflow_id = resolve_dataflow_gen1(workspace_id, dataflow)
-    
+
     return _delete_request(
         'dataflows_gen1',
         workspace_id=workspace_id,
@@ -396,9 +394,9 @@ def refresh_dataflow_gen1(
 
 @df
 def get_dataflow_gen1_transactions(
-    workspace: str, 
-    dataflow: str, 
-    *, 
+    workspace: str,
+    dataflow: str,
+    *,
     df: Optional[bool] = True,
 ) -> Union[DataFrame, List[Dict[str, str]], None]:
     """
@@ -407,9 +405,9 @@ def get_dataflow_gen1_transactions(
     Args:
         workspace (str): The workspace name or ID.
         dataflow (str): The dataflow name or ID.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
-    
+
     Returns:
         Union[DataFrame, List[Dict[str, str]], None]: The dataflow transactions or None if not found.
 
@@ -433,9 +431,9 @@ def get_dataflow_gen1_transactions(
 
 @df
 def get_dataflows_gen1_datasources(
-    workspace: str, 
-    dataflow: str, 
-    *, 
+    workspace: str,
+    dataflow: str,
+    *,
     df: Optional[bool] = True,
 ) -> Union[DataFrame, List[Dict[str, str]], None]:
     """

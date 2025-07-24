@@ -1,19 +1,19 @@
-from ..utils.decorators import df
-from .encrypt_gateway_credentials import _get_encrypt_gateway_credentials
-from ..api.api import _post_request
-from ..utils.logging import get_logger
-
 import pandas
+
+from ..api.api import _post_request
+from ..utils.decorators import df
+from ..utils.logging import get_logger
+from .encrypt_gateway_credentials import _get_encrypt_gateway_credentials
 
 logger = get_logger(__name__)
 
 
 @df
 def create_github_source_control_connection(
-    display_name: str, 
-    repository: str, 
-    github_token: str, 
-    *, 
+    display_name: str,
+    repository: str,
+    github_token: str,
+    *,
     df: bool = True,
 ) -> pandas.DataFrame | dict | None:
     """

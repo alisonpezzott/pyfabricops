@@ -1,5 +1,3 @@
-
-
 def export_report(
     workspace: str,
     report: str,

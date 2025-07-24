@@ -1,12 +1,16 @@
 import time
-from typing import Any, Literal, NamedTuple, Optional, Union, Dict, List
+from typing import Any, Dict, List, Literal, NamedTuple, Optional, Union
 from urllib.parse import urlencode
 
 import requests
 
-from .auth import _get_token
-from ..utils.exceptions import AuthenticationError, InvalidParameterError, RequestError
+from ..utils.exceptions import (
+    AuthenticationError,
+    InvalidParameterError,
+    RequestError,
+)
 from ..utils.logging import get_logger
+from .auth import _get_token
 from .scopes import FABRIC_API, POWERBI_API
 
 logger = get_logger(__name__)
@@ -559,11 +563,11 @@ ENDPOINT_TEMPLATES = {
 
 
 def _list_request(
-        endpoint: str, 
-        workspace_id: Optional[str] = None, 
-        **kwargs,
-    ) -> Union[List[Dict[str, str]], Dict[str, str], None]:
-    
+    endpoint: str,
+    workspace_id: Optional[str] = None,
+    **kwargs,
+) -> Union[List[Dict[str, str]], Dict[str, str], None]:
+
     if endpoint not in ENDPOINT_TEMPLATES:
         raise RequestError(f'Unknown template name: {endpoint}')
 
@@ -573,7 +577,7 @@ def _list_request(
         raise RequestError(
             f'Workspace ID is required for endpoint: {endpoint}'
         )
-    
+
     if template['requires_workspace_id']:
         endpoint = f"{template['endpoint_prefix']}{workspace_id}{template['endpoint']}"
     else:
@@ -584,7 +588,7 @@ def _list_request(
         audience=template['audience'],
         content_type=template['content_type'],
         method='get',
-        **kwargs
+        **kwargs,
     )
 
     if kwargs['return_raw']:
@@ -614,7 +618,7 @@ def _get_request(
         raise RequestError(
             f'Workspace ID is required for endpoint: {endpoint}'
         )
-    
+
     if template['requires_workspace_id']:
         endpoint = f"{template['endpoint_prefix']}{workspace_id}{template['endpoint']}/{item_id}"
     else:
@@ -624,7 +628,7 @@ def _get_request(
         endpoint=endpoint,
         audience=template['audience'],
         content_type=template['content_type'],
-        method='get'
+        method='get',
     )
 
     if kwargs['return_raw']:
@@ -652,7 +656,7 @@ def _delete_request(
         raise RequestError(
             f'Workspace ID is required for endpoint: {endpoint}'
         )
-    
+
     if template['requires_workspace_id']:
         endpoint = f"{template['endpoint_prefix']}{workspace_id}{template['endpoint']}/{item_id}"
     else:
@@ -692,14 +696,14 @@ def _post_request(
         raise RequestError(
             f'Workspace ID is required for endpoint: {endpoint}'
         )
-    
+
     if template['requires_workspace_id']:
         endpoint = f"{template['endpoint_prefix']}{workspace_id}{template['endpoint']}"
     else:
         endpoint = template['endpoint']
 
     if not item_id is None:
-        endpoint += f"/{item_id}"
+        endpoint += f'/{item_id}'
 
     if not kwargs.get('endpoint_suffix', '') is None:
         endpoint += kwargs.get('endpoint_suffix', '')
@@ -753,7 +757,7 @@ def _patch_request(
         endpoint = template['endpoint']
 
     if not item_id is None:
-        endpoint += f"/{item_id}"
+        endpoint += f'/{item_id}'
 
     if not kwargs.get('endpoint_suffix', '') is None:
         endpoint += kwargs.get('endpoint_suffix', '')

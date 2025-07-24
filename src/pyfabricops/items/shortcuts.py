@@ -1,17 +1,17 @@
-from typing import Literal, Dict, List, Union, Optional
+from typing import Dict, List, Literal, Optional, Union
+
 from pandas import DataFrame
 
 from ..api.api import (
-    _list_request,
-    _get_request,
-    _post_request,
     _delete_request,
+    _get_request,
+    _list_request,
+    _post_request,
 )
-from ..utils.decorators import df
-from .lakehouses import resolve_lakehouse
-from ..utils.logging import get_logger
 from ..core.workspaces import resolve_workspace
-
+from ..utils.decorators import df
+from ..utils.logging import get_logger
+from .lakehouses import resolve_lakehouse
 
 logger = get_logger(__name__)
 
@@ -60,18 +60,18 @@ shortcuts_payloads_targets = {
 
 @df
 def list_shortcuts(
-    workspace: str, 
-    lakehouse: str, 
-    *, 
+    workspace: str,
+    lakehouse: str,
+    *,
     df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, str]], None]: 
+) -> Union[DataFrame, List[Dict[str, str]], None]:
     """
     Lists all shortcuts in the specified workspace and lakehouse
 
     Args:
         workspace (str): The workspace name or ID.
         lakehouse (str): The lakehouse name or ID.
-        ddf (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        ddf (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
@@ -83,9 +83,9 @@ def list_shortcuts(
         list_shortcuts('MyProjectWorkspace', 'MyLakehouse', df=True)
         ```
     """
-    workspace_id = resolve_workspace(workspace) 
+    workspace_id = resolve_workspace(workspace)
 
-    lakehouse_id = resolve_lakehouse(workspace_id, lakehouse) 
+    lakehouse_id = resolve_lakehouse(workspace_id, lakehouse)
 
     return _list_request(
         endpoint='items',
@@ -112,7 +112,7 @@ def get_shortcut(
         lakehouse (str): The lakehouse name or ID.
         shortcut_path (str): The shortcut path.
         shortcut_name (str): The shortcut name or ID.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
@@ -124,8 +124,8 @@ def get_shortcut(
         get_shortcut('MyProjectWorkspace', 'MyLakehouse', 'Files/Raw', 'MyShortcut', df=True)
         ```
     """
-    workspace_id = resolve_workspace(workspace) 
-    lakehouse_id = resolve_lakehouse(workspace_id, lakehouse) 
+    workspace_id = resolve_workspace(workspace)
+    lakehouse_id = resolve_lakehouse(workspace_id, lakehouse)
     return _get_request(
         endpoint='items',
         workspace_id=workspace_id,
@@ -218,7 +218,7 @@ def create_shortcut(
         target_workspace_id (str, optional): Workspace ID for OneLake targets.
         target_bucket (str, optional): Bucket name for S3-compatible targets.
         custom_target_payload (dict, optional): Custom target payload to override automatic generation.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:

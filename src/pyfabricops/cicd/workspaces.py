@@ -1,4 +1,3 @@
-
 def _get_workspace_config(
     workspace: str,
     *,
@@ -272,7 +271,6 @@ def _resolve_workspace_path(
     return workspace_path
 
 
-
 def get_workspace_id(workspace_name: str) -> str:
     """
     Returns a workspace ID for a given workspace name.
@@ -289,7 +287,7 @@ def get_workspace_id(workspace_name: str) -> str:
         ```
     """
     workspaces = list_workspaces()
-    
+
     if not workspaces:
         raise ResourceNotFoundError(f'No workspaces found.')
 
@@ -301,9 +299,7 @@ def get_workspace_id(workspace_name: str) -> str:
         raise ResourceNotFoundError(f"Workspace '{workspace_name}' not found.")
 
 
-def resolve_workspace(
-    workspace: str
-) -> str | None:
+def resolve_workspace(workspace: str) -> str | None:
     """
     Resolves a workspace name to its ID.
 
@@ -320,4 +316,3 @@ def resolve_workspace(
         return workspace
     else:
         return get_workspace_id(workspace)
-    

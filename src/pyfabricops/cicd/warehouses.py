@@ -1,5 +1,3 @@
-
-
 def export_warehouse(
     workspace: str,
     warehouse: str,

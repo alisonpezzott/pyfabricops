@@ -1,10 +1,10 @@
 import time
-from typing import Literal, Dict, List, Union
+from typing import Dict, List, Literal, Union
 
-from .connections import resolve_connection
 from ..api.api import _api_request, _lro_handler
 from ..utils.decorators import df
 from ..utils.logging import get_logger
+from .connections import resolve_connection
 from .workspaces import resolve_workspace
 
 logger = get_logger(__name__)

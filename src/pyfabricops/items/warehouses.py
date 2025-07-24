@@ -1,29 +1,29 @@
 import time
+from typing import Dict, List, Optional, Union
 
 from pandas import DataFrame
-from typing import Optional, Dict, List, Union
 
 from ..api.api import (
-    _list_request,
-    _get_request,
-    _post_request,
-    _patch_request,
     _delete_request,
+    _get_request,
+    _list_request,
+    _patch_request,
+    _post_request,
 )
-from ..utils.decorators import df
 from ..core.folders import resolve_folder
+from ..core.workspaces import resolve_workspace
+from ..utils.decorators import df
 from ..utils.logging import get_logger
 from ..utils.schemas import PLATFORM_SCHEMA, PLATFORM_VERSION
 from ..utils.utils import is_valid_uuid
-from ..core.workspaces import resolve_workspace
 
 logger = get_logger(__name__)
 
 
 @df
 def list_warehouses(
-    workspace: str, 
-    *, 
+    workspace: str,
+    *,
     df: Optional[bool] = True,
 ) -> Union[DataFrame, List[Dict[str, str]], None]:
     """
@@ -32,7 +32,7 @@ def list_warehouses(
 
     Args:
         workspace (str): The workspace name or ID.
-        ddf (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        ddf (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
@@ -44,9 +44,9 @@ def list_warehouses(
         ```
     """
     return _list_request(
-        'warehouses', 
+        'warehouses',
         workspace_id=resolve_workspace(workspace),
-    )  
+    )
 
 
 def get_warehouse_id(workspace: str, warehouse: str) -> Union[str, None]:
@@ -76,8 +76,8 @@ def get_warehouse_id(workspace: str, warehouse: str) -> Union[str, None]:
 
 
 def resolve_warehouse(
-    workspace: str, 
-    warehouse: str, 
+    workspace: str,
+    warehouse: str,
 ) -> Union[str, None]:
     """
     Resolves a warehouse name to its ID.
@@ -97,14 +97,14 @@ def resolve_warehouse(
     if is_valid_uuid(warehouse):
         return warehouse
     else:
-        return get_warehouse_id(workspace, warehouse)  
+        return get_warehouse_id(workspace, warehouse)
 
 
 @df
 def get_warehouse(
-    workspace: str, 
-    warehouse: str, 
-    *, 
+    workspace: str,
+    warehouse: str,
+    *,
     df: Optional[bool] = True,
 ) -> Union[DataFrame, Dict[str, str], None]:
     """
@@ -113,7 +113,7 @@ def get_warehouse(
     Args:
         workspace (str): The workspace name or ID.
         warehouse (str): The name or ID of the warehouse.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
@@ -134,7 +134,7 @@ def get_warehouse(
         workspace_id=workspace_id,
         warehouse_id=warehouse_id,
     )
-    
+
     if response.data:
         warehouse_sql_endpoint_id = response.data['properties'][
             'sqlEndpointProperties'
@@ -187,7 +187,7 @@ def create_warehouse(
         description (Optional[str]): The description for the warehouse.
         folder (Optional[str]): The folder to create the warehouse in.
         enable_schemas (Optional[bool]): Whether to enable schemas for the warehouse.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
@@ -202,18 +202,18 @@ def create_warehouse(
     workspace_id = resolve_workspace(workspace)
 
     payload = {'displayName': display_name}
-    
+
     if description:
         payload['description'] = description
-    
+
     if folder:
         folder_id = resolve_folder(workspace_id, folder)
         if folder_id:
             payload['folderId'] = folder_id
-    
+
     if enable_schemas:
         payload['creationPayload'] = {'enableSchemas': True}
-    
+
     return _post_request(
         endpoint='warehouses',
         workspace_id=workspace_id,
@@ -238,7 +238,7 @@ def update_warehouse(
         warehouse (str): The name or ID of the warehouse to update.
         display_name (Optional[str]): The new display name for the warehouse.
         description (Optional[str]): The new description for the warehouse.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:

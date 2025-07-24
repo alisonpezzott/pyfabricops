@@ -1,29 +1,29 @@
 import time
+from typing import Dict, List, Optional, Union
 
 from pandas import DataFrame
-from typing import Optional, Dict, List, Union
 
 from ..api.api import (
-    _list_request,
-    _get_request,
-    _post_request,
-    _patch_request,
     _delete_request,
+    _get_request,
+    _list_request,
+    _patch_request,
+    _post_request,
 )
-from ..utils.decorators import df
 from ..core.folders import resolve_folder
+from ..core.workspaces import resolve_workspace
+from ..utils.decorators import df
 from ..utils.logging import get_logger
 from ..utils.schemas import PLATFORM_SCHEMA, PLATFORM_VERSION
 from ..utils.utils import is_valid_uuid
-from ..core.workspaces import resolve_workspace
 
 logger = get_logger(__name__)
 
 
 @df
 def list_lakehouses(
-    workspace: str, 
-    *, 
+    workspace: str,
+    *,
     df: Optional[bool] = True,
 ) -> Union[DataFrame, List[Dict[str, str]], None]:
     """
@@ -32,7 +32,7 @@ def list_lakehouses(
 
     Args:
         workspace (str): The workspace name or ID.
-        ddf (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        ddf (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
@@ -44,9 +44,9 @@ def list_lakehouses(
         ```
     """
     return _list_request(
-        'lakehouses', 
+        'lakehouses',
         workspace_id=resolve_workspace(workspace),
-    )  
+    )
 
 
 def get_lakehouse_id(workspace: str, lakehouse: str) -> Union[str, None]:
@@ -76,8 +76,8 @@ def get_lakehouse_id(workspace: str, lakehouse: str) -> Union[str, None]:
 
 
 def resolve_lakehouse(
-    workspace: str, 
-    lakehouse: str, 
+    workspace: str,
+    lakehouse: str,
 ) -> Union[str, None]:
     """
     Resolves a lakehouse name to its ID.
@@ -97,14 +97,14 @@ def resolve_lakehouse(
     if is_valid_uuid(lakehouse):
         return lakehouse
     else:
-        return get_lakehouse_id(workspace, lakehouse)  
+        return get_lakehouse_id(workspace, lakehouse)
 
 
 @df
 def get_lakehouse(
-    workspace: str, 
-    lakehouse: str, 
-    *, 
+    workspace: str,
+    lakehouse: str,
+    *,
     df: Optional[bool] = True,
 ) -> Union[DataFrame, Dict[str, str], None]:
     """
@@ -113,7 +113,7 @@ def get_lakehouse(
     Args:
         workspace (str): The workspace name or ID.
         lakehouse (str): The name or ID of the lakehouse.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
@@ -134,7 +134,7 @@ def get_lakehouse(
         workspace_id=workspace_id,
         lakehouse_id=lakehouse_id,
     )
-    
+
     if response.data:
         lakehouse_sql_endpoint_id = response.data['properties'][
             'sqlEndpointProperties'
@@ -187,7 +187,7 @@ def create_lakehouse(
         description (Optional[str]): The description for the lakehouse.
         folder (Optional[str]): The folder to create the lakehouse in.
         enable_schemas (Optional[bool]): Whether to enable schemas for the lakehouse.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
@@ -202,18 +202,18 @@ def create_lakehouse(
     workspace_id = resolve_workspace(workspace)
 
     payload = {'displayName': display_name}
-    
+
     if description:
         payload['description'] = description
-    
+
     if folder:
         folder_id = resolve_folder(workspace_id, folder)
         if folder_id:
             payload['folderId'] = folder_id
-    
+
     if enable_schemas:
         payload['creationPayload'] = {'enableSchemas': True}
-    
+
     return _post_request(
         endpoint='lakehouses',
         workspace_id=workspace_id,
@@ -238,7 +238,7 @@ def update_lakehouse(
         lakehouse (str): The name or ID of the lakehouse to update.
         display_name (Optional[str]): The new display name for the lakehouse.
         description (Optional[str]): The new description for the lakehouse.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:

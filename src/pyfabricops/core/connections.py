@@ -1,18 +1,17 @@
-from typing import Literal, List, Dict, Union, Optional
+from typing import Dict, List, Literal, Optional, Union
 
 from pandas import DataFrame
 
-from ..utils.decorators import df
 from ..api.api import (
-    _list_request, 
-    _get_request, 
     _delete_request,
+    _get_request,
+    _list_request,
     _patch_request,
-    _post_request
+    _post_request,
 )
+from ..utils.decorators import df
 from ..utils.logging import get_logger
 from ..utils.utils import is_valid_uuid
-
 
 logger = get_logger(__name__)
 
@@ -25,32 +24,30 @@ def list_connections(
     Returns the list of connections.
 
     Args:
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
         (Union[DataFrame, List[Dict[str, str]], None]): A list of connections.
-    
+
     Examples:
         ```python
         list_connections()
         ```
     """
-    return _list_request('connections')  
+    return _list_request('connections')
 
 
 @df
 def _get_connection(
-    connection_id: str, 
-    *, 
-    df: Optional[bool] = True
+    connection_id: str, *, df: Optional[bool] = True
 ) -> Union[DataFrame, Dict[str, str], None]:
     """
     Retrieves the details of a connection.
 
     Args:
         connection_id (str): The ID of the connection to retrieve.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
     Returns:
         (Union[DataFrame, Dict[str, str], None]): The details of the specified connection, or None if not found.
@@ -82,15 +79,14 @@ def delete_connection(connection: str) -> None:
         ```
     """
     return _delete_request(
-        'connections',
-        item_id=resolve_connection(connection)
+        'connections', item_id=resolve_connection(connection)
     )
 
 
 @df
 def list_connection_role_assignments(
-    connection: str, 
-    *, 
+    connection: str,
+    *,
     df: Optional[bool] = True,
 ) -> Union[DataFrame, List[Dict[str, str]], None]:
     """
@@ -98,7 +94,7 @@ def list_connection_role_assignments(
 
     Args:
         connection (str): The name or ID of the connection.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
@@ -143,9 +139,9 @@ def add_connection_role_assignment(
     Examples:
         ```python
         add_connection_role_assignment(
-            '123e4567-e89b-12d3-a456-426614174000', 
-            'abcd1234-5678-90ef-ghij-klmnopqrstuv', 
-            'User', 
+            '123e4567-e89b-12d3-a456-426614174000',
+            'abcd1234-5678-90ef-ghij-klmnopqrstuv',
+            'User',
             'Owner'
         )
         ```
@@ -155,7 +151,7 @@ def add_connection_role_assignment(
         item_id=resolve_connection(connection),
         payload={
             'principal': {'id': user_uuid, 'type': user_type},
-            'role': role
+            'role': role,
         },
         endpoint_suffix='/roleAssignments',
     )
@@ -163,10 +159,7 @@ def add_connection_role_assignment(
 
 @df
 def get_connection_role_assignment(
-    connection: str, 
-    user_uuid: str, 
-    *, 
-    df: Optional[bool] = True
+    connection: str, user_uuid: str, *, df: Optional[bool] = True
 ) -> Union[DataFrame, Dict[str, str], None]:
     """
     Retrieves a role assignment for a connection.
@@ -174,7 +167,7 @@ def get_connection_role_assignment(
     Args:
         connection (str): The name or ID of the connection to retrieve the role assignment from.
         user_uuid (str): The UUID of the user or group to retrieve the role assignment for.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
@@ -183,7 +176,7 @@ def get_connection_role_assignment(
     Examples:
         ```python
         get_connection_role_assignment(
-            "123e4567-e89b-12d3-a456-426614174000", 
+            "123e4567-e89b-12d3-a456-426614174000",
             "98765432-9817-1234-5678-987654321234",
         )
         ```
@@ -214,7 +207,7 @@ def update_connection_role_assignment(
         user_uuid (str): The UUID of the user or group to update the role assignment for.
         user_type (str): The type of the principal. Options: User, Group, ServicePrincipal, ServicePrincipalProfile.
         role (str): The role to assign to the user or group. Options: Owner, User, UserWithReshare.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
@@ -223,9 +216,9 @@ def update_connection_role_assignment(
     Examples:
         ```python
         update_connection_role_assignment(
-            "123e4567-e89b-12d3-a456-426614174000", 
-            "98765432-9817-1234-5678-987654321234", 
-            "User", 
+            "123e4567-e89b-12d3-a456-426614174000",
+            "98765432-9817-1234-5678-987654321234",
+            "User",
             "Owner"
         )
         ```
@@ -235,7 +228,7 @@ def update_connection_role_assignment(
         item_id=resolve_connection(connection),
         payload={
             'principal': {'id': user_uuid, 'type': user_type},
-            'role': role
+            'role': role,
         },
         endpoint_suffix=f'/roleAssignments/{user_uuid}',
     )
@@ -258,9 +251,9 @@ def delete_connection_role_assignment(
     Examples:
         ```python
         delete_connection_role_assignment(
-            "123e4567-e89b-12d3-a456-426614174000", 
+            "123e4567-e89b-12d3-a456-426614174000",
             "98765432-9817-1234-5678-987654321234",
-        ) 
+        )
         ```
     """
     return _delete_request(
@@ -306,16 +299,15 @@ def resolve_connection(connection: str) -> str | None:
 
 @df
 def get_connection(
-    connection: str, 
-    df: Optional[bool] = True
+    connection: str, df: Optional[bool] = True
 ) -> Union[DataFrame, List[Dict[str, str]], None]:
     """
     Returns the specified connection.
 
     Args:
         connection (str): The name or ID of the connection to retrieve.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
-	        If False, returns a list of dictionaries.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
+                If False, returns a list of dictionaries.
 
     Returns:
         (Union[DataFrame, List[Dict[str, str]], None]) The details of the connection if found, otherwise None. If `df=True`, returns a DataFrame with flattened keys.

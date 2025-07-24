@@ -1,45 +1,45 @@
-from typing import Dict, List, Union, Optional
+from typing import Dict, List, Optional, Union
 
 from pandas import DataFrame
 
-from ..utils.decorators import df
 from ..api.api import (
-    _post_request,
     _delete_request,
     _get_request,
     _list_request,
+    _post_request,
 )
-from ..utils.logging import get_logger
-from ..core.workspaces import resolve_workspace
 from ..core.folders import resolve_folder
+from ..core.workspaces import resolve_workspace
+from ..utils.decorators import df
+from ..utils.logging import get_logger
 from ..utils.utils import is_valid_uuid
-
 
 logger = get_logger(__name__)
 
 
 @df
 def list_semantic_models(
-    workspace: str, 
-    df: Optional[bool] = True, 
+    workspace: str,
+    df: Optional[bool] = True,
 ) -> Union[DataFrame, List[Dict[str, str]], None]:
     """
     Returns a list of semantic models in a specified workspace.
 
     Args:
         workspace_id (str): The ID of the workspace.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
         (Union[DataFrame, List[Dict[str, str]], None]): A list of semantic models or a DataFrame if df is True.
     """
-    return _list_request('semantic_models', workspace_id=resolve_workspace(workspace))
+    return _list_request(
+        'semantic_models', workspace_id=resolve_workspace(workspace)
+    )
 
 
 def get_semantic_model_id(
-    workspace: str, 
-    semantic_model_name: str
+    workspace: str, semantic_model_name: str
 ) -> Union[str, None]:
     """
     Retrieves the ID of a semantic model by its name from the specified workspace.
@@ -56,7 +56,9 @@ def get_semantic_model_id(
         get_semantic_model_id('123e4567-e89b-12d3-a456-426614174000', 'SalesDataModel')
         ```
     """
-    models = list_semantic_models(workspace_id=resolve_workspace(workspace), df=False)
+    models = list_semantic_models(
+        workspace_id=resolve_workspace(workspace), df=False
+    )
     for model in models:
         if model.get('displayName') == semantic_model_name:
             return model.get('id')
@@ -75,18 +77,15 @@ def resolve_semantic_model(
 
 @df
 def get_semantic_model(
-    workspace: str, 
-    semantic_model: str, 
-    *, 
-    df: Optional[bool] = True
+    workspace: str, semantic_model: str, *, df: Optional[bool] = True
 ) -> Union[DataFrame, Dict[str, str], None]:
     """
     Retrieves a semantic model by its name or ID from the specified workspace.
 
     Args:
         workspace_id (str): The workspace ID.
-        semantic_model_id (str): The ID of the semantic model.  
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        semantic_model_id (str): The ID of the semantic model.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
@@ -123,7 +122,7 @@ def create_semantic_model(
         item_definition (Dict[str, str]): The definition of the semantic model.
         description (Optional[str]): A description for the semantic model.
         folder (Optional[str]): The ID of the folder to create the semantic model in.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
@@ -141,7 +140,7 @@ def create_semantic_model(
         ```
     """
     workspace_id = resolve_workspace(workspace)
-    
+
     payload = {'displayName': display_name, 'definition': item_definition}
 
     if description:
@@ -173,8 +172,8 @@ def update_semantic_model(
         workspace (str): The workspace name or ID.
         semantic_model (str): The ID of the semantic model to update.
         display_name (str, optional): The new display name for the semantic model.
-        description (str, optional): The new description for the semantic model.  
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        description (str, optional): The new description for the semantic model.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
@@ -234,9 +233,8 @@ def delete_semantic_model(workspace: str, semantic_model: str) -> None:
 
 
 def get_semantic_model_definition(
-        workspace: str, 
-        semantic_model: str
-    ) -> Union[Dict[str, str], None]:
+    workspace: str, semantic_model: str
+) -> Union[Dict[str, str], None]:
     """
     Retrieves the definition of a semantic model by its name or ID from the specified workspace.
 
@@ -251,8 +249,8 @@ def get_semantic_model_definition(
         ```python
         get_semantic_model_definition(
             workspace_id='123e4567-e89b-12d3-a456-426614174000',
-            semantic_model_id='456e7890-e12b-34d5-a678-9012345678901', 
-        ) 
+            semantic_model_id='456e7890-e12b-34d5-a678-9012345678901',
+        )
         ```
     """
     workspace_id = resolve_workspace(workspace)
@@ -264,13 +262,13 @@ def get_semantic_model_definition(
         workspace_id=workspace_id,
         item_id=semantic_model_id,
         endpoint_suffix='/getDefinition',
-    )  
-    
+    )
+
 
 @df
 def update_semantic_model_definition(
-    workspace: str, 
-    semantic_model: str, 
+    workspace: str,
+    semantic_model: str,
     item_definition: Dict[str, str],
     *,
     df: Optional[bool] = True,
@@ -282,8 +280,8 @@ def update_semantic_model_definition(
     Args:
         workspace (str): The workspace name or ID.
         semantic_model (str): The name or ID of the semantic model to update.
-        item_definition (Dict[str, str]): The new definition for the semantic model.  
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+        item_definition (Dict[str, str]): The new definition for the semantic model.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
@@ -295,7 +293,7 @@ def update_semantic_model_definition(
             workspace_id='123e4567-e89b-12d3-a456-426614174000',
             semantic_model_id='456e7890-e12b-34d5-a678-9012345678901',
             item_definition={...} # New definition dict of the semantic model
-        ) 
+        )
         ```
     """
     workspace_id = resolve_workspace(workspace)
