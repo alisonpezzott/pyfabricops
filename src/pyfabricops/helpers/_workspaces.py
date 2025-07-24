@@ -1,8 +1,9 @@
+from .._logging import get_logger
 from .._workspaces import list_workspaces
 
-from .._logging import get_logger
 
 logger = get_logger(__name__)
+
 
 def get_workspace_id(workspace: str) -> str | None:
     """

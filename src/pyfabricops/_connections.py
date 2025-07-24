@@ -1,162 +1,113 @@
-import logging
 from typing import Literal
 
 import pandas
 
-from ._core import ApiResult, api_core_request, pagination_handler
 from ._decorators import df
-from ._encrypt_gateway_credentials import _get_encrypt_gateway_credentials
-from ._generic_endpoints import _list_generic
+from ._generic_endpoints import (
+    _list_generic, 
+    _get_generic, 
+    _delete_generic,
+    _patch_generic,
+    _post_generic
+)
 from ._logging import get_logger
-from ._utils import is_valid_uuid
+
 
 logger = get_logger(__name__)
 
 
 @df
 def list_connections(
-    df: bool = True, **kwargs
-) -> list | pandas.DataFrame | None:
+    df: bool = True,
+) -> pandas.DataFrame | list[dict] | None:
     """
-    Returns a list of connections in a specified workspace.
+    Returns the list of connections.
 
     Args:
-        df (bool): If True, returns a pandas DataFrame. Defaults to True.
-        **kwargs: Additional keyword arguments for the API request.
+        df (bool, optional): If True, returns a pandas DataFrame. Defaults to True.
 
     Returns:
-        list | pandas.DataFrame | None: A list of connections or a DataFrame if df is True.
-    """
-    return _list_generic('connections', df=df, **kwargs)
-
-
-def resolve_connection(connection: str, *, silent: bool = False) -> str:
-    """
-    Resolves a connection name to its ID.
-
-    Args:
-        connection (str): The name of the connection.
-        silent (bool, optional): If True, suppresses warnings. Defaults to False.
-
-    Returns:
-        str: The ID of the connection.
-
+        (pandas.DataFrame | list[dict] | None): A list of connections or a DataFrame if df is True.
+    
     Examples:
         ```python
-        resolve_connection("My Connection")
-        resolve_connection("123e4567-e89b-12d3-a456-426614174000")
+        list_connections()
         ```
     """
-    if is_valid_uuid(connection):
-        return connection
-
-    connections = list_connections(df=False)
-    if not connections:
-        return None
-
-    for conn in connections:
-        if conn['displayName'] == connection:
-            return conn['id']
-
-    # If we get here, connection was not found
-    if not silent:
-        logger.warning(f"Connection '{connection}' not found.")
-    return None
+    return _list_generic('connections')  
 
 
 @df
-def get_connection(connection: str, *, df=False) -> dict | pandas.DataFrame:
+def get_connection(
+    connection_id: str, 
+    *, 
+    df=True
+) -> pandas.DataFrame | dict | None:
     """
-    Retrieves the details of a connection by its ID or name.
+    Retrieves the details of a connection.
 
     Args:
-        connection (str): The ID or name of the connection to retrieve.
-        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
+        connection_id (str): The ID of the connection to retrieve.
+        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to True.
 
     Returns:
-        (dict or pandas.DataFrame): The details of the specified connection, or None if not found.
+        (pandas.DataFrame | dict | None): The details of the specified connection, or None if not found.
 
     Examples:
         ```python
-        get_connection("My Connection")
         get_connection("123e4567-e89b-12d3-a456-426614174000")
         ```
     """
-    connection_id = resolve_connection(connection)
-    if connection_id is None:
-        return None
-    response = api_core_request(endpoint=f'/connections/{connection_id}')
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-    else:
-        return response.data
+    return _get_generic(
+        'connections',
+        item_id=connection_id,
+    )
 
 
-def delete_connection(connection: str) -> bool:
+def delete_connection(connection_id: str) -> None:
     """
-    Removes a connection by name or ID.
+    Deletes a connection.
 
     Args:
-        connection (str): The ID or name of the connection to delete.
+        connection_id (str): The ID of the connection to delete.
 
     Returns:
-        bool: True if the connection was deleted successfully, False otherwise.
+        None
 
     Examples:
         ```python
-        delete_connection("My Connection")
         delete_connection("123e4567-e89b-12d3-a456-426614174000")
         ```
     """
-    connection_id = resolve_connection(connection)
-    if not connection_id:
-        return None
-    response = api_core_request(
-        endpoint=f'/connections/{connection_id}',
-        method='delete',
-        return_raw=True,
+    return _delete_generic(
+        'connections',
+        item_id=connection_id
     )
-    if not response.status_code == 200:
-        logger.warning(f'{response.status_code}: {response.text}.')
-        return False
-    else:
-        return True
 
 
 @df
 def list_connection_role_assignments(
-    connection: str, *, df=False
-) -> dict | pandas.DataFrame:
+    connection_id: str, *, df=True
+) -> pandas.DataFrame | list[dict] | None:
     """
     Lists all role assignments for a connection.
 
     Args:
-        connection (str): The ID or name of the connection.
+        connection_id (str): The ID of the connection.
         df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
 
     Returns:
-        (dict or pandas.DataFrame): The list of role assignments for the connection.
+        (pandas.DataFrame | list[dict] | None): The list of role assignments for the connection.
 
     Examples:
         ```python
-        list_connection_role_assignments("My Connection")
         list_connection_role_assignments("123e4567-e89b-12d3-a456-426614174000")
         ```
     """
-    connection_id = resolve_connection(connection)
-    if connection_id is None:
-        return None
-
-    response = api_core_request(
-        endpoint=f'/connections/{connection_id}/roleAssignments'
+    return _list_generic(
+        'connections_role_assignments',
+        workspace_id=connection_id,
     )
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-    else:
-        response = pagination_handler(response)
-    return response.data.get('value')
 
 
 @df
@@ -168,8 +119,8 @@ def add_connection_role_assignment(
     ] = 'User',
     role: Literal['Owner', 'User', 'UserWithReshare'] = 'User',
     *,
-    df: bool = False,
-) -> dict | pandas.DataFrame:
+    df: bool = True,
+) -> pandas.DataFrame | dict | None:
     """
     Adds a role to a connection.
 
@@ -181,108 +132,32 @@ def add_connection_role_assignment(
         df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
 
     Returns:
-        (dict or pandas.DataFrame): The role assignment details.
+        (pandas.DataFrame | dict | None): The role assignment details.
 
     Examples:
         ```python
-        add_connection_role_assignment("My Connection", "user-uuid", "User", "Owner")
-        add_connection_role_assignment("123e4567-e89b-12d3-a456-426614174000", "user-uuid", "User", "Owner")
+        add_connection_role_assignment(
+            '123e4567-e89b-12d3-a456-426614174000', 
+            'abcd1234-5678-90ef-ghij-klmnopqrstuv', 
+            'User', 
+            'Owner'
+        )
         ```
     """
-    connection_id = resolve_connection(connection)
-    if not connection_id:
-        return None
-    payload = {'principal': {'id': user_uuid, 'type': user_type}, 'role': role}
-    response = api_core_request(
-        endpoint=f'/connections/{connection_id}/roleAssignments',
-        method='post',
-        payload=payload,
+    return _post_generic(
+        'connections_role_assignments',
+        workspace_id=connection,
+        payload={
+            'principal': {'id': user_uuid, 'type': user_type},
+            'role': role
+        }
     )
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-    else:
-        return response.data
-
-
-@df
-def add_connection_roles_assignments(
-    connection: str,
-    role_assignments: list[dict[str, str]],
-    *,
-    df: bool = False,
-) -> dict | pandas.DataFrame:
-    """
-    Adds multiple role assignments to a connection.
-
-    Args:
-        connection (str): The ID or name of the connection to add the role assignments to.
-        role_assignments (list[dict]): A list of role assignment dictionaries.
-        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
-
-    Returns:
-        (dict or pandas.DataFrame): The response from the API if successful.
-
-    Examples:
-        ```python
-        add_connection_roles_assigments(
-            "My Connection",
-            [
-                {
-                    "user_uuid": "9322eb4a-4132-4bd1-8df1-5cd3d1d2400b",
-                    "user_type": "User",
-                    "role": "Owner"
-                },
-                {
-                    "user_uuid": "b025341a-965a-4c35-b12e-2af63e5eb58f",
-                    "user_type": "User",
-                    "role": "User"
-                },
-                {
-                    "user_uuid": "cbe83b10-3b7c-4479-8168-e5281fabf7ea",
-                    "user_type": "Group",
-                    "role": "UserWithReshare"
-                }
-            ],
-            df=True,
-        )
-        ```
-    """
-    connection_id = resolve_connection(connection)
-    if not connection_id:
-        return None
-
-    role_addeds = []
-
-    for assignment in role_assignments:
-        role_added = add_connection_role_assignment(
-            connection=connection_id,
-            user_uuid=assignment['user_uuid'],
-            user_type=assignment['user_type'],
-            role=assignment['role'],
-            df=False,
-        )
-        if role_added:
-            role_addeds.append(role_added)
-
-    if not role_addeds:
-        logger.warning(
-            f'No role assignments were added for connection {connection}.'
-        )
-        logger.info('Returning existing role assignments.')
-        return list_connection_role_assignments(connection, df=df)
-
-    else:
-        logger.info(
-            f'Added {len(role_addeds)} role assignments to connection {connection}.'
-        )
-        return role_addeds
 
 
 @df
 def get_connection_role_assignment(
-    connection: str, user_uuid: str, *, df=False
-) -> dict | pandas.DataFrame:
+    connection_id: str, user_uuid: str, *, df=True
+) -> pandas.DataFrame | dict | None:
     """
     Retrieves a role assignment for a connection.
 
@@ -292,31 +167,26 @@ def get_connection_role_assignment(
         df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
 
     Returns:
-        (dict or pandas.DataFrame): The role assignment details.
+        (pandas.DataFrame | dict | None): The role assignment details.
 
     Examples:
         ```python
-        get_connection_role_assignment("My Connection", "98765432-9817-1234-5678-987654321234")
-        get_connection_role_assignment("123e4567-e89b-12d3-a456-426614174000", "98765432-9817-1234-5678-987654321234")
+        get_connection_role_assignment(
+            "123e4567-e89b-12d3-a456-426614174000", 
+            "98765432-9817-1234-5678-987654321234",
+        )
         ```
     """
-    connection_id = resolve_connection(connection)
-    if not connection_id:
-        return None
-
-    response = api_core_request(
-        endpoint=f'/connections/{connection_id}/roleAssignments/{user_uuid}'
+    return _get_generic(
+        'connections_role_assignments',
+        workspace_id=connection_id,
+        item_id=user_uuid,
     )
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-    else:
-        return response.data
 
 
 @df
 def update_connection_role_assignment(
-    connection: str,
+    connection_id: str,
     user_uuid: str,
     user_type: Literal[
         'User', 'Group', 'ServicePrincipal', 'ServicePrincipalProfile'
@@ -324,7 +194,7 @@ def update_connection_role_assignment(
     role: Literal['Owner', 'User', 'UserWithReshare'] = 'User',
     *,
     df: bool = False,
-) -> dict | pandas.DataFrame:
+) -> pandas.DataFrame | dict | None:
     """
     Updates a role assignment for a connection.
 
@@ -336,40 +206,33 @@ def update_connection_role_assignment(
         df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
 
     Returns:
-        (dict or pandas.DataFrame): The updated role assignment details.
+        (pandas.DataFrame | dict | None): The updated role assignment details.
 
     Examples:
         ```python
         update_connection_role_assignment(
-            "My Connection", "98765432-9817-1234-5678-987654321234", "User", "Owner"
-        )
-
-        update_connection_role_assignment(
-            "123e4567-e89b-12d3-a456-426614174000", "98765432-9817-1234-5678-987654321234", "User", "Owner"
+            "123e4567-e89b-12d3-a456-426614174000", 
+            "98765432-9817-1234-5678-987654321234", 
+            "User", 
+            "Owner"
         )
         ```
     """
-    connection_id = resolve_connection(connection)
-    if not connection_id:
-        return None
-
-    payload = {'principal': {'id': user_uuid, 'type': user_type}, 'role': role}
-    response = api_core_request(
-        endpoint=f'/connections/{connection_id}/roleAssignments/{user_uuid}',
-        method='patch',
-        payload=payload,
+    return _patch_generic(
+        'connections_role_assignments',
+        workspace_id=connection_id,
+        item_id=user_uuid,
+        payload={
+            'principal': {'id': user_uuid, 'type': user_type},
+            'role': role
+        }
     )
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-    else:
-        return response.data
 
 
 def delete_connection_role_assignment(
-    connection: str,
+    connection_id: str,
     user_uuid: str,
-):
+) -> None:
     """
     Deletes a role assignment for a connection.
 
@@ -382,261 +245,14 @@ def delete_connection_role_assignment(
 
     Examples:
         ```python
-        delete_connection_role_assignment("My Connection", "98765432-9817-1234-5678-987654321234")
-        delete_connection_role_assignment("123e4567-e89b-12d3-a456-426614174000", "98765432-9817-1234-5678-987654321234")
+        delete_connection_role_assignment(
+            "123e4567-e89b-12d3-a456-426614174000", 
+            "98765432-9817-1234-5678-987654321234",
+        ) 
         ```
     """
-    connection_id = resolve_connection(connection)
-    if not connection_id:
-        return None
-
-    response = api_core_request(
-        endpoint=f'/connections/{connection_id}/roleAssignments/{user_uuid}',
-        method='delete',
-        return_raw=True,
-    )
-    if not response.status_code == 200:
-        logger.warning(f'{response.status_code}: {response.text}.')
-        return False
-    else:
-        return True
-
-
-@df
-def create_github_source_control_connection(
-    display_name: str, repository: str, github_token: str, *, df: bool = False
-):
-    """
-    Creates a new GitHub source control connection.
-
-    Args:
-        display_name (str): The display name for the connection.
-        repository (str): The URL of the GitHub repository.
-        github_token (str): The GitHub token for authentication.
-        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
-
-    Returns:
-        (dict or pandas.DataFrame): The created connection.
-
-    Examples:
-        ```python
-            from dotenv import load_dotenv
-            load_dotenv()
-            pf.create_github_source_control_connection(
-                display_name='pyfabricops-examples',
-                repository='https://github.com/alisonpezzott/pyfabricops-examples',
-                github_token=os.getenv('GH_TOKEN'),
-                df=True,
-            )
-        ```
-    """
-    payload = {
-        'connectivityType': 'ShareableCloud',
-        'displayName': display_name,
-        'connectionDetails': {
-            'type': 'GitHubSourceControl',
-            'creationMethod': 'GitHubSourceControl.Contents',
-            'parameters': [
-                {'dataType': 'Text', 'name': 'url', 'value': repository}
-            ],
-        },
-        'privacyLevel': 'Organizational',
-        'credentialDetails': {
-            'singleSignOnType': 'None',
-            'connectionEncryption': 'NotEncrypted',
-            'credentials': {'credentialType': 'Key', 'key': github_token},
-        },
-    }
-
-    response = api_core_request(
-        endpoint='/connections',
-        method='post',
-        payload=payload,
-        return_raw=True,
-    )
-
-    if not response.status_code == 201:
-        logger.warning(f'{response.status_code}: {response.text}.')
-        return False
-    else:
-        return response.json()
-
-
-@df
-def create_sql_cloud_connection(
-    display_name: str,
-    server: str,
-    database: str,
-    username: str,
-    password: str,
-    privacy_level: str = 'Organizational',
-    connection_encryption: str = 'NotEncrypted',
-    *,
-    df: bool = False,
-) -> ApiResult:
-    """
-    Creates a new cloud connection using the Fabric API.
-
-    Args:
-        display_name (str): The display name for the connection.
-        server (str): The server name for the SQL connection.
-        database (str): The database name for the SQL connection.
-        username (str): The username for the SQL connection.
-        password (str): The password for the SQL connection.
-        privacy_level (str): The privacy level of the connection. Default is "Organizational".
-        connection_encryption (str): The encryption type for the connection. Default is "NotEncrypted".
-        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
-
-    Returns:
-        (dict or pandas.DataFrame): The response from the API if successful.
-
-    Examples:
-        ```python
-        from dotenv import load_dotenv
-        load_dotenv()
-
-        create_sql_cloud_connection(
-            display_name='My SQL Connection',
-            server='myserver.database.windows.net',
-            database='mydatabase',
-            username=os.getenv('SQL_USERNAME'),
-            password=os.getenv('SQL_PASSWORD'),
-            privacy_level='Organizational',
-            connection_encryption='NotEncrypted',
-            df=True,
-        )
-        ```
-    """
-    payload = {
-        'connectivityType': 'ShareableCloud',
-        'displayName': display_name,
-        'connectionDetails': {
-            'type': 'SQL',
-            'creationMethod': 'SQL',
-            'parameters': [
-                {'dataType': 'Text', 'name': 'server', 'value': server},
-                {'dataType': 'Text', 'name': 'database', 'value': database},
-            ],
-        },
-        'privacyLevel': privacy_level,
-        'credentialDetails': {
-            'singleSignOnType': 'None',
-            'connectionEncryption': connection_encryption,
-            'credentials': {
-                'credentialType': 'Basic',
-                'username': username,
-                'password': password,
-            },
-        },
-    }
-    response = api_core_request(
-        endpoint=f'/connections',
-        method='post',
-        payload=payload,
-        return_raw=True,
-    )
-
-    if not response.status_code == 201:
-        logger.warning(f'{response.status_code}: {response.text}.')
-        return False
-    else:
-        return response.json()
-
-
-@df
-def create_sql_on_premises_connection(
-    display_name: str,
-    gateway_id: str,
-    server: str,
-    database: str,
-    username: str,
-    password: str,
-    credential_type: str = 'Basic',
-    privacy_level: str = 'Organizational',
-    connection_encryption: str = 'NotEncrypted',
-    skip_test_connection: bool = False,
-    *,
-    df: bool = False,
-):
-    """
-    Creates a new cloud connection using the Fabric API.
-
-    Args:
-        display_name (str): The display name for the connection. If None, defaults to connection_name.
-        gateway (str): The ID or displayName of the gateway to use for the connection.
-        server (str): The server name for the SQL connection.
-        database (str): The database name for the SQL connection.
-        username (str): The username for the SQL connection.
-        password (str): The password for the SQL connection.
-        credential_type (str): The type of credentials to use. Default is "Basic".
-        privacy_level (str): The privacy level of the connection. Default is "Organizational".
-        connection_encryption (str): The encryption type for the connection. Default is "NotEncrypted".
-        skip_test_connection (bool): Whether to skip the test connection step. Default is False.
-        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
-
-    Returns:
-        (dict or pandas.DataFrame): The response from the API.
-
-    Examples:
-        ```python
-        from dotenv import load_dotenv
-        load_dotenv()
-
-        create_sql_on_premises_connection(
-            display_name='My SQL On-Premises Connection',
-            gateway_id='123e4567-e89b-12d3-a456-426614174000',
-            server='myserver.database.windows.net',
-            database='mydatabase',
-            username=os.getenv('SQL_USERNAME'),
-            password=os.getenv('SQL_PASSWORD'),
-            credential_type='Basic',
-            privacy_level='Organizational',
-            connection_encryption='NotEncrypted',
-            skip_test_connection=False,
-            df=True,
-        )
-        ```
-    """
-    encrypted_credentials = _get_encrypt_gateway_credentials(
-        gateway_id=gateway_id, username=username, password=password
-    )
-    payload = {
-        'connectivityType': 'OnPremisesGateway',
-        'gatewayId': gateway_id,
-        'displayName': display_name,
-        'connectionDetails': {
-            'type': 'SQL',
-            'creationMethod': 'SQL',
-            'parameters': [
-                {'dataType': 'Text', 'name': 'server', 'value': server},
-                {'dataType': 'Text', 'name': 'database', 'value': database},
-            ],
-        },
-        'privacyLevel': privacy_level,
-        'credentialDetails': {
-            'singleSignOnType': 'None',
-            'connectionEncryption': connection_encryption,
-            'skipTestConnection': skip_test_connection,
-            'credentials': {
-                'credentialType': credential_type,
-                'values': [
-                    {
-                        'gatewayId': gateway_id,
-                        'encryptedCredentials': encrypted_credentials,
-                    }
-                ],
-            },
-        },
-    }
-    response = api_core_request(
-        endpoint=f'/connections',
-        method='post',
-        payload=payload,
-        return_raw=True,
-    )
-
-    if not response.status_code == 201:
-        logger.warning(f'{response.status_code}: {response.text}.')
-        return False
-    else:
-        return response.json()
+    return _delete_generic(
+        'connections_role_assignments',
+        workspace_id=connection_id,
+        item_id=user_uuid,
+    )  

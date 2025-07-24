@@ -1,8 +1,9 @@
 from .._folders import list_folders
-
 from .._logging import get_logger
 
+
 logger = get_logger(__name__)
+
 
 def get_folder_id(workspace_id: str, folder_name: str) -> str | None:
     """
