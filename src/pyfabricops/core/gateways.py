@@ -77,7 +77,7 @@ def get_gateway_id(gateway_name: str) -> Union[str, None]:
     for _gateway in gateways:
         if _gateway['displayName'] == gateway_name:
             return _gateway['id']
-        logger.warning(f"Gateway '{gateway_name}' not found.")
+    logger.warning(f"Gateway '{gateway_name}' not found.")
     return None
 
 

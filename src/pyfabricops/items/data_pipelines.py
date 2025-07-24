@@ -45,34 +45,6 @@ def list_data_pipelines(
     )
 
 
-@df
-def _get_data_pipeline(
-    workspace_id: str, data_pipeline_id: str, *, df: bool = True
-) -> Union[DataFrame, Dict[str, str], None]:
-    """
-    Retrieves the details of a specific data pipeline.
-
-    Args:
-        workspace (str): The ID of the workspace.
-        data_pipeline (str): The name or ID of the data pipeline.
-        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
-
-    Returns:
-        dict | pandas.DataFrame | None: The data pipeline details if found, otherwise None.
-
-    Examples:
-        ```python
-        get_data_pipeline('MyProjectWorkspace', 'SalesDataPipeline')
-        get_data_pipeline('123e4567-e89b-12d3-a456-426614174000', 'SalesDataPipeline')
-        ```
-    """
-    return _get_request(
-        'data_pipelines',
-        workspace_id=workspace_id,
-        data_pipeline_id=data_pipeline_id,
-    )
-
-
 def get_data_pipeline_id(
     workspace: str, data_pipeline_name: str
 ) -> Union[str, None]:
@@ -141,7 +113,8 @@ def get_data_pipeline(
         ```
     """
     workspace_id = resolve_workspace(workspace)
-    return _get_data_pipeline(
+    return _get_request(
+        'data_pipelines',
         workspace_id=workspace_id,
         data_pipeline_id=resolve_data_pipeline(workspace_id, data_pipeline),
     )

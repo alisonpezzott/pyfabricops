@@ -41,15 +41,50 @@ def list_workspaces(
     return _list_request('workspaces')
 
 
+def get_workspace_id(workspace: str) -> Union[str, None]:
+    """
+    Retrieves the ID of a workspace by its name.
+
+    Args:
+        workspace (str): The name of the workspace.
+
+    Returns:
+        str | None: The ID of the workspace if found, otherwise None.
+    """
+    workspaces = list_workspaces(df=False)
+    for _workspace in workspaces:
+        if _workspace['displayName'] == workspace:
+            return _workspace['id']
+
+    logger.warning(f"Workspace '{workspace}' not found.")
+    return None
+
+
+def resolve_workspace(workspace: str) -> Union[str, None]:
+    """
+    Resolves a workspace name to its ID.
+
+    Args:
+        workspace (str): The name of the workspace.
+
+    Returns:
+        str | None: The ID of the workspace if found, otherwise None.
+    """
+    if is_valid_uuid(workspace):
+        return workspace
+    else:
+        return get_workspace_id(workspace)
+
+
 @df
-def _get_workspace(
-    workspace_id: str, df: Optional[bool] = True
+def get_workspace(
+    workspace: str, df: Optional[bool] = True
 ) -> Union[DataFrame, List[Dict[str, str]], None]:
     """
     Returns the specified workspace.
 
     Args:
-        workspace_id (str): The ID of the workspace to retrieve.
+        workspace (str): The name or ID of the workspace to retrieve.
         df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
                 If False, returns a list of dictionaries.
 
@@ -63,7 +98,7 @@ def _get_workspace(
         get_workspace('MyProjectWorkspace', df=False) # Returns as list
         ```
     """
-    return _get_request('workspaces', item_id=workspace_id)
+    return _get_request('workspaces', item_id=resolve_workspace(workspace))
 
 
 @df
@@ -449,64 +484,3 @@ def unassign_from_capacity(workspace: str) -> None:
             f'Workspace {workspace} unassigned from capacity successfully.'
         )
     return response
-
-
-def get_workspace_id(workspace: str) -> Union[str, None]:
-    """
-    Retrieves the ID of a workspace by its name.
-
-    Args:
-        workspace (str): The name of the workspace.
-
-    Returns:
-        str | None: The ID of the workspace if found, otherwise None.
-    """
-    workspaces = list_workspaces(df=False)
-    for _workspace in workspaces:
-        if _workspace['displayName'] == workspace:
-            return _workspace['id']
-    
-    logger.warning(f"Workspace '{workspace}' not found.")
-    return None
-
-
-def resolve_workspace(workspace: str) -> Union[str, None]:
-    """
-    Resolves a workspace name to its ID.
-
-    Args:
-        workspace (str): The name of the workspace.
-
-    Returns:
-        str | None: The ID of the workspace if found, otherwise None.
-    """
-    if is_valid_uuid(workspace):
-        return workspace
-    else:
-        return get_workspace_id(workspace)
-
-
-@df
-def get_workspace(
-    workspace: str, df: Optional[bool] = True
-) -> Union[DataFrame, List[Dict[str, str]], None]:
-    """
-    Returns the specified workspace.
-
-    Args:
-        workspace (str): The name or ID of the workspace to retrieve.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
-                If False, returns a list of dictionaries.
-
-    Returns:
-        (Union[DataFrame, List[Dict[str, str]], None]) The details of the workspace if found, otherwise None. If `df=True`, returns a DataFrame with flattened keys.
-
-    Examples:
-        ```python
-        get_workspace('123e4567-e89b-12d3-a456-426614174000')
-        get_workspace('MyProjectWorkspace')
-        get_workspace('MyProjectWorkspace', df=False) # Returns as list
-        ```
-    """
-    workspace_id = resolve_workspace(workspace)
-    return _get_request('workspaces', item_id=workspace_id)

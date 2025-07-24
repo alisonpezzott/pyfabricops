@@ -6,10 +6,12 @@ import re
 import shutil
 import subprocess
 import uuid
+from functools import lru_cache
 from pathlib import Path
 
 import json5
 import pandas
+from pandas import DataFrame
 
 from .exceptions import (
     ConfigurationError,
@@ -17,9 +19,6 @@ from .exceptions import (
     ResourceNotFoundError,
 )
 from .logging import get_logger
-
-from pandas import DataFrame
-from functools import lru_cache
 
 logger = get_logger(__name__)
 
@@ -693,22 +692,24 @@ def generate_full_folders_path(
 
     Args:
         folders_df (DataFrame): The DataFrame containing folder information.
-    
-    Returns: 
+
+    Returns:
         DataFrame: The full folder paths.
     """
-    
+
     df = folders_df
 
     # Create a dict to lookup: id → {displayName, parentFolderId}
-    folder_map = df.set_index('id')[['displayName', 'parentFolderId']].to_dict('index')
+    folder_map = df.set_index('id')[['displayName', 'parentFolderId']].to_dict(
+        'index'
+    )
 
     # Recursive function with cache to build the full path
     @lru_cache(maxsize=None)
     def build_full_path(folder_id: str) -> str:
         """
         Returns the full path for the folder `folder_id`,
-        recursively concatenating the names of its parents. 
+        recursively concatenating the names of its parents.
         """
         node = folder_map.get(folder_id)
         if node is None:

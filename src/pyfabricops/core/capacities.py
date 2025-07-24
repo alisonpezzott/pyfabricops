@@ -39,10 +39,12 @@ def get_capacity_id(capacity_name: str) -> str | None:
         str | None: The ID of the capacity if found, otherwise None.
     """
     capacities = list_capacities(df=False)
+
     for _capacity in capacities:
         if _capacity['displayName'] == capacity_name:
             return _capacity['id']
-        logger.warning(f"Capacity '{capacity_name}' not found.")
+
+    logger.warning(f"Capacity '{capacity_name}' not found.")
     return None
 
 

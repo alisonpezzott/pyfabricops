@@ -19,8 +19,8 @@ logger = get_logger(__name__)
 
 @df
 def list_folders(
-    workspace: str, 
-    *, 
+    workspace: str,
+    *,
     df: Optional[bool] = True,
 ) -> Union[DataFrame, List[Dict[str, str]], None]:
     """
@@ -39,8 +39,7 @@ def list_folders(
         list_folders('123e4567-e89b-12d3-a456-426614174000')
         ```
     """
-    return _list_request('folders', workspace_id=resolve_workspace(workspace)) 
-
+    return _list_request('folders', workspace_id=resolve_workspace(workspace))
 
 
 def get_folder_id(workspace: str, folder_name: str) -> Union[str, None]:

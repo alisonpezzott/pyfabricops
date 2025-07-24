@@ -164,9 +164,9 @@ from .items.warehouses import (
 )
 from .utils.logging import setup_logging
 from .utils.utils import (
-    dataframe_to_list, 
-    generate_full_folders_path, 
-    read_json
+    dataframe_to_list,
+    generate_full_folders_path,
+    read_json,
 )
 
 __all__ = [

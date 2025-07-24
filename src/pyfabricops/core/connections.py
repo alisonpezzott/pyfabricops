@@ -38,29 +38,65 @@ def list_connections(
     return _list_request('connections')
 
 
-@df
-def _get_connection(
-    connection_id: str, *, df: Optional[bool] = True
-) -> Union[DataFrame, Dict[str, str], None]:
+def get_connection_id(connection: str) -> str | None:
     """
-    Retrieves the details of a connection.
+    Retrieves the ID of a connection by its name.
 
     Args:
-        connection_id (str): The ID of the connection to retrieve.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
-            If False, returns a list of dictionaries.
+        connection (str): The name of the connection.
+
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The details of the specified connection, or None if not found.
+        str | None: The ID of the connection if found, otherwise None.
+    """
+    connections = list_connections(df=False)
+
+    for _connection in connections:
+        if _connection['displayName'] == connection:
+            return _connection['id']
+
+    logger.warning(f"Connection '{connection}' not found.")
+    return None
+
+
+def resolve_connection(connection: str) -> str | None:
+    """
+    Resolves a connection name to its ID.
+
+    Args:
+        connection (str): The name of the connection.
+
+    Returns:
+        str | None: The ID of the connection if found, otherwise None.
+    """
+    if is_valid_uuid(connection):
+        return connection
+    else:
+        return get_connection_id(connection)
+
+
+@df
+def get_connection(
+    connection: str, df: Optional[bool] = True
+) -> Union[DataFrame, List[Dict[str, str]], None]:
+    """
+    Returns the specified connection.
+
+    Args:
+        connection (str): The name or ID of the connection to retrieve.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
+                If False, returns a list of dictionaries.
+
+    Returns:
+        (Union[DataFrame, List[Dict[str, str]], None]) The details of the connection if found, otherwise None. If `df=True`, returns a DataFrame with flattened keys.
 
     Examples:
         ```python
-        get_connection("123e4567-e89b-12d3-a456-426614174000")
+        get_connection('123e4567-e89b-12d3-a456-426614174000')
+        get_connection('MyProjectConnection')
+        get_connection('MyProjectConnection', df=False) # Returns as list
         ```
     """
-    return _get_request(
-        'connections',
-        item_id=connection_id,
-    )
+    return _get_request('connections', item_id=resolve_connection(connection))
 
 
 def delete_connection(connection: str) -> None:
@@ -261,63 +297,3 @@ def delete_connection_role_assignment(
         item_id=resolve_connection(connection),
         endpoint_suffix=f'/roleAssignments/{user_uuid}',
     )
-
-
-def get_connection_id(connection: str) -> str | None:
-    """
-    Retrieves the ID of a connection by its name.
-
-    Args:
-        connection (str): The name of the connection.
-
-    Returns:
-        str | None: The ID of the connection if found, otherwise None.
-    """
-    connections = list_connections(df=False)
-    for _connection in connections:
-        if _connection['displayName'] == connection:
-            return _connection['id']
-        logger.warning(f"Connection '{connection}' not found.")
-    return None
-
-
-def resolve_connection(connection: str) -> str | None:
-    """
-    Resolves a connection name to its ID.
-
-    Args:
-        connection (str): The name of the connection.
-
-    Returns:
-        str | None: The ID of the connection if found, otherwise None.
-    """
-    if is_valid_uuid(connection):
-        return connection
-    else:
-        return get_connection_id(connection)
-
-
-@df
-def get_connection(
-    connection: str, df: Optional[bool] = True
-) -> Union[DataFrame, List[Dict[str, str]], None]:
-    """
-    Returns the specified connection.
-
-    Args:
-        connection (str): The name or ID of the connection to retrieve.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
-                If False, returns a list of dictionaries.
-
-    Returns:
-        (Union[DataFrame, List[Dict[str, str]], None]) The details of the connection if found, otherwise None. If `df=True`, returns a DataFrame with flattened keys.
-
-    Examples:
-        ```python
-        get_connection('123e4567-e89b-12d3-a456-426614174000')
-        get_connection('MyProjectConnection')
-        get_connection('MyProjectConnection', df=False) # Returns as list
-        ```
-    """
-    connection_id = resolve_connection(connection)
-    return _get_request('connections', item_id=connection_id)
