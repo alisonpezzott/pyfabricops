@@ -117,3 +117,26 @@ def get_gateway(
         ```
     """
     return _get_request('gateways', resolve_gateway(gateway))   
+
+
+
+def get_gateway_public_key(gateway_id: str) -> dict | None:
+    """
+    Extracts the public key of a gateway by its ID.
+
+    Args:
+        gateway_id (str): The ID of the gateway to retrieve the public key from.
+
+    Returns:
+        dict: The public key details if found, otherwise None.
+
+    Examples:
+        ```python
+        get_gateway_public_key('123e4567-e89b-12d3-a456-426614174000')
+        ```
+    """
+    response = get_gateway(gateway_id, df=False)
+    if not response:
+        return None
+
+    return response.get('publicKey')

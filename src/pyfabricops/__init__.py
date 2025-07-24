@@ -228,7 +228,7 @@ from .core.workspaces import (
     unassign_from_capacity,
     update_workspace,
 )
-from .cicd._support_files import create_support_files
+from .cicd.support_files import create_support_files
 from .helpers._workspaces import get_workspace_id
 from .helpers._folders import get_folder_id
 from .orchestration._workspaces import export_full_workspace

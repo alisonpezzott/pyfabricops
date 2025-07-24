@@ -1,98 +1,104 @@
-import json
-import os
-import uuid
-from typing import Literal
+from typing import Literal, Dict, List, Union, Optional
 
-import pandas
+from pandas import DataFrame
 
 from ..api.api import _api_request
 from ..utils.decorators import df
-from ..api.api import _list_request
+from ..api.api import (
+    _list_request,
+    _get_request,
+    _post_request,
+    _patch_request,
+    _delete_request,
+)  
 from ..utils.logging import get_logger
-from ..utils.utils import (
-    get_current_branch,
-    is_valid_uuid,
-    load_and_sanitize,
-    read_json,
-    write_json,
-    write_single_line_json,
-)
-from ..core.workspaces import (
-    _resolve_workspace_path,
-    get_workspace,
-    get_workspace_suffix,
-    resolve_workspace,
-)
+from ..utils.utils import is_valid_uuid
+from ..core.folders import resolve_folder
+from ..core.workspaces import resolve_workspace  
 
 logger = get_logger(__name__)
 
 
 @df
 def list_dataflows_gen1(
-    workspace_id: str, df: bool = True, **kwargs
-) -> list | pandas.DataFrame | None:
+    workspace: str, 
+    *,
+    df: Optional[bool] = True, 
+) -> Union[DataFrame, List[Dict[str, str]], None]:
     """
     Returns a list of Gen1 dataflows in a specified workspace.
 
     Args:
-        workspace_id (str): The ID of the workspace.
-        df (bool): If True, returns a pandas DataFrame. Defaults to True.
-        **kwargs: Additional keyword arguments for the API request.
+        workspace (str): The name or ID of the workspace.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+            If False, returns a list of dictionaries. 
 
     Returns:
-        list | pandas.DataFrame | None: A list of Gen1 dataflows or a DataFrame if df is True.
+        (Union[DataFrame, List[Dict[str, str]], None]): A list of Gen1 dataflows or a DataFrame if df is True.
     """
     return _list_request(
-        'dataflows_gen1', workspace_id=workspace_id, df=df, **kwargs
+        'dataflows_gen1', 
+        workspace_id=resolve_workspace(workspace)
     )
 
 
-def resolve_dataflow_gen1(workspace: str, dataflow: str) -> str | None:
+def get_dataflow_gen1_id(workspace: str, dataflow_name: str) -> Union[str, None]:
     """
-    Resolve a Power BI dataflow by its name.
+    Retrieves the ID of a Gen1 dataflow by its name.
 
     Args:
-        workspace (str): The workspace name or ID.
         dataflow_name (str): The name of the dataflow.
 
     Returns:
-        str: The resolved dataflow ID.
+        str | None: The ID of the dataflow if found, otherwise None.
+    """
+    dataflows = list_dataflows_gen1(
+        workspace_id=resolve_workspace(workspace), 
+        df=False,
+    )
+    for _dataflow in dataflows:
+        if _dataflow['displayName'] == dataflow_name:
+            return _dataflow['id']
+    logger.warning(f"Dataflow '{dataflow_name}' not found in workspace '{workspace}'.")
+    return None
 
-    Examples:
-        ```python
-        resolve_dataflow_gen1('MyProjectWorkspace', 'SalesDataflowGen1')
-        resolve_dataflow_gen1('123e4567-e89b-12d3-a456-426614174000', 'SalesDataflowGen1')
-        ```
+
+
+def resolve_dataflow_gen1(workspace: str, dataflow: str) -> Union[str, None]:
+    """
+    Resolves a dataflow name to its ID.
+
+    Args:
+        workspace (str): The name or ID of the workspace.
+        dataflow (str): The name or ID of the dataflow.
+
+    Returns:
+        str | None: The ID of the dataflow if found, otherwise None.
     """
     if is_valid_uuid(dataflow):
         return dataflow
-
-    workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
-
-    dataflows = list_dataflows_gen1(workspace, df=False)
-    for df in dataflows:
-        if df['name'] == dataflow:
-            return df['objectId']
-    logger.warning(f"Dataflow '{dataflow}' not found.")
-    return None
+    else:
+        return get_dataflow_gen1_id(workspace, dataflow)
 
 
 @df
 def get_dataflow_gen1(
-    workspace: str, dataflow: str, *, df: bool = False
-) -> dict | pandas.DataFrame | None:
+    workspace: str, 
+    dataflow: str, 
+    *, 
+    df: Optional[bool] = True,
+) -> Union[DataFrame, Dict[str, str], None]:
     """
-    Resolve a Power BI dataflow by its name.
+    Get a Power BI dataflow.
 
     Args:
         workspace (str): The workspace name or ID.
-        dataflow_name (str): The name of the dataflow.
-        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
+        dataflow (str): The name of the dataflow.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+            If False, returns a list of dictionaries.
 
     Returns:
-        str: The resolved dataflow ID.
+        (Union[DataFrame, Dict[str, str], None]): The dataflow.
 
     Examples:
         ```python
@@ -101,29 +107,17 @@ def get_dataflow_gen1(
         ```
     """
     workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
 
-    dataflows = list_dataflows_gen1(workspace, df=False)
-    if not dataflows:
-        return None
-
-    if is_valid_uuid(dataflow):
-        for df in dataflows:
-            if df['objectId'] == dataflow:
-                return df
-    else:
-        for df in dataflows:
-            if df['name'] == dataflow:
-                return df
-
-    logger.warning(f"Dataflow '{dataflow}' not found.")
-    return None
+    return _get_request(
+        'dataflows_gen1',
+        workspace_id=workspace_id,
+        item_id=resolve_dataflow_gen1(workspace_id, dataflow)
+    )  
 
 
 def get_dataflow_gen1_definition(workspace: str, dataflow: str) -> dict | None:
     """
-    Get the definition of a Power BI dataflow.
+    Get the definition of a Power BI dataflow Gen1.
 
     Args:
         workspace (str): The workspace name or ID.
@@ -139,127 +133,196 @@ def get_dataflow_gen1_definition(workspace: str, dataflow: str) -> dict | None:
         ```
     """
     workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
-
+    
     dataflow_id = resolve_dataflow_gen1(workspace_id, dataflow)
-    if not dataflow_id:
-        return None
 
-    response = _api_request(
-        audience='powerbi',
-        endpoint=f'/groups/{workspace_id}/dataflows/{dataflow_id}',
-        method='get',
-        return_raw=True,
-    )
-    if response.status_code != 200:
-        logger.warning(
-            f'{response.status_code}: {response.json().get("error", {})}'
-        )
-        return None
-    else:
-        return response.json()
-
-
-def _serialize_dataflow_gen1_model(path: str) -> tuple[bytes, str]:
-    """
-    Prepares the body for a dataflow deployment by reading and serializing the model.json file.
-
-    Args:
-        dataflow_path (str): The path to the directory containing the model.json file.
-
-    Returns:
-        tuple[bytes, str]: The serialized multipart body and the boundary string.
-
-    Raises:
-        UnicodeEncodeError: If there is an encoding issue with the JSON content.
-
-    Examples:
-        ```python
-        _serialize_dataflow_gen1_model('path/to/MyDataflowGen1.Dataflow')
-        ```
-    """
-    # Read and clean JSON using load_and_sanitize function
-    df_json = load_and_sanitize(os.path.join(path, 'model.json'))
-
-    json_str = json.dumps(df_json, ensure_ascii=False, separators=(',', ':'))
-
-    # Boundary setup
-    boundary = uuid.uuid4().hex
-    LF = '\r\n'
-
-    # Serialized Json Body
-    body = (
-        f'--{boundary}{LF}'
-        f'Content-Disposition: form-data; name="model.json"; filename="model.json"{LF}'
-        f'Content-Type: application/json{LF}{LF}'
-        f'{json_str}{LF}'
-        f'--{boundary}--{LF}'
+    return _get_request(
+        'dataflows_gen1',
+        workspace_id=workspace_id,
+        item_id=dataflow_id
     )
 
-    try:
-        body.encode('utf-8')
-    except UnicodeEncodeError as e:
-        logger.error(f'Encoding error: {e}')
-        raise
-    return body.encode('utf-8'), boundary
 
-
-def deploy_dataflow_gen1(workspace: str, path: str) -> bool | None:
+@df
+def update_dataflow_gen1_definition(
+    workspace: str, dataflow: str, item_definition: Dict[str, str]
+) -> Union[DataFrame, Dict[str, str], None]:
     """
-    Deploy a dataflow in a workspace from a model.json file
+    Updates the definition of an existing dataflow in the specified workspace.
+    If the dataflow does not exist, it returns None.
 
     Args:
         workspace (str): The workspace name or ID.
-        path (str): Path to the model.json file for the dataflow.
+        dataflow (str): The name or ID of the dataflow to update.
+        item_definition (Dict[str, str]): The item_definition of the dataflow.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+            If False, returns a list of dictionaries.
 
     Returns:
-        None
-
-    Raises:
-        Exception: If the API request fails or returns an error.
+        (Union[DataFrame, Dict[str, str], None]): The updated dataflow details if successful, otherwise None.
 
     Examples:
         ```python
-        deploy_dataflow_gen1('MyProjectWorkspace', 'path/to/MyDataflowGen1.Dataflow')
-        deploy_dataflow_gen1('123e4567-e89b-12d3-a456-426614174000', 'path/to/MyDataflowGen1.Dataflow')
+        update_dataflow_gen1_definition(
+            workspace='MyProjectWorkspace', 
+            dataflow='SalesDataflowGen1', 
+            item_definition={...} # The definition of the dataflow
+        )  
         ```
     """
-    # Read and clean JSON
-    body, boundary = _serialize_dataflow_gen1_model(path)
+    workspace_id = resolve_workspace(workspace)
 
-    content_type = f'multipart/form-data; boundary={boundary}'
+    dataflow_id = resolve_dataflow_gen1(workspace_id, dataflow)
 
-    params = {
-        'datasetDisplayName': 'model.json',
-        'nameConflict': 'Abort',
+    params = {'updateMetadata': True}
+    payload = {'definition': item_definition}
+
+    return _post_request(
+        'dataflows_gen1',
+        workspace_id=workspace_id,
+        item_id=dataflow_id,
+        payload=payload,
+        params=params,
+    )
+
+
+@df
+def create_dataflow_gen1(
+    workspace: str,
+    display_name: str,
+    item_definition: Dict[str, str],
+    *,
+    description: Optional[str] = None,
+    folder: Optional[str] = None,
+    df: Optional[bool] = True,
+) -> Union[DataFrame, Dict[str, str], None]:
+    """
+    Creates a new dataflow in the specified workspace.
+
+    Args:
+        workspace (str): The workspace name or ID.
+        display_name (str): The display name of the dataflow.
+        description (str, optional): A description for the dataflow.
+        folder (str, optional): The folder to create the dataflow in.
+        item_definition (Dict[str, str]): The definition of the dataflow.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+            If False, returns a list of dictionaries.
+
+    Returns:
+        (Union[DataFrame, Dict[str, str], None]): The created dataflow details.
+
+    Examples:
+        ```python
+        create_dataflow_gen1(
+            workspace='MyProjectWorkspace',
+            display_name='SalesDataflowGen1',
+            item_definition={...},
+            description='This is a sales dataflow',
+            folder='SalesDataflowsFolder'
+        )
+        ```
+    """
+    workspace_id = resolve_workspace(workspace)
+
+    payload = {
+        'displayName': display_name,
+        'definition': item_definition,
     }
 
+    if folder:
+        folder_id = resolve_folder(workspace_id, folder)
+        if folder_id:
+            payload['folderId'] = folder_id
+     
+    if description:
+        payload['description'] = description
+
+    return _post_request(
+        'data_pipelines',
+        workspace_id=workspace_id,
+        payload=payload,
+    ) 
+
+
+@df
+def update_dataflow_gen1(
+    workspace: str,
+    dataflow: str,
+    *,
+    display_name: Optional[str] = None,
+    description: Optional[str] = None,
+    df: Optional[bool] = True,
+) -> Union[DataFrame, Dict[str, str], None]:
+    """
+    Updates the properties of the specified dataflow.
+
+    Args:
+        workspace (str): The workspace name or ID.
+        dataflow (str): The name or ID of the dataflow to update.
+        display_name (str, optional): The new display name for the dataflow.
+        description (str, optional): The new description for the dataflow.
+        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
+
+    Returns:
+        (Union[DataFrame, Dict[str, str], None]): The updated dataflow details if successful, otherwise None.
+
+    Examples:
+        ```python
+        update_dataflow_gen1('MyProjectWorkspace', 'SalesDataflowGen1', display_name='UpdatedSalesDataflowGen1')
+        update_dataflow_gen1('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', description='Updated description')
+        ```
+    """
     workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
 
-    response = _api_request(
-        audience='powerbi',
-        endpoint=f'/groups/{workspace_id}/imports',
-        content_type=content_type,
-        credential_type='user',
-        method='post',
-        data=body,
-        params=params,
-        return_raw=True,
+    dataflow_id = resolve_dataflow_gen1(workspace_id, dataflow)
+
+    payload = {}
+
+    if display_name:
+        payload['displayName'] = display_name
+
+    if description:
+        payload['description'] = description
+
+    return _patch_request(
+        'dataflows_gen1',
+        workspace_id=workspace_id,
+        item_id=dataflow_id,
+        payload=payload,
     )
-    # Handle response
-    if not response.status_code in (200, 202):
-        logger.error(
-            f'Error deploying the dataflow: {response.status_code} - {response.json().get("error", {})}'
-        )
-        return None
-    logger.success(f'Dataflow deployed successfully.')
-    return True
 
 
-def takeover_dataflow_gen1(workspace: str, dataflow: str) -> bool | None:
+def delete_dataflow_gen1(
+    workspace: str, dataflow: str
+) -> None:
+    """
+    Deletes a dataflow from the specified workspace.
+
+    Args:
+        workspace (str): The name or ID of the workspace.
+        dataflow (str): The name or ID of the dataflow to delete.
+
+    Returns:
+        None: If the dataflow is successfully deleted.
+
+    Examples:
+        ```python
+        delete_dataflow_gen1('MyProjectWorkspace', 'SalesDataflowGen1')
+        delete_dataflow_gen1('123e4567-e89b-12d3-a456-426614174000', 'SalesDataflowGen1')
+        ```
+    """
+    workspace_id = resolve_workspace(workspace)
+
+    dataflow_id = resolve_dataflow_gen1(workspace_id, dataflow)
+    
+    return _delete_request(
+        'dataflows_gen1',
+        workspace_id=workspace_id,
+        item_id=dataflow_id,
+    )
+
+
+def takeover_dataflow_gen1(workspace: str, dataflow: str) -> Union[bool, None]:
     """
     Take over a dataflow in a workspace
 
@@ -274,215 +337,23 @@ def takeover_dataflow_gen1(workspace: str, dataflow: str) -> bool | None:
         ```
     """
     workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
 
     dataflow_id = resolve_dataflow_gen1(workspace_id, dataflow)
-    if not dataflow_id:
-        return None
 
-    response = _api_request(
-        audience='powerbi',
-        endpoint=f'/groups/{workspace_id}/dataflows/{dataflow_id}/Default.Takeover',
-        method='post',
+    return _post_request(
+        'dataflows_gen1',
+        workspace_id=workspace_id,
+        item_id=dataflow_id,
+        endpoint_suffix='/Default.Takeover',
         return_raw=True,
     )
-
-    return response
-
-
-def export_dataflow_gen1(
-    workspace: str,
-    dataflow: str,
-    project_path: str,
-    *,
-    workspace_path: str = None,
-    update_config: bool = True,
-    config_path: str = None,
-    branch: str = None,
-    workspace_suffix: str = None,
-    branches_path: str = None,
-) -> bool | None:
-    """
-    Export a dataflow from a workspace to a file.
-
-    Args:
-        workspace (str): The workspace name or ID.
-        dataflow (str): The dataflow name or ID.
-        project_path (str, optional): The path to the project folder.
-        workspace_path (str, optional): The path to the workspace folder.
-        update_config (bool, optional): Whether to update the config file.
-        config_path (str, optional): The path to the config file.
-        branch (str, optional): The branch name.
-        workspace_suffix (str, optional): The workspace suffix.
-        branches_path (str, optional): The path to the branches folder.
-
-    Returns:
-        bool | None: True if the export was successful, False otherwise.
-
-    Examples:
-        ```python
-        export_dataflow_gen1('MyProjectWorkspace', 'SalesDataflowGen1', project_path='path/to/project')
-        export_dataflow_gen1('123e4567-e89b-12d3-a456-426614174000', 'SalesDataflowGen1', project_path='path/to/project')
-        ```
-    """
-    workspace_path = _resolve_workspace_path(
-        workspace=workspace,
-        workspace_suffix=workspace_suffix,
-        project_path=project_path,
-        workspace_path=workspace_path,
-    )
-
-    workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
-
-    workspace_name = get_workspace(workspace_id).get('displayName')
-
-    # Get the dataflow details
-    dataflow_ = get_dataflow_gen1(workspace_id, dataflow)
-    if not dataflow_:
-        return None
-
-    dataflow_id = dataflow_['objectId']
-    dataflow_name = dataflow_['name']
-    dataflow_description = dataflow_.get('description', '')
-
-    definition_response = get_dataflow_gen1_definition(
-        workspace=workspace_id,
-        dataflow=dataflow_id,
-    )
-
-    if not definition_response:
-        return None
-
-    dataflow_name = dataflow_['name']
-    dataflow_path = os.path.join(
-        project_path, workspace_path, dataflow_name + '.Dataflow'
-    )
-    os.makedirs(dataflow_path, exist_ok=True)
-
-    # Save the model as model.json inside the item folder in single-line format (Power BI portal format)
-    model_json_path = os.path.join(dataflow_path, 'model.json')
-    write_single_line_json(definition_response, model_json_path)
-
-    logger.success(f'Exported dataflow {dataflow_name} to {dataflow_path}.')
-
-    if not update_config:
-        return None
-
-    else:
-
-        # Get branch
-        branch = get_current_branch(branch)
-
-        # Get the workspace suffix and treating the name
-        workspace_suffix = get_workspace_suffix(
-            branch, workspace_suffix, branches_path
-        )
-        workspace_name_without_suffix = workspace_name.split(workspace_suffix)[
-            0
-        ]
-
-        # Try to read existing config.json
-        if not config_path:
-            config_path = os.path.join(project_path, 'config.json')
-        try:
-            existing_config = read_json(config_path)
-            logger.info(
-                f'Found existing config file at {config_path}, merging workspace config...'
-            )
-        except FileNotFoundError:
-            logger.warning(
-                f'No existing config found at {config_path}, creating a new one.'
-            )
-            existing_config = {}
-
-        config = existing_config[branch][workspace_name_without_suffix]
-
-        if 'dataflows_gen1' not in config:
-            config['dataflows_gen1'] = {}
-        if dataflow_name not in config['dataflows_gen1']:
-            config['dataflows_gen1'][dataflow_name] = {}
-        if 'id' not in config['dataflows_gen1'][dataflow_name]:
-            config['dataflows_gen1'][dataflow_name]['id'] = dataflow_id
-        if 'description' not in config['dataflows_gen1'][dataflow_name]:
-            config['dataflows_gen1'][dataflow_name][
-                'description'
-            ] = dataflow_description
-
-        # Update the config with the new dataflow details
-        config['dataflows_gen1'][dataflow_name]['id'] = dataflow_id
-        config['dataflows_gen1'][dataflow_name][
-            'description'
-        ] = dataflow_description
-
-        # Saving the updated config back to the config file
-        existing_config[branch][workspace_name_without_suffix] = config
-        write_json(existing_config, config_path)
-
-
-def export_all_dataflows_gen1(
-    workspace: str,
-    project_path: str,
-    *,
-    workspace_path: str = None,
-    update_config: bool = True,
-    config_path: str = None,
-    branch: str = None,
-    workspace_suffix: str = None,
-    branches_path: str = None,
-) -> bool | None:
-    """
-    Export all dataflows from a workspace to a file.
-
-    Args:
-        workspace (str): The workspace name or ID.
-        project_path (str): The path to the project folder.
-        workspace_path (str): The path to the workspace folder.
-        update_config (bool): Whether to update the config file.
-        config_path (str): The path to the config file.
-        branch (str): The branch name.
-        workspace_suffix (str): The workspace suffix.
-        branches_path (str): The path to the branches folder.
-
-    Returns:
-        bool | None: True if the export was successful, False otherwise.
-
-    Examples:
-        ```python
-        export_all_dataflows_gen1('MyProjectWorkspace', project_path='path/to/project')
-        export_all_dataflows_gen1('123e4567-e89b-12d3-a456-426614174000', project_path='path/to/project')
-        ```
-    """
-    workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
-
-    dataflows = list_dataflows_gen1(workspace_id, df=False)
-
-    if not dataflows:
-        return None
-    else:
-        for dataflow in dataflows:
-            export_dataflow_gen1(
-                workspace=workspace,
-                dataflow=dataflow['objectId'],
-                project_path=project_path,
-                workspace_path=workspace_path,
-                update_config=update_config,
-                config_path=config_path,
-                branch=branch,
-                workspace_suffix=workspace_suffix,
-                branches_path=branches_path,
-            )
 
 
 def refresh_dataflow_gen1(
     workspace: str,
     dataflow: str,
     *,
-    process_type: str = 'default',
+    process_type: Optional[str] = 'default',
     notify_option: Literal[
         'MailOnFailure', 'NoNotification'
     ] = 'NoNotification',
@@ -506,81 +377,92 @@ def refresh_dataflow_gen1(
         ```
     """
     workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
 
     dataflow_id = resolve_dataflow_gen1(workspace_id, dataflow)
-    if not dataflow_id:
-        return None
 
     payload = {'notifyOption': notify_option}
 
     params = {'processType': process_type}
 
-    response = _api_request(
-        endpoint=f'/groups/{workspace_id}/dataflows/{dataflow_id}/refreshes',
-        method='post',
-        params=params,
+    return _post_request(
+        'dataflows_gen1',
+        workspace_id=workspace_id,
+        item_id=dataflow_id,
+        endpoint_suffix='/refreshes',
         payload=payload,
-        audience='powerbi',
+        params=params,
     )
-    if response.status_code == 200:
-        logger.success('Refresh accepted successfully.')
-        return None
-    else:
-        logger.error(f'{response.status_code}: Error refreshing dataflow.')
-        return None
 
 
 @df
 def get_dataflow_gen1_transactions(
-    workspace: str, dataflow: str, *, df: bool = False
-) -> list | pandas.DataFrame:
+    workspace: str, 
+    dataflow: str, 
+    *, 
+    df: Optional[bool] = True,
+) -> Union[DataFrame, List[Dict[str, str]], None]:
+    """
+    Get transactions for a dataflow in a workspace.
+
+    Args:
+        workspace (str): The workspace name or ID.
+        dataflow (str): The dataflow name or ID.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+            If False, returns a list of dictionaries.
+    
+    Returns:
+        Union[DataFrame, List[Dict[str, str]], None]: The dataflow transactions or None if not found.
+
+    Examples:
+        ```python
+        get_dataflow_gen1_transactions('MyProjectWorkspace', 'SalesDataflowGen1')
+        get_dataflow_gen1_transactions('123e4567-e89b-12d3-a456-426614174000', 'SalesDataflowGen1')
+        ```
+    """
     workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
 
     dataflow_id = resolve_dataflow_gen1(workspace_id, dataflow)
-    if not dataflow_id:
-        return None
 
-    response = _api_request(
-        endpoint=f'/groups/{workspace_id}/dataflows/{dataflow_id}/transactions',
-        audience='powerbi',
+    return _post_request(
+        'dataflows_gen1',
+        workspace_id=workspace_id,
+        item_id=dataflow_id,
+        endpoint_suffix='/transactions',
     )
-
-    if response.status_code == 200:
-        logger.success('Retrieved dataflow transactions successfully.')
-        return response.data.get('value', [])
-    else:
-        logger.error(
-            f'{response.status_code}: Error retrieving dataflow transactions.'
-        )
-        return None
 
 
 @df
 def get_dataflows_gen1_datasources(
-    workspace: str, dataflow: str, *, df: bool = False
-) -> list | pandas.DataFrame:
+    workspace: str, 
+    dataflow: str, 
+    *, 
+    df: Optional[bool] = True,
+) -> Union[DataFrame, List[Dict[str, str]], None]:
+    """
+    Get the data sources for a dataflow in a workspace.
+
+    Args:
+        workspace (str): The workspace name or ID.
+        dataflow (str): The dataflow name or ID.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
+            If False, returns a list of dictionaries.
+
+    Returns:
+        Union[DataFrame, List[Dict[str, str]], None]: The dataflow datasources or None if not found.
+
+    Examples:
+        ```python
+        get_dataflows_gen1_datasources('MyProjectWorkspace', 'SalesDataflowGen1')
+        get_dataflows_gen1_datasources('123e4567-e89b-12d3-a456-426614174000', 'SalesDataflowGen1')
+        ```
+    """
     workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
 
     dataflow_id = resolve_dataflow_gen1(workspace_id, dataflow)
-    if not dataflow_id:
-        return None
 
-    response = _api_request(
-        endpoint=f'/groups/{workspace_id}/dataflows/{dataflow_id}/datasources',
-        audience='powerbi',
+    return _post_request(
+        'dataflows_gen1',
+        workspace_id=workspace_id,
+        item_id=dataflow_id,
+        endpoint_suffix='/datasources',
     )
-
-    if response.status_code == 200:
-        logger.success('Retrieved dataflow datasources successfully.')
-        return response.data.get('value', [])
-    else:
-        logger.error(
-            f'{response.status_code}: Error retrieving dataflow datasources.'
-        )
-        return None

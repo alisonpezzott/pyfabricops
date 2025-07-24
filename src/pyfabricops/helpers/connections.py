@@ -1,38 +1,11 @@
-from ..core.connections import list_connections  
 from ..utils.decorators import df
-from ._encrypt_gateway_credentials import _get_encrypt_gateway_credentials
+from .encrypt_gateway_credentials import _get_encrypt_gateway_credentials
 from ..api.api import _post_request
 from ..utils.logging import get_logger
 
 import pandas
 
 logger = get_logger(__name__)
-
-
-def get_connection_id(connection_name: str) -> str | None:
-    """
-    Retrieves the connection ID for a given connection name.
-
-    Args:
-        connection_name (str): The name of the connection to search for.
-
-    Returns:
-        str | None: The ID of the connection if found, otherwise None.
-    
-    Examples:
-        ```python
-        get_connection_id("My Connection")
-        ```
-    """
-    connections = list_connections(df=False)
-    if not connections:
-        return None
-
-    for connection in connections:
-        if connection.get('displayName') == connection_name:
-            return connection.get('id')
-    
-    return None
 
 
 @df
