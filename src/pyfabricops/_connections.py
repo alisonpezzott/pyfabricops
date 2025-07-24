@@ -1,6 +1,6 @@
-from typing import Literal
+from typing import Literal, List, Dict, Union, Optional
 
-import pandas
+from pandas import DataFrame
 
 from ._decorators import df
 from ._generic_endpoints import (
@@ -18,16 +18,17 @@ logger = get_logger(__name__)
 
 @df
 def list_connections(
-    df: bool = True,
-) -> pandas.DataFrame | list[dict] | None:
+    df: Optional[bool] = True,
+) -> Union[DataFrame, List[Dict[str, str]], None]:
     """
     Returns the list of connections.
 
     Args:
-        df (bool, optional): If True, returns a pandas DataFrame. Defaults to True.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+            If False, returns a list of dictionaries.
 
     Returns:
-        (pandas.DataFrame | list[dict] | None): A list of connections or a DataFrame if df is True.
+        (Union[DataFrame, List[Dict[str, str]], None]): A list of connections.
     
     Examples:
         ```python
@@ -41,17 +42,17 @@ def list_connections(
 def get_connection(
     connection_id: str, 
     *, 
-    df=True
-) -> pandas.DataFrame | dict | None:
+    df: Optional[bool] = True
+) -> Union[DataFrame, Dict[str, str], None]:
     """
     Retrieves the details of a connection.
 
     Args:
         connection_id (str): The ID of the connection to retrieve.
-        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to True.
-
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+            If False, returns a list of dictionaries.
     Returns:
-        (pandas.DataFrame | dict | None): The details of the specified connection, or None if not found.
+        (Union[DataFrame, Dict[str, str], None]): The details of the specified connection, or None if not found.
 
     Examples:
         ```python
@@ -87,17 +88,20 @@ def delete_connection(connection_id: str) -> None:
 
 @df
 def list_connection_role_assignments(
-    connection_id: str, *, df=True
-) -> pandas.DataFrame | list[dict] | None:
+    connection_id: str, 
+    *, 
+    df: Optional[bool] = True,
+) -> Union[DataFrame, List[Dict[str, str]], None]:
     """
     Lists all role assignments for a connection.
 
     Args:
         connection_id (str): The ID of the connection.
-        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+            If False, returns a list of dictionaries.
 
     Returns:
-        (pandas.DataFrame | list[dict] | None): The list of role assignments for the connection.
+        (Union[DataFrame, List[Dict[str, str]], None]): The list of role assignments for the connection.
 
     Examples:
         ```python
@@ -105,8 +109,9 @@ def list_connection_role_assignments(
         ```
     """
     return _list_generic(
-        'connections_role_assignments',
-        workspace_id=connection_id,
+        'connections',
+        item_id=connection_id,
+        endpoint_suffix='/roleAssignments',
     )
 
 
@@ -119,8 +124,8 @@ def add_connection_role_assignment(
     ] = 'User',
     role: Literal['Owner', 'User', 'UserWithReshare'] = 'User',
     *,
-    df: bool = True,
-) -> pandas.DataFrame | dict | None:
+    df: Optional[bool] = True,
+) -> Union[DataFrame, Dict[str, str], None]:
     """
     Adds a role to a connection.
 
@@ -129,10 +134,10 @@ def add_connection_role_assignment(
         user_uuid (str): The UUID of the user or group to assign the role to.
         user_type (str): The type of the principal. Options: User, Group, ServicePrincipal, ServicePrincipalProfile.
         role (str): The role to add to the connection. Options: Owner, User, UserWithReshare.
-        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  If False, returns a list of dictionaries.
 
     Returns:
-        (pandas.DataFrame | dict | None): The role assignment details.
+        (Union[DataFrame, Dict[str, str], None]): The role assignment details.
 
     Examples:
         ```python
@@ -145,29 +150,34 @@ def add_connection_role_assignment(
         ```
     """
     return _post_generic(
-        'connections_role_assignments',
+        'connections',
         workspace_id=connection,
         payload={
             'principal': {'id': user_uuid, 'type': user_type},
             'role': role
-        }
+        },
+        endpoint_suffix='/roleAssignments',
     )
 
 
 @df
 def get_connection_role_assignment(
-    connection_id: str, user_uuid: str, *, df=True
-) -> pandas.DataFrame | dict | None:
+    connection_id: str, 
+    user_uuid: str, 
+    *, 
+    df: Optional[bool] = True
+) -> Union[DataFrame, Dict[str, str], None]:
     """
     Retrieves a role assignment for a connection.
 
     Args:
         connection_id (str): The ID of the connection to retrieve the role assignment from.
         user_uuid (str): The UUID of the user or group to retrieve the role assignment for.
-        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+            If False, returns a list of dictionaries.
 
     Returns:
-        (pandas.DataFrame | dict | None): The role assignment details.
+        (Union[DataFrame, Dict[str, str], None]): The role assignment details.
 
     Examples:
         ```python
@@ -178,9 +188,9 @@ def get_connection_role_assignment(
         ```
     """
     return _get_generic(
-        'connections_role_assignments',
-        workspace_id=connection_id,
-        item_id=user_uuid,
+        'connections',
+        item_id=connection_id,
+        endpoint_suffix=f'/roleAssignments/{user_uuid}',
     )
 
 
@@ -193,8 +203,8 @@ def update_connection_role_assignment(
     ] = 'User',
     role: Literal['Owner', 'User', 'UserWithReshare'] = 'User',
     *,
-    df: bool = False,
-) -> pandas.DataFrame | dict | None:
+    df: Optional[bool] = False,
+) -> Union[DataFrame, Dict[str, str], None]:
     """
     Updates a role assignment for a connection.
 
@@ -203,10 +213,11 @@ def update_connection_role_assignment(
         user_uuid (str): The UUID of the user or group to update the role assignment for.
         user_type (str): The type of the principal. Options: User, Group, ServicePrincipal, ServicePrincipalProfile.
         role (str): The role to assign to the user or group. Options: Owner, User, UserWithReshare.
-        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+            If False, returns a list of dictionaries.
 
     Returns:
-        (pandas.DataFrame | dict | None): The updated role assignment details.
+        (Union[DataFrame, Dict[str, str], None]): The updated role assignment details.
 
     Examples:
         ```python
@@ -219,13 +230,13 @@ def update_connection_role_assignment(
         ```
     """
     return _patch_generic(
-        'connections_role_assignments',
-        workspace_id=connection_id,
-        item_id=user_uuid,
+        'connections',
+        item_id=connection_id,
         payload={
             'principal': {'id': user_uuid, 'type': user_type},
             'role': role
-        }
+        },
+        endpoint_suffix=f'/roleAssignments/{user_uuid}',
     )
 
 
@@ -252,7 +263,7 @@ def delete_connection_role_assignment(
         ```
     """
     return _delete_generic(
-        'connections_role_assignments',
-        workspace_id=connection_id,
-        item_id=user_uuid,
-    )  
+        'connections',
+        item_id=connection_id,
+        endpoint_suffix=f'/roleAssignments/{user_uuid}',
+    )

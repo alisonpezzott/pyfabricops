@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union, List, Dict
 
 from ._core import api_core_request, lro_handler, pagination_handler
 from ._endpoint_templates import ENDPOINT_TEMPLATES
@@ -8,7 +8,12 @@ from ._logging import get_logger
 logger = get_logger(__name__)
 
 
-def _list_generic(endpoint: str, workspace_id: Optional[str] = None):
+def _list_generic(
+        endpoint: str, 
+        workspace_id: Optional[str] = None, 
+        **kwargs,
+    ) -> Union[List[Dict[str, str]], Dict[str, str], None]:
+    
     if endpoint not in ENDPOINT_TEMPLATES:
         raise RequestError(f'Unknown template name: {endpoint}')
 
@@ -18,11 +23,14 @@ def _list_generic(endpoint: str, workspace_id: Optional[str] = None):
         raise RequestError(
             f'Workspace ID is required for endpoint: {endpoint}'
         )
+    
+    if template['requires_workspace_id']:
+        endpoint = f"{template['endpoint_prefix']}{workspace_id}{template['endpoint']}"
+    else:
+        endpoint = template['endpoint']
 
     response = api_core_request(
-        endpoint=template['endpoint']
-        if not template['requires_workspace_id']
-        else f"{template['endpoint_prefix']}{workspace_id}{template['endpoint']}",
+        endpoint=endpoint,
         audience=template['audience'],
         content_type=template['content_type'],
         payload=template['payload'],
@@ -48,7 +56,8 @@ def _get_generic(
     endpoint: str,
     workspace_id: Optional[str] = None,
     item_id: Optional[str] = None,
-):
+    **kwargs,
+) -> Union[List[Dict[str, str]], Dict[str, str], None]:
     if endpoint not in ENDPOINT_TEMPLATES:
         raise RequestError(f'Unknown template name: {endpoint}')
 
@@ -58,11 +67,14 @@ def _get_generic(
         raise RequestError(
             f'Workspace ID is required for endpoint: {endpoint}'
         )
+    
+    if template['requires_workspace_id']:
+        endpoint = f"{template['endpoint_prefix']}{workspace_id}{template['endpoint']}/{item_id}"
+    else:
+        endpoint = f"{template['endpoint']}/{item_id}"
 
     response = api_core_request(
-        endpoint=f"{template['endpoint']}/{item_id}"
-        if not template['requires_workspace_id']
-        else f"{template['endpoint_prefix']}{workspace_id}{template['endpoint']}/{item_id}",
+        endpoint=endpoint,
         audience=template['audience'],
         content_type=template['content_type'],
         payload=template['payload'],
@@ -86,7 +98,8 @@ def _delete_generic(
     endpoint: str,
     workspace_id: Optional[str] = None,
     item_id: Optional[str] = None,
-):
+    **kwargs,
+) -> Union[List[Dict[str, str]], Dict[str, str], None]:
     if endpoint not in ENDPOINT_TEMPLATES:
         raise RequestError(f'Unknown template name: {endpoint}')
 
@@ -96,11 +109,14 @@ def _delete_generic(
         raise RequestError(
             f'Workspace ID is required for endpoint: {endpoint}'
         )
+    
+    if template['requires_workspace_id']:
+        endpoint = f"{template['endpoint_prefix']}{workspace_id}{template['endpoint']}/{item_id}"
+    else:
+        endpoint = f"{template['endpoint']}/{item_id}"
 
     response = api_core_request(
-        endpoint=f"{template['endpoint']}/{item_id}"
-        if not template['requires_workspace_id']
-        else f"{template['endpoint_prefix']}{workspace_id}{template['endpoint']}/{item_id}",
+        endpoint=endpoint,
         audience=template['audience'],
         content_type=template['content_type'],
         payload=template['payload'],
@@ -126,7 +142,8 @@ def _post_generic(
     workspace_id: Optional[str] = None,
     item_id: Optional[str] = None,
     payload: Optional[dict] = None,
-):
+    **kwargs,
+) -> Union[List[Dict[str, str]], Dict[str, str], None]:
     if endpoint not in ENDPOINT_TEMPLATES:
         raise RequestError(f'Unknown template name: {endpoint}')
 
@@ -136,14 +153,17 @@ def _post_generic(
         raise RequestError(
             f'Workspace ID is required for endpoint: {endpoint}'
         )
-
-    endpoint = template['endpoint'] if not template['requires_workspace_id'] else f"{template['endpoint_prefix']}{workspace_id}{template['endpoint']}"
     
+    if template['requires_workspace_id']:
+        endpoint = f"{template['endpoint_prefix']}{workspace_id}{template['endpoint']}"
+    else:
+        endpoint = template['endpoint']
+
     if not item_id is None:
         endpoint += f"/{item_id}"
 
-    if not template['endpoint_suffix'] is None:
-        endpoint += template['endpoint_suffix']
+    if not kwargs.get('endpoint_suffix', '') is None:
+        endpoint += kwargs.get('endpoint_suffix', '')
 
     response = api_core_request(
         endpoint=endpoint,
@@ -184,7 +204,8 @@ def _patch_generic(
     workspace_id: Optional[str] = None,
     item_id: Optional[str] = None,
     payload: Optional[dict] = None,
-):
+    **kwargs,
+) -> Union[List[Dict[str, str]], Dict[str, str], None]:
     if endpoint not in ENDPOINT_TEMPLATES:
         raise RequestError(f'Unknown template name: {endpoint}')
 

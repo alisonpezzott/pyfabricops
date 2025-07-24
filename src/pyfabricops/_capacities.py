@@ -1,4 +1,6 @@
-import pandas
+from typing import List, Optional, Union, Dict
+from pandas import DataFrame
+
 
 from ._decorators import df
 from ._generic_endpoints import _list_generic
@@ -12,15 +14,16 @@ logger = get_logger(__name__)
 @df
 def list_capacities(
     df: bool = True,
-) -> pandas.DataFrame | list[dict] | None:
+) -> Union[DataFrame, List[Dict[str, str]], None]:
     """
     Returns a list of capacities.
 
     Args:
-        df (bool): If True, returns a pandas DataFrame. Defaults to True.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+            If False, returns a list of dictionaries.
 
     Returns:
-        (pandas.DataFrame | list[dict] | None): A DataFrame with the list of capacities.  
+        (Union[DataFrame, List[Dict[str, str]], None]): A DataFrame with the list of capacities.  
         If `df=False`, returns a list of dictionaries. If no capacities are found, returns None.
     """
     return _list_generic('capacities')

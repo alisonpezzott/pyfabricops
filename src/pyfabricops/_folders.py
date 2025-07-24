@@ -1,4 +1,5 @@
-import pandas
+from pandas import DataFrame
+from typing import Dict, List, Union, Optional
 
 from ._decorators import df
 from ._generic_endpoints import (
@@ -16,21 +17,24 @@ logger = get_logger(__name__)
 
 @df
 def list_folders(
-    workspace_id: str, *, df: bool = True
-) -> list | pandas.DataFrame | None:
+    workspace_id: str, 
+    *, 
+    df: Optional[bool] = True
+) -> Union[DataFrame, List[Dict[str, str]], None]: 
     """
     List folders in a workspace
 
     Args:
         workspace_id (str): The workspace to list folders from.
-        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+            If False, returns a list of dictionaries.
 
     Returns:
-        (list or pandas.DataFrame or None): A list of folders in the workspace. df=True returns a DataFrame.
+        (Union[DataFrame, List[Dict[str, str]], None]): A list of folders in the workspace.
 
     Examples:
         ```python
-        list_folders('my_workspace')
+        list_folders('123e4567-e89b-12d3-a456-426614174000')
         ```
     """
     return _list_generic('folders', workspace_id)
@@ -38,22 +42,29 @@ def list_folders(
 
 @df
 def get_folder(
-    workspace_id: str, folder_id: str, *, df: bool = True
-) -> dict | pandas.DataFrame | None:
+    workspace_id: str, 
+    folder_id: str, 
+    *, df: 
+    Optional[bool] = True
+) -> Union[DataFrame, Dict[str, str], None]:
     """
     Get a folder in a workspace.
 
     Args:
-        workspace (str): The workspace to get the folder from.
-        folder (str): The folder to get.
+        workspace_id (str): The workspace to get the folder from.
+        folder_id (str): The folder to get.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+            If False, returns a list of dictionaries.
 
     Returns:
-        (dict or pandas.DataFrame): The folder details if found, otherwise None.
+        (Union[DataFrame, Dict[str, str], None]): The folder details if found, otherwise None.
 
     Examples:
         ```python
-        get_folder('MyProjectWorkspace', 'SalesFolder')
-        get_folder('123e4567-e89b-12d3-a456-426614174000', 'SalesFolder')
+        get_folder(
+            workspace_id='123e4567-e89b-12d3-a456-426614174000', 
+            folder_id='98f6b7c8-1234-5678-90ab-cdef12345678'
+        )
         ```
     """
     return _get_generic(
@@ -63,8 +74,12 @@ def get_folder(
 
 @df
 def create_folder(
-    workspace_id: str, display_name: str, *, parent_folder_id: str = None, df: bool = True
-) -> dict | pandas.DataFrame | None:
+    workspace_id: str, 
+    display_name: str, 
+    *, 
+    parent_folder_id: str = None, 
+    df: Optional[bool] = True,
+) -> Union[DataFrame, Dict[str, str], None]:
     """
     Create a new folder in the specified workspace.
 
@@ -72,15 +87,19 @@ def create_folder(
         workspace_id (str): The workspace where the folder will be created.
         display_name (str): The name of the folder to create.
         parent_folder_id (str): The ID of the parent folder.
-        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+            If False, returns a list of dictionaries.
 
     Returns:
-        (dict or pandas.DataFrame or None): The created folder details if successful, otherwise None.
+        (Union[DataFrame, Dict[str, str], None]): The created folder details if successful, otherwise None.
 
     Examples:
         ```python
-        create_folder('MyProjectWorkspace', 'NewFolder', 'ParentFolder')
-        create_folder('123e4567-e89b-12d3-a456-426614174000', 'NewFolder', 'ParentFolder')
+        create_folder(
+            workspace_id='123e4567-e89b-12d3-a456-426614174000',
+            display_name='NewFolder',
+            parent_folder_id='456e7890-e12b-34d5-a678-90abcdef1234'
+        )
         ```
     """
     payload = {'displayName': display_name}
@@ -95,7 +114,7 @@ def create_folder(
     )
 
 
-def delete_folder(workspace_id: str, folder_id: str) -> bool | None:
+def delete_folder(workspace_id: str, folder_id: str) -> None:
     """
     Delete a folder in a workspace
 
@@ -104,12 +123,14 @@ def delete_folder(workspace_id: str, folder_id: str) -> bool | None:
         folder_id (str): The folder to delete.
 
     Returns:
-        (bool | None): True if the folder was deleted successfully, False if not found, None if workspace is invalid.
+        None.
 
     Examples:
         ```python
-        delete_folder('MyProjectWorkspace', 'SalesFolder')
-        delete_folder('123e4567-e89b-12d3-a456-426614174000', 'SalesFolder')
+        delete_folder(
+            workspace_id='123e4567-e89b-12d3-a456-426614174000',
+            folder_id='98f6b7c8-1234-5678-90ab-cdef12345678'
+        )
         ```
     """
     return _delete_generic(
@@ -119,8 +140,12 @@ def delete_folder(workspace_id: str, folder_id: str) -> bool | None:
 
 @df
 def update_folder(
-    workspace_id: str, folder_id: str, display_name: str, *, df: bool = True
-) -> dict | pandas.DataFrame | None:
+    workspace_id: str, 
+    folder_id: str, 
+    display_name: str, 
+    *, 
+    df: Optional[bool] = True
+) -> Union[DataFrame, Dict[str, str], None]:
     """
     Update a existing folder in the specified workspace.
 
@@ -128,15 +153,19 @@ def update_folder(
         workspace_id (str): The workspace where the folder will be updated.
         folder_id (str): The folder to update.
         display_name (str): The name of the folder to update.
-        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  
+            If False, returns a list of dictionaries.
 
     Returns:
-        (dict or pandas.DataFrame | None): The updated folder details if successful, otherwise None.
+        (Union[DataFrame, Dict[str, str], None]): The updated folder details if successful, otherwise None.
 
     Examples:
         ```python
-        update_folder('MyProjectWorkspace', 'OldFolderName', 'NewFolderName')
-        update_folder('123e4567-e89b-12d3-a456-426614174000', 'OldFolderName', 'NewFolderName')
+        update_folder(
+            workspace_id='123e4567-e89b-12d3-a456-426614174000',
+            folder_id='98f6b7c8-1234-5678-90ab-cdef12345678',
+            display_name='NewFolderName',
+        )
         ```
     """
     payload = {'displayName': display_name}
@@ -147,8 +176,12 @@ def update_folder(
 
 @df
 def move_folder(
-    workspace_id: str, folder_id: str, target_folder_id: str, *, df: bool = True
-) -> dict | pandas.DataFrame | None:
+    workspace_id: str, 
+    folder_id: str, 
+    target_folder_id: str, 
+    *, 
+    df: Optional[bool] = True
+) -> Union[DataFrame, Dict[str, str], None]:
     """
     Move a existing folder into other or root folder.
 
@@ -156,17 +189,26 @@ def move_folder(
         workspace_id (str): The workspace where the folder will be updated.
         folder_id (str): The folder to be moved.
         target_folder_id (str): The name of the parent folder will receive the moved folder.
+        df (bool, optional): Keyword-only.  
+            If True or not provided, returns a DataFrame with flattened keys.  
+            If False, returns a list of dictionaries.
 
     Returns:
-        (dict | pandas.DataFrame | None): The moved folder details if successful, otherwise None.
+        (Union[DataFrame, Dict[str, str], None]): The moved folder details if successful, otherwise None.
 
     Examples:
         ```python
-        move_folder('MyProjectWorkspace', 'SalesFolder', 'Archive')
-        move_folder('123e4567-e89b-12d3-a456-426614174000', 'SalesFolder', 'Archive')
+        move_folder(
+            workspace_id='123e4567-e89b-12d3-a456-426614174000',
+            folder_id='414e7890-e12b-34d5-a678-90abcdef1234',
+            target_folder_id='9859b7c8-1234-5678-90ab-cdef12345678',
+        )
         ```
     """
     payload = {'targetFolderId': target_folder_id}
     return _post_generic(
-        'folders_move', workspace_id, item_id=folder_id, payload=payload
+        'folders', workspace_id, 
+        item_id=folder_id, 
+        payload=payload, 
+        endpoint_suffix='/move',
     )
