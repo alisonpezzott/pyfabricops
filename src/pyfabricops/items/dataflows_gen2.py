@@ -2,13 +2,7 @@ from typing import Any, Dict, List, Optional, Union
 
 from pandas import DataFrame
 
-from ..api.api import (
-    _delete_request,
-    _get_request,
-    _list_request,
-    _patch_request,
-    _post_request,
-)
+from ..api.api import api_request
 from ..core.folders import resolve_folder
 from ..core.workspaces import resolve_workspace
 from ..utils.decorators import df
@@ -37,7 +31,10 @@ def list_dataflows_gen2(
     """
     workspace_id = resolve_workspace(workspace)
 
-    return _list_request('dataflows_gen2', workspace_id=workspace_id)
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/dataflows',
+        support_pagination=True,
+    )
 
 
 def get_dataflow_gen2_id(
@@ -121,10 +118,8 @@ def get_dataflow_gen2(
 
     dataflow_id = resolve_dataflow_gen2(workspace_id, dataflow)
 
-    return _get_request(
-        'dataflows_gen2',
-        workspace_id=workspace_id,
-        dataflow_id=dataflow_id,
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/dataflows/' + dataflow_id,
     )
 
 
@@ -169,10 +164,9 @@ def update_dataflow_gen2(
     if description:
         payload['description'] = description
 
-    return _patch_request(
-        endpoint='dataflows_gen2',
-        workspace_id=workspace_id,
-        dataflow_id=dataflow_id,
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/dataflows/' + dataflow_id,
+        method='patch',
         payload=payload,
     )
 
@@ -201,10 +195,9 @@ def delete_dataflow_gen2(workspace: str, dataflow: str) -> None:
 
     dataflow_id = resolve_dataflow_gen2(workspace_id, dataflow)
 
-    return _delete_request(
-        endpoint='dataflows_gen2',
-        workspace_id=workspace_id,
-        dataflow_id=dataflow_id,
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/dataflows/' + dataflow_id,
+        method='delete',
     )
 
 
@@ -232,11 +225,9 @@ def get_dataflow_gen2_definition(
 
     dataflow_id = resolve_dataflow_gen2(workspace_id, dataflow)
 
-    return _get_request(
-        endpoint='dataflows_gen2',
-        workspace_id=workspace_id,
-        dataflow_id=dataflow_id,
-        endpoint_suffix='/getDefinition',
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/dataflows/' + dataflow_id + '/getDefinition',
+        support_lro=True,
     )
 
 
@@ -275,13 +266,12 @@ def update_dataflow_gen2_definition(
 
     params = {'updateMetadata': True}
 
-    return _post_request(
-        endpoint='dataflows_gen2',
-        workspace_id=workspace_id,
-        dataflow_id=dataflow_id,
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/dataflows/' + dataflow_id + '/updateDefinition',
+        method='patch',
         payload=payload,
         params=params,
-        endpoint_suffix='/updateDefinition',
+        support_lro=True,
     )
 
 
@@ -328,36 +318,9 @@ def create_dataflow_gen2(
         if folder_id:
             payload['folderId'] = folder_id
 
-    return _post_request(
-        endpoint='dataflows_gen2',
-        workspace_id=workspace_id,
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/dataflows',
+        method='post',
         payload=payload,
-    )
-
-
-def delete_dataflow_gen2(workspace: str, dataflow: str) -> None:
-    """
-    Deletes a dataflow from the specified workspace.
-
-    Args:
-        workspace (str): The workspace name or ID.
-        dataflow (str): The name or ID of the dataflow to delete.
-
-    Returns:
-        None
-
-    Examples:
-        ```python
-        delete_dataflow('MyProjectWorkspace', 'SalesDataModel')
-        delete_dataflow('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000')
-        ```
-    """
-    workspace_id = resolve_workspace(workspace)
-
-    dataflow_id = resolve_dataflow_gen2(workspace_id, dataflow)
-
-    return _delete_request(
-        endpoint='dataflows_gen2',
-        workspace_id=workspace_id,
-        dataflow_id=dataflow_id,
+        support_lro=True,
     )

@@ -3,18 +3,11 @@ from typing import Any, Dict, List, Optional, Union
 
 from pandas import DataFrame
 
-from ..api.api import (
-    _delete_request,
-    _get_request,
-    _list_request,
-    _patch_request,
-    _post_request,
-)
+from ..api.api import api_request
 from ..core.folders import resolve_folder
 from ..core.workspaces import resolve_workspace
 from ..utils.decorators import df
 from ..utils.logging import get_logger
-from ..utils.schemas import PLATFORM_SCHEMA, PLATFORM_VERSION
 from ..utils.utils import is_valid_uuid
 
 logger = get_logger(__name__)
@@ -43,9 +36,9 @@ def list_lakehouses(
         list_lakehouses('MyProjectWorkspace')
         ```
     """
-    return _list_request(
-        'lakehouses',
-        workspace_id=resolve_workspace(workspace),
+    return api_request(
+        endpoint='/workspaces/' + resolve_workspace(workspace) + '/lakehouses',
+        support_pagination=True,
     )
 
 
@@ -129,10 +122,8 @@ def get_lakehouse(
     workspace_id = resolve_workspace(workspace)
     lakehouse_id = resolve_lakehouse(workspace_id, lakehouse)
 
-    response = _get_request(
-        endpoint='lakehouses',
-        workspace_id=workspace_id,
-        lakehouse_id=lakehouse_id,
+    response = api_request(
+        endpoint='/workspaces/' + workspace_id + '/lakehouses/' + lakehouse_id,
     )
 
     if response.data:
@@ -148,10 +139,8 @@ def get_lakehouse(
         RETRY_INTERVAL = 10
         logger.info(f'Checking lakehouse SQL endpoint...')
         for attempt in range(1, MAX_RETRIES + 1):
-            response = _get_request(
-                endpoint='lakehouses',
-                workspace_id=workspace_id,
-                lakehouse_id=lakehouse_id,
+            response = api_request(
+                endpoint='/workspaces/' + workspace_id + '/lakehouses/' + lakehouse_id,
             )
             if not response.success:
                 logger.warning(
@@ -214,9 +203,9 @@ def create_lakehouse(
     if enable_schemas:
         payload['creationPayload'] = {'enableSchemas': True}
 
-    return _post_request(
-        endpoint='lakehouses',
-        workspace_id=workspace_id,
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/lakehouses',
+        method='post',
         payload=payload,
     )
 
@@ -261,10 +250,9 @@ def update_lakehouse(
     if description:
         payload['description'] = description
 
-    return _patch_request(
-        endpoint='lakehouses',
-        workspace_id=workspace_id,
-        lakehouse_id=lakehouse_id,
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/lakehouses/' + lakehouse_id,
+        method='patch',
         payload=payload,
     )
 
@@ -288,8 +276,7 @@ def delete_lakehouse(workspace: str, lakehouse: str) -> None:
     """
     workspace_id = resolve_workspace(workspace)
     lakehouse_id = resolve_lakehouse(workspace_id, lakehouse)
-    return _delete_request(
-        endpoint='lakehouses',
-        workspace_id=workspace_id,
-        lakehouse_id=lakehouse_id,
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/lakehouses/' + lakehouse_id,
+        method='delete',
     )

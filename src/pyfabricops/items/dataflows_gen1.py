@@ -2,14 +2,7 @@ from typing import Any, Dict, List, Literal, Optional, Union
 
 from pandas import DataFrame
 
-from ..api.api import (
-    _base_api,
-    _delete_request,
-    _get_request,
-    _list_request,
-    _patch_request,
-    _post_request,
-)
+from ..api.api import api_request
 from ..core.folders import resolve_folder
 from ..core.workspaces import resolve_workspace
 from ..utils.decorators import df
@@ -36,8 +29,11 @@ def list_dataflows_gen1(
     Returns:
         (Union[DataFrame, List[Dict[str, Any]], None]): A list of Gen1 dataflows or a DataFrame if df is True.
     """
-    return _list_request(
-        'dataflows_gen1', workspace_id=resolve_workspace(workspace)
+    return api_request(
+        endpoint='/groups/' + resolve_workspace(workspace) + '/dataflows',
+        audience='powerbi',
+        method='get',
+        support_pagination=True,
     )
 
 
@@ -110,10 +106,10 @@ def get_dataflow_gen1(
     """
     workspace_id = resolve_workspace(workspace)
 
-    return _get_request(
-        'dataflows_gen1',
-        workspace_id=workspace_id,
-        item_id=resolve_dataflow_gen1(workspace_id, dataflow),
+    return api_request(
+        endpoint='/groups/' + workspace_id + '/dataflows/' + resolve_dataflow_gen1(workspace_id, dataflow),
+        method='get',
+        audience='powerbi',
     )
 
 
@@ -138,8 +134,11 @@ def get_dataflow_gen1_definition(workspace: str, dataflow: str) -> dict | None:
 
     dataflow_id = resolve_dataflow_gen1(workspace_id, dataflow)
 
-    return _get_request(
-        'dataflows_gen1', workspace_id=workspace_id, item_id=dataflow_id
+    return api_request(
+        endpoint='/groups/' + workspace_id + '/dataflows/' + dataflow_id + '/getDefinition',
+        method='post',
+        support_lro=True,
+        audience='powerbi',
     )
 
 
@@ -177,12 +176,12 @@ def update_dataflow_gen1_definition(
     params = {'updateMetadata': True}
     payload = {'definition': item_definition}
 
-    return _post_request(
-        'dataflows_gen1',
-        workspace_id=workspace_id,
-        item_id=dataflow_id,
+    return api_request(
+        endpoint='/groups/' + workspace_id + '/dataflows/' + dataflow_id,
+        method='patch',
         payload=payload,
         params=params,
+        audience='powerbi',
     )
 
 
@@ -237,10 +236,11 @@ def create_dataflow_gen1(
     if description:
         payload['description'] = description
 
-    return _post_request(
-        'data_pipelines',
-        workspace_id=workspace_id,
+    return api_request(
+        endpoint='/groups/' + workspace_id + '/dataflows',
+        method='post',
         payload=payload,
+        audience='powerbi',
     )
 
 
@@ -284,11 +284,11 @@ def update_dataflow_gen1(
     if description:
         payload['description'] = description
 
-    return _patch_request(
-        'dataflows_gen1',
-        workspace_id=workspace_id,
-        item_id=dataflow_id,
+    return api_request(
+        endpoint='/groups/' + workspace_id + '/dataflows/' + dataflow_id,
+        method='patch',
         payload=payload,
+        audience='powerbi',
     )
 
 
@@ -313,10 +313,10 @@ def delete_dataflow_gen1(workspace: str, dataflow: str) -> None:
 
     dataflow_id = resolve_dataflow_gen1(workspace_id, dataflow)
 
-    return _delete_request(
-        'dataflows_gen1',
-        workspace_id=workspace_id,
-        item_id=dataflow_id,
+    return api_request(
+        endpoint='/groups/' + workspace_id + '/dataflows/' + dataflow_id,
+        method='delete',
+        audience='powerbi',
     )
 
 
@@ -338,12 +338,10 @@ def takeover_dataflow_gen1(workspace: str, dataflow: str) -> Union[bool, None]:
 
     dataflow_id = resolve_dataflow_gen1(workspace_id, dataflow)
 
-    return _post_request(
-        'dataflows_gen1',
-        workspace_id=workspace_id,
-        item_id=dataflow_id,
-        endpoint_suffix='/Default.Takeover',
-        return_raw=True,
+    return api_request(
+        endpoint='/groups/' + workspace_id + '/dataflows/' + dataflow_id + '/Default.Takeover',
+        method='post',
+        support_lro=True,
     )
 
 
@@ -382,13 +380,12 @@ def refresh_dataflow_gen1(
 
     params = {'processType': process_type}
 
-    return _post_request(
-        'dataflows_gen1',
-        workspace_id=workspace_id,
-        item_id=dataflow_id,
-        endpoint_suffix='/refreshes',
+    return api_request(
+        endpoint='/groups/' + workspace_id + '/dataflows/' + dataflow_id + '/refreshes',
+        method='post',
         payload=payload,
         params=params,
+        audience='powerbi',
     )
 
 
@@ -421,11 +418,10 @@ def get_dataflow_gen1_transactions(
 
     dataflow_id = resolve_dataflow_gen1(workspace_id, dataflow)
 
-    return _post_request(
-        'dataflows_gen1',
-        workspace_id=workspace_id,
-        item_id=dataflow_id,
-        endpoint_suffix='/transactions',
+    return api_request(
+        endpoint='/groups/' + workspace_id + '/dataflows/' + dataflow_id + '/transactions',
+        method='post',
+        audience='powerbi',
     )
 
 
@@ -458,9 +454,8 @@ def get_dataflows_gen1_datasources(
 
     dataflow_id = resolve_dataflow_gen1(workspace_id, dataflow)
 
-    return _post_request(
-        'dataflows_gen1',
-        workspace_id=workspace_id,
-        item_id=dataflow_id,
-        endpoint_suffix='/datasources',
+    return api_request(
+        endpoint='/groups/' + workspace_id + '/dataflows/' + dataflow_id + '/datasources',
+        method='post',
+        audience='powerbi',
     )

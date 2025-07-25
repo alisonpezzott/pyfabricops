@@ -2,13 +2,7 @@ from typing import Any, Dict, List, Optional, Union
 
 from pandas import DataFrame
 
-from ..api.api import (
-    _delete_request,
-    _get_request,
-    _list_request,
-    _patch_request,
-    _post_request,
-)
+from ..api.api import api_request
 from ..core.folders import resolve_folder
 from ..core.workspaces import resolve_workspace
 from ..utils.decorators import df
@@ -39,9 +33,9 @@ def list_data_pipelines(
         list_data_pipelines('123e4567-e89b-12d3-a456-426614174000')
         ```
     """
-    return _list_request(
-        'data_pipelines',
-        workspace_id=resolve_workspace(workspace),
+    return api_request(
+        '/workspaces/' + resolve_workspace(workspace) + '/dataPipelines',
+        support_pagination=True,
     )
 
 
@@ -113,10 +107,8 @@ def get_data_pipeline(
         ```
     """
     workspace_id = resolve_workspace(workspace)
-    return _get_request(
-        'data_pipelines',
-        workspace_id=workspace_id,
-        data_pipeline_id=resolve_data_pipeline(workspace_id, data_pipeline),
+    return api_request(
+        '/workspaces/' + workspace_id + '/dataPipelines/' + resolve_data_pipeline(workspace_id, data_pipeline),
     )
 
 
@@ -160,10 +152,9 @@ def update_data_pipeline(
     if description:
         payload['description'] = description
 
-    return _patch_request(
-        'data_pipelines',
-        workspace_id=workspace_id,
-        item_id=data_pipeline_id,
+    return api_request(
+        '/workspaces/' + workspace_id + '/dataPipelines/' + data_pipeline_id,
+        method='patch',
         payload=payload,
     )
 
@@ -192,10 +183,9 @@ def delete_data_pipeline(workspace: str, data_pipeline: str) -> None:
 
     data_pipeline_id = resolve_data_pipeline(workspace_id, data_pipeline)
 
-    return _delete_request(
-        'data_pipelines',
-        workspace_id=workspace_id,
-        item_id=data_pipeline_id,
+    return api_request(
+        '/workspaces/' + workspace_id + '/dataPipelines/' + data_pipeline_id,
+        method='delete',
     )
 
 
@@ -221,12 +211,11 @@ def get_data_pipeline_definition(workspace: str, data_pipeline: str) -> dict:
 
     data_pipeline_id = resolve_data_pipeline(workspace_id, data_pipeline)
 
-    return _post_request(
-        'data_pipelines',
-        workspace_id=workspace_id,
-        item_id=data_pipeline_id,
-        endpoint_suffix='/getDefinition',
-    )
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/dataPipelines/' + data_pipeline_id + '/getDefinition',
+        method='post',
+        support_lro=True,
+    ) 
 
 
 @df
@@ -263,10 +252,9 @@ def update_data_pipeline_definition(
     params = {'updateMetadata': True}
     payload = {'definition': item_definition}
 
-    return _post_request(
-        'data_pipelines',
-        workspace_id=workspace_id,
-        item_id=data_pipeline_id,
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/dataPipelines/' + data_pipeline_id,
+        method='post',
         payload=payload,
         params=params,
     )
@@ -323,9 +311,9 @@ def create_data_pipeline(
     if description:
         payload['description'] = description
 
-    return _post_request(
-        'data_pipelines',
-        workspace_id=workspace_id,
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/dataPipelines',
+        method='post',
         payload=payload,
     )
 
@@ -351,8 +339,7 @@ def delete_data_pipeline(workspace: str, data_pipeline: str) -> None:
 
     data_pipeline_id = resolve_data_pipeline(workspace_id, data_pipeline)
 
-    return _delete_request(
-        'data_pipelines',
-        workspace_id=workspace_id,
-        item_id=data_pipeline_id,
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/dataPipelines/' + data_pipeline_id,
+        method='delete',
     )

@@ -2,13 +2,7 @@ from typing import Any, Dict, List, Optional, Union
 
 from pandas import DataFrame
 
-from ..api.api import (
-    _delete_request,
-    _get_request,
-    _list_request,
-    _patch_request,
-    _post_request,
-)
+from ..api.api import api_request
 from ..core.folders import resolve_folder
 from ..core.workspaces import resolve_workspace
 from ..utils.decorators import df
@@ -41,9 +35,9 @@ def list_notebooks(
         list_notebooks('MyProjectWorkspace', df=True)
         ```
     """
-    return _list_request(
-        endpoint='notebooks',
-        workspace_id=resolve_workspace(workspace),
+    return api_request(
+        endpoint='/workspaces/' + resolve_workspace(workspace) + '/notebooks',
+        support_pagination=True,
     )
 
 
@@ -127,10 +121,8 @@ def get_notebook(
 
     notebook_id = resolve_notebook(workspace_id, notebook)
 
-    return _get_request(
-        endpoint='notebooks',
-        workspace_id=workspace_id,
-        item_id=notebook_id,
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/notebooks/' + notebook_id,
     )
 
 
@@ -175,10 +167,9 @@ def update_notebook(
     if description:
         payload['description'] = description
 
-    return _patch_request(
-        endpoint='notebooks',
-        workspace_id=workspace_id,
-        item_id=notebook_id,
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/notebooks/' + notebook_id,
+        method='patch',
         payload=payload,
     )
 
@@ -207,10 +198,9 @@ def delete_notebook(workspace: str, notebook: str) -> None:
 
     notebook_id = resolve_notebook(workspace_id, notebook)
 
-    return _delete_request(
-        endpoint='notebooks',
-        workspace_id=workspace_id,
-        item_id=notebook_id,
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/notebooks/' + notebook_id,
+        method='delete',
     )
 
 
@@ -237,11 +227,10 @@ def get_notebook_definition(
 
     notebook_id = resolve_notebook(workspace_id, notebook)
 
-    return _post_request(
-        endpoint='notebooks',
-        workspace_id=workspace_id,
-        item_id=notebook_id,
-        endpoint_suffix='/getDefinition',
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/notebooks/' + notebook_id + '/getDefinition',
+        method='post',
+        support_lro=True,
     )
 
 
@@ -279,12 +268,12 @@ def update_notebook_definition(
 
     params = {'updateMetadata': True}
 
-    return _post_request(
-        endpoint='notebooks',
-        workspace_id=workspace_id,
-        item_id=notebook_id,
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/notebooks/' + notebook_id + '/updateDefinition',
+        method='post',
         payload=payload,
         params=params,
+        support_lro=True,
     )
 
 
@@ -329,8 +318,9 @@ def create_notebook(
         if folder_id:
             payload['folderId'] = folder_id
 
-    return _post_request(
-        endpoint='notebooks',
-        workspace_id=workspace_id,
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/notebooks',
+        method='post',
         payload=payload,
+        support_lro=True,
     )

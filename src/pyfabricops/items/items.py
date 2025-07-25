@@ -2,13 +2,7 @@ from typing import Any, Dict, List, Optional, Union
 
 from pandas import DataFrame
 
-from ..api.api import (
-    _delete_request,
-    _get_request,
-    _list_request,
-    _patch_request,
-    _post_request,
-)
+from ..api.api import api_request
 from ..core.folders import resolve_folder
 from ..core.workspaces import resolve_workspace
 from ..utils.decorators import df
@@ -41,9 +35,8 @@ def list_items(
         ```
     """
     workspace_id = resolve_workspace(workspace)
-    return _list_request(
-        endpoint='items',
-        workspace_id=workspace_id,
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/items',
     )
 
 
@@ -131,10 +124,8 @@ def get_item(
 
     item_id = resolve_item(workspace_id, item)
 
-    return _get_request(
-        endpoint='items',
-        workspace_id=workspace_id,
-        item_id=item_id,
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/items/' + item_id,
     )
 
 
@@ -179,10 +170,9 @@ def update_item(
     if description:
         payload['description'] = description
 
-    return _patch_request(
-        endpoint='items',
-        workspace_id=workspace_id,
-        item_id=item_id,
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/items/' + item_id,
+        method='patch',
         payload=payload,
     )
 
@@ -211,10 +201,9 @@ def delete_item(workspace: str, item: str) -> None:
 
     item_id = resolve_item(workspace_id, item)
 
-    return _delete_request(
-        endpoint='items',
-        workspace_id=workspace_id,
-        item_id=item_id,
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/items/' + item_id,
+        method='delete',
     )
 
 
@@ -241,11 +230,10 @@ def get_item_definition(
 
     item_id = resolve_item(workspace_id, item)
 
-    return _post_request(
-        endpoint='items',
-        workspace_id=workspace_id,
-        item_id=item_id,
-        endpoint_suffix='/getDefinition',
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/items/' + item_id + '/getDefinition',
+        method='post',
+        support_lro=True,
     )
 
 
@@ -285,13 +273,11 @@ def update_item_definition(
 
     params = {'updateMetadata': True}
 
-    return _post_request(
-        endpoint='items',
-        workspace_id=workspace_id,
-        item_id=item_id,
-        endpoint_suffix='/updateDefinition',
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/items/' + item_id + '/updateDefinition',
         payload=payload,
         params=params,
+        support_lro=True,
     )
 
 
@@ -339,8 +325,11 @@ def create_item(
         if folder_id:
             payload['folderId'] = folder_id
 
-    return _post_request(
-        endpoint='items', workspace_id=workspace_id, payload=payload
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/items',
+        method='post',
+        payload=payload,
+        support_lro=True,
     )
 
 
@@ -365,8 +354,7 @@ def delete_item(workspace: str, item: str) -> None:
 
     item_id = resolve_item(workspace_id, item)
 
-    return _delete_request(
-        endpoint='items',
-        workspace_id=workspace_id,
-        item_id=item_id,
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/items/' + item_id,
+        method='delete',
     )
