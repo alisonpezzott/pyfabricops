@@ -17,7 +17,8 @@ logger = get_logger(__name__)
 
 
 class ApiResult(NamedTuple):
-    """A named tuple to encapsulate the result of an API request.""" 
+    """A named tuple to encapsulate the result of an API request."""
+
     success: bool
     status_code: int
     data: Optional[Any] = None
@@ -446,7 +447,7 @@ def api_request(
     if not response.success:
         logger.warning(f'{response.status_code}: {response.error}.')
         return None
-    
+
     if method == 'delete' and response.status_code == 200:
         logger.success(f'Deleted {endpoint} successfully.')
         return None
@@ -454,7 +455,7 @@ def api_request(
     # Handle pagination if supported
     if support_pagination:
         return _pagination_handler(response).data.get('value', [])
- 
+
     # Handle long-running operations (LRO) if supported
     if support_lro and response.status_code == 202:
         logger.info('Long-running operation detected, handling LRO...')
@@ -467,14 +468,16 @@ def api_request(
             if lro_response.data:
                 return lro_response.data
             else:
-                logger.success('Long-running operation completed successfully but without data.')
+                logger.success(
+                    'Long-running operation completed successfully but without data.'
+                )
                 return None
-            
+
         else:
             logger.warning(
                 f'{lro_response.status_code}: {lro_response.error}.'
             )
             return None
-    
+
     # Otherwise, return the parsed data
     return response.data

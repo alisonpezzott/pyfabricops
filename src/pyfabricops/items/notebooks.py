@@ -228,7 +228,11 @@ def get_notebook_definition(
     notebook_id = resolve_notebook(workspace_id, notebook)
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/notebooks/' + notebook_id + '/getDefinition',
+        endpoint='/workspaces/'
+        + workspace_id
+        + '/notebooks/'
+        + notebook_id
+        + '/getDefinition',
         method='post',
         support_lro=True,
     )
@@ -269,7 +273,11 @@ def update_notebook_definition(
     params = {'updateMetadata': True}
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/notebooks/' + notebook_id + '/updateDefinition',
+        endpoint='/workspaces/'
+        + workspace_id
+        + '/notebooks/'
+        + notebook_id
+        + '/updateDefinition',
         method='post',
         payload=payload,
         params=params,

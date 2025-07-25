@@ -107,7 +107,10 @@ def get_dataflow_gen1(
     workspace_id = resolve_workspace(workspace)
 
     return api_request(
-        endpoint='/groups/' + workspace_id + '/dataflows/' + resolve_dataflow_gen1(workspace_id, dataflow),
+        endpoint='/groups/'
+        + workspace_id
+        + '/dataflows/'
+        + resolve_dataflow_gen1(workspace_id, dataflow),
         method='get',
         audience='powerbi',
     )
@@ -135,7 +138,11 @@ def get_dataflow_gen1_definition(workspace: str, dataflow: str) -> dict | None:
     dataflow_id = resolve_dataflow_gen1(workspace_id, dataflow)
 
     return api_request(
-        endpoint='/groups/' + workspace_id + '/dataflows/' + dataflow_id + '/getDefinition',
+        endpoint='/groups/'
+        + workspace_id
+        + '/dataflows/'
+        + dataflow_id
+        + '/getDefinition',
         method='post',
         support_lro=True,
         audience='powerbi',
@@ -339,7 +346,11 @@ def takeover_dataflow_gen1(workspace: str, dataflow: str) -> Union[bool, None]:
     dataflow_id = resolve_dataflow_gen1(workspace_id, dataflow)
 
     return api_request(
-        endpoint='/groups/' + workspace_id + '/dataflows/' + dataflow_id + '/Default.Takeover',
+        endpoint='/groups/'
+        + workspace_id
+        + '/dataflows/'
+        + dataflow_id
+        + '/Default.Takeover',
         method='post',
         support_lro=True,
     )
@@ -381,7 +392,11 @@ def refresh_dataflow_gen1(
     params = {'processType': process_type}
 
     return api_request(
-        endpoint='/groups/' + workspace_id + '/dataflows/' + dataflow_id + '/refreshes',
+        endpoint='/groups/'
+        + workspace_id
+        + '/dataflows/'
+        + dataflow_id
+        + '/refreshes',
         method='post',
         payload=payload,
         params=params,
@@ -419,7 +434,11 @@ def get_dataflow_gen1_transactions(
     dataflow_id = resolve_dataflow_gen1(workspace_id, dataflow)
 
     return api_request(
-        endpoint='/groups/' + workspace_id + '/dataflows/' + dataflow_id + '/transactions',
+        endpoint='/groups/'
+        + workspace_id
+        + '/dataflows/'
+        + dataflow_id
+        + '/transactions',
         method='post',
         audience='powerbi',
     )
@@ -455,7 +474,11 @@ def get_dataflows_gen1_datasources(
     dataflow_id = resolve_dataflow_gen1(workspace_id, dataflow)
 
     return api_request(
-        endpoint='/groups/' + workspace_id + '/dataflows/' + dataflow_id + '/datasources',
+        endpoint='/groups/'
+        + workspace_id
+        + '/dataflows/'
+        + dataflow_id
+        + '/datasources',
         method='post',
         audience='powerbi',
     )

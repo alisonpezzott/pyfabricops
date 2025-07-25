@@ -231,7 +231,11 @@ def get_item_definition(
     item_id = resolve_item(workspace_id, item)
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/items/' + item_id + '/getDefinition',
+        endpoint='/workspaces/'
+        + workspace_id
+        + '/items/'
+        + item_id
+        + '/getDefinition',
         method='post',
         support_lro=True,
     )
@@ -274,7 +278,11 @@ def update_item_definition(
     params = {'updateMetadata': True}
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/items/' + item_id + '/updateDefinition',
+        endpoint='/workspaces/'
+        + workspace_id
+        + '/items/'
+        + item_id
+        + '/updateDefinition',
         payload=payload,
         params=params,
         support_lro=True,

@@ -223,7 +223,7 @@ def delete_report(workspace: str, report: str) -> None:
 
     return api_request(
         endpoint='/workspaces/' + workspace_id + '/reports/' + report_id,
-        method='delete'
+        method='delete',
     )
 
 
@@ -253,7 +253,11 @@ def get_report_definition(
     report_id = resolve_report(workspace, report)
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/reports/' + report_id + '/getDefinition',
+        endpoint='/workspaces/'
+        + workspace_id
+        + '/reports/'
+        + report_id
+        + '/getDefinition',
         method='post',
         support_lro=True,
     )
@@ -295,9 +299,13 @@ def update_report_definition(
     params = {'updateMetadata': True}
     payload = {'definition': item_definition}
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/reports/' + report_id + '/updateDefinition',
+        endpoint='/workspaces/'
+        + workspace_id
+        + '/reports/'
+        + report_id
+        + '/updateDefinition',
         method='post',
         payload=payload,
         params=params,
         support_lro=True,
-    ) 
+    )

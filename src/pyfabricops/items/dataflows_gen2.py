@@ -226,7 +226,11 @@ def get_dataflow_gen2_definition(
     dataflow_id = resolve_dataflow_gen2(workspace_id, dataflow)
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/dataflows/' + dataflow_id + '/getDefinition',
+        endpoint='/workspaces/'
+        + workspace_id
+        + '/dataflows/'
+        + dataflow_id
+        + '/getDefinition',
         support_lro=True,
     )
 
@@ -267,7 +271,11 @@ def update_dataflow_gen2_definition(
     params = {'updateMetadata': True}
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/dataflows/' + dataflow_id + '/updateDefinition',
+        endpoint='/workspaces/'
+        + workspace_id
+        + '/dataflows/'
+        + dataflow_id
+        + '/updateDefinition',
         method='patch',
         payload=payload,
         params=params,

@@ -140,7 +140,10 @@ def get_warehouse(
         logger.info(f'Checking warehouse SQL endpoint...')
         for attempt in range(1, MAX_RETRIES + 1):
             response = api_request(
-                endpoint='/workspaces/' + workspace_id + '/warehouses/' + warehouse_id,
+                endpoint='/workspaces/'
+                + workspace_id
+                + '/warehouses/'
+                + warehouse_id,
             )
             if not response.success:
                 logger.warning(

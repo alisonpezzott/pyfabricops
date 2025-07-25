@@ -1,5 +1,5 @@
 import time
-from typing import Any, Dict, List, Literal, Union, Optional
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from pandas import DataFrame
 
@@ -316,7 +316,6 @@ def update_from_git(
     return False
 
 
-
 def commit_to_git(
     workspace: str,
     *,
@@ -360,16 +359,16 @@ def commit_to_git(
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return None
-    
+
     payload = {'mode': mode}
-    
+
     if comment:
         payload['comment'] = comment
-    
+
     if mode == 'Selective' and selective_payload:
         # If in selective mode, include the specific changes to commit
         payload.update(selective_payload)
-    
+
     return api_request(
         endpoint=f'/workspaces/{workspace_id}/git/commitToGit',
         method='post',
@@ -408,7 +407,7 @@ def git_disconnect(
         method='post',
         credential_type=credential_type,
         return_raw=True,
-    ) 
+    )
     if response.status_code == 200:
         logger.success('Successfully disconnected from Git.')
         return None
@@ -447,7 +446,9 @@ def get_git_connection(
         ```
     """
     return api_request(
-        endpoint='/workspaces/' + resolve_workspace(workspace) + '/git/connection',
+        endpoint='/workspaces/'
+        + resolve_workspace(workspace)
+        + '/git/connection',
         credential_type=credential_type,
     )
 
@@ -482,7 +483,9 @@ def get_my_git_credentials(
         ```
     """
     return api_request(
-        endpoint='/workspaces/' + resolve_workspace(workspace) + '/git/myGitCredentials',
+        endpoint='/workspaces/'
+        + resolve_workspace(workspace)
+        + '/git/myGitCredentials',
         credential_type=credential_type,
     )
 
@@ -538,9 +541,11 @@ def update_my_git_connection(
         payload = payload_configured
     elif request_body_type == 'UpdateGitCredentialsToNoneRequest':
         payload = payload_none
-    
+
     return api_request(
-        endpoint=f'/workspaces/' + resolve_workspace(workspace) + '/git/myGitCredentials',
+        endpoint=f'/workspaces/'
+        + resolve_workspace(workspace)
+        + '/git/myGitCredentials',
         method='patch',
         payload=payload,
         credential_type=credential_type,
@@ -599,7 +604,9 @@ def ado_connect(
         }
     }
     return api_request(
-        endpoint='/workspaces/' + resolve_workspace(workspace) + '/git/connect',
+        endpoint='/workspaces/'
+        + resolve_workspace(workspace)
+        + '/git/connect',
         method='post',
         payload=payload,
         credential_type=credential_type,

@@ -108,7 +108,10 @@ def get_data_pipeline(
     """
     workspace_id = resolve_workspace(workspace)
     return api_request(
-        '/workspaces/' + workspace_id + '/dataPipelines/' + resolve_data_pipeline(workspace_id, data_pipeline),
+        '/workspaces/'
+        + workspace_id
+        + '/dataPipelines/'
+        + resolve_data_pipeline(workspace_id, data_pipeline),
     )
 
 
@@ -212,10 +215,14 @@ def get_data_pipeline_definition(workspace: str, data_pipeline: str) -> dict:
     data_pipeline_id = resolve_data_pipeline(workspace_id, data_pipeline)
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/dataPipelines/' + data_pipeline_id + '/getDefinition',
+        endpoint='/workspaces/'
+        + workspace_id
+        + '/dataPipelines/'
+        + data_pipeline_id
+        + '/getDefinition',
         method='post',
         support_lro=True,
-    ) 
+    )
 
 
 @df
@@ -253,7 +260,10 @@ def update_data_pipeline_definition(
     payload = {'definition': item_definition}
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/dataPipelines/' + data_pipeline_id,
+        endpoint='/workspaces/'
+        + workspace_id
+        + '/dataPipelines/'
+        + data_pipeline_id,
         method='post',
         payload=payload,
         params=params,
@@ -340,6 +350,9 @@ def delete_data_pipeline(workspace: str, data_pipeline: str) -> None:
     data_pipeline_id = resolve_data_pipeline(workspace_id, data_pipeline)
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/dataPipelines/' + data_pipeline_id,
+        endpoint='/workspaces/'
+        + workspace_id
+        + '/dataPipelines/'
+        + data_pipeline_id,
         method='delete',
     )

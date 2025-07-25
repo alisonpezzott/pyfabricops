@@ -66,7 +66,9 @@ def get_lakehouse_id(workspace: str, lakehouse: str) -> Union[str, None]:
         if lakehouse_['displayName'] == lakehouse:
             return lakehouse_['id']
 
-    logger.warning(f'Lakehouse {lakehouse} not found in workspace {workspace}.')
+    logger.warning(
+        f'Lakehouse {lakehouse} not found in workspace {workspace}.'
+    )
     return None
 
 

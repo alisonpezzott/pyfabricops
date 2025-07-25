@@ -83,7 +83,11 @@ def list_shortcuts(
     lakehouse_id = resolve_lakehouse(workspace_id, lakehouse)
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/lakehouses/' + lakehouse_id + '/shortcuts',
+        endpoint='/workspaces/'
+        + workspace_id
+        + '/lakehouses/'
+        + lakehouse_id
+        + '/shortcuts',
         support_pagination=True,
     )
 
@@ -120,7 +124,14 @@ def get_shortcut(
     workspace_id = resolve_workspace(workspace)
     lakehouse_id = resolve_lakehouse(workspace_id, lakehouse)
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/lakehouses/' + lakehouse_id + '/shortcuts/' + shortcut_path + '/' + shortcut_name,
+        endpoint='/workspaces/'
+        + workspace_id
+        + '/lakehouses/'
+        + lakehouse_id
+        + '/shortcuts/'
+        + shortcut_path
+        + '/'
+        + shortcut_name,
     )
 
 
@@ -148,8 +159,15 @@ def delete_shortcut(
     workspace_id = resolve_workspace(workspace)
     lakehouse_id = resolve_lakehouse(workspace_id, lakehouse)
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/lakehouses/' + lakehouse_id + '/shortcuts/' + shortcut_path + '/' + shortcut_name,
-        method='delete'
+        endpoint='/workspaces/'
+        + workspace_id
+        + '/lakehouses/'
+        + lakehouse_id
+        + '/shortcuts/'
+        + shortcut_path
+        + '/'
+        + shortcut_name,
+        method='delete',
     )
 
 
@@ -294,7 +312,11 @@ def create_shortcut(
     params = {'shortcutConflictPolicy': conflict_policy}
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/lakehouses/' + lakehouse_id + '/shortcuts',
+        endpoint='/workspaces/'
+        + workspace_id
+        + '/lakehouses/'
+        + lakehouse_id
+        + '/shortcuts',
         method='post',
         payload=payload,
         params=params,

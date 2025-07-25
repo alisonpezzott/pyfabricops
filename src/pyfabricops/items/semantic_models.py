@@ -29,7 +29,9 @@ def list_semantic_models(
         (Union[DataFrame, List[Dict[str, Any]], None]): A list of semantic models or a DataFrame if df is True.
     """
     return api_request(
-        endpoint='/workspaces/' + resolve_workspace(workspace) + '/semanticModels',
+        endpoint='/workspaces/'
+        + resolve_workspace(workspace)
+        + '/semanticModels',
         support_pagination=True,
     )
 
@@ -95,7 +97,10 @@ def get_semantic_model(
     workspace_id = resolve_workspace(workspace)
     semantic_model_id = resolve_semantic_model(workspace, semantic_model)
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/semanticModels/' + semantic_model_id,
+        endpoint='/workspaces/'
+        + workspace_id
+        + '/semanticModels/'
+        + semantic_model_id,
     )
 
 
@@ -152,7 +157,7 @@ def create_semantic_model(
         method='post',
         payload=payload,
         support_lro=True,
-    ) 
+    )
 
 
 @df
@@ -200,7 +205,10 @@ def update_semantic_model(
         payload['description'] = description
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/semanticModels/' + semantic_model_id,
+        endpoint='/workspaces/'
+        + workspace_id
+        + '/semanticModels/'
+        + semantic_model_id,
         method='patch',
         payload=payload,
     )
@@ -226,8 +234,11 @@ def delete_semantic_model(workspace: str, semantic_model: str) -> None:
     semantic_model_id = resolve_semantic_model(workspace, semantic_model)
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/semanticModels/' + semantic_model_id,
-        method='delete'
+        endpoint='/workspaces/'
+        + workspace_id
+        + '/semanticModels/'
+        + semantic_model_id,
+        method='delete',
     )
 
 
@@ -257,7 +268,11 @@ def get_semantic_model_definition(
     semantic_model_id = resolve_semantic_model(workspace, semantic_model)
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/semanticModels/' + semantic_model_id + '/getDefinition',
+        endpoint='/workspaces/'
+        + workspace_id
+        + '/semanticModels/'
+        + semantic_model_id
+        + '/getDefinition',
         method='post',
         support_lro=True,
     )
@@ -299,9 +314,13 @@ def update_semantic_model_definition(
     params = {'updateMetadata': True}
     payload = {'definition': item_definition}
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/semanticModels/' + semantic_model_id + '/updateDefinition',
+        endpoint='/workspaces/'
+        + workspace_id
+        + '/semanticModels/'
+        + semantic_model_id
+        + '/updateDefinition',
         method='post',
         payload=payload,
         params=params,
         support_lro=True,
-    ) 
+    )
