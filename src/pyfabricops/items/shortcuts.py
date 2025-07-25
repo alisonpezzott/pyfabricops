@@ -1,4 +1,4 @@
-from typing import Dict, List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from pandas import DataFrame
 
@@ -64,7 +64,7 @@ def list_shortcuts(
     lakehouse: str,
     *,
     df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, str]], None]:
+) -> Union[DataFrame, List[Dict[str, Any]], None]:
     """
     Lists all shortcuts in the specified workspace and lakehouse
 
@@ -75,7 +75,7 @@ def list_shortcuts(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, List[Dict[str, str]], None]): A list of shortcuts, a DataFrame with flattened keys, or None if not found.
+        (Union[DataFrame, List[Dict[str, Any]], None]): A list of shortcuts, a DataFrame with flattened keys, or None if not found.
 
     Examples:
         ```python
@@ -103,7 +103,7 @@ def get_shortcut(
     shortcut_name: str,
     *,
     df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, str], None]:
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Retrieves a specific shortcut in the specified workspace.
 
@@ -116,7 +116,7 @@ def get_shortcut(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The shortcut details, a DataFrame with flattened keys, or None if not found.
+        (Union[DataFrame, Dict[str, Any], None]): The shortcut details, a DataFrame with flattened keys, or None if not found.
 
     Examples:
         ```python
@@ -196,7 +196,7 @@ def create_shortcut(
     target_bucket: Optional[str] = None,
     custom_target_payload: Optional[dict] = None,
     df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, str], None]:
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Creates a new shortcut in the specified lakehouse.
 
@@ -222,7 +222,7 @@ def create_shortcut(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The created shortcut information or None if failed.
+        (Union[DataFrame, Dict[str, Any], None]): The created shortcut information or None if failed.
 
     Examples:
         ```python

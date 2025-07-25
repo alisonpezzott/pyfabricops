@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 from pandas import DataFrame
 
@@ -21,7 +21,7 @@ logger = get_logger(__name__)
 @df
 def list_data_pipelines(
     workspace: str, *, df: Optional[bool] = True
-) -> Union[DataFrame, List[Dict[str, str]], None]:
+) -> Union[DataFrame, List[Dict[str, Any]], None]:
     """
     Lists all data_pipelines in the specified workspace.
 
@@ -92,7 +92,7 @@ def resolve_data_pipeline(
 @df
 def get_data_pipeline(
     workspace: str, data_pipeline: str
-) -> Union[DataFrame, Dict[str, str], None]:
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Retrieves the details of a data pipeline by its ID.
 
@@ -104,7 +104,7 @@ def get_data_pipeline(
 
 
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The data pipeline details if found, otherwise None.
+        (Union[DataFrame, Dict[str, Any], None]): The data pipeline details if found, otherwise None.
 
     Examples:
         ```python
@@ -128,7 +128,7 @@ def update_data_pipeline(
     display_name: Optional[str] = None,
     description: Optional[str] = None,
     df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, str], None]:
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Updates the properties of the specified data pipeline.
 
@@ -140,7 +140,7 @@ def update_data_pipeline(
         df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
 
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The updated data pipeline details if successful, otherwise None.
+        (Union[DataFrame, Dict[str, Any], None]): The updated data pipeline details if successful, otherwise None.
 
     Examples:
         ```python
@@ -231,8 +231,8 @@ def get_data_pipeline_definition(workspace: str, data_pipeline: str) -> dict:
 
 @df
 def update_data_pipeline_definition(
-    workspace: str, data_pipeline: str, item_definition: Dict[str, str]
-) -> Union[DataFrame, Dict[str, str], None]:
+    workspace: str, data_pipeline: str, item_definition: Dict[str, Any]
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Updates the definition of an existing data_pipeline in the specified workspace.
     If the data_pipeline does not exist, it returns None.
@@ -240,12 +240,12 @@ def update_data_pipeline_definition(
     Args:
         workspace (str): The workspace name or ID.
         data_pipeline (str): The name or ID of the data_pipeline to update.
-        item_definition (Dict[str, str]): The item_definition of the data_pipeline.
+        item_definition (Dict[str, Any]): The item_definition of the data_pipeline.
         df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The updated data_pipeline details if successful, otherwise None.
+        (Union[DataFrame, Dict[str, Any], None]): The updated data_pipeline details if successful, otherwise None.
 
     Examples:
         ```python
@@ -276,12 +276,12 @@ def update_data_pipeline_definition(
 def create_data_pipeline(
     workspace: str,
     display_name: str,
-    item_definition: Dict[str, str],
+    item_definition: Dict[str, Any],
     *,
     description: Optional[str] = None,
     folder: Optional[str] = None,
     df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, str], None]:
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Creates a new data_pipeline in the specified workspace.
 
@@ -290,12 +290,12 @@ def create_data_pipeline(
         display_name (str): The display name of the data_pipeline.
         description (str, optional): A description for the data_pipeline.
         folder (str, optional): The folder to create the data_pipeline in.
-        item_definition (Dict[str, str]): The definition of the data_pipeline.
+        item_definition (Dict[str, Any]): The definition of the data_pipeline.
         df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The created data_pipeline details.
+        (Union[DataFrame, Dict[str, Any], None]): The created data_pipeline details.
 
     Examples:
         ```python

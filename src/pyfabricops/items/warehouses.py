@@ -1,5 +1,5 @@
 import time
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 from pandas import DataFrame
 
@@ -25,7 +25,7 @@ def list_warehouses(
     workspace: str,
     *,
     df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, str]], None]:
+) -> Union[DataFrame, List[Dict[str, Any]], None]:
     """
     Returns a list of warehouses from the specified workspace.
     This API supports pagination.
@@ -36,7 +36,7 @@ def list_warehouses(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, List[Dict[str, str]], None]): A list of warehouses, excluding those that start with the specified prefixes. If `df=True`, returns a DataFrame with flattened keys.
+        (Union[DataFrame, List[Dict[str, Any]], None]): A list of warehouses, excluding those that start with the specified prefixes. If `df=True`, returns a DataFrame with flattened keys.
 
     Examples:
         ```python
@@ -106,7 +106,7 @@ def get_warehouse(
     warehouse: str,
     *,
     df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, str], None]:
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Retrieves a warehouse by its name or ID from the specified workspace.
 
@@ -117,7 +117,7 @@ def get_warehouse(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The warehouse details if found. If `df=True`, returns a DataFrame with flattened keys.
+        (Union[DataFrame, Dict[str, Any], None]): The warehouse details if found. If `df=True`, returns a DataFrame with flattened keys.
 
     Examples:
         ```python
@@ -177,7 +177,7 @@ def create_warehouse(
     folder: Optional[str] = None,
     enable_schemas: Optional[bool] = False,
     df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, str], None]:
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Create a warehouse in the specified workspace.
 
@@ -191,7 +191,7 @@ def create_warehouse(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The created warehouse details if successful, otherwise None.
+        (Union[DataFrame, Dict[str, Any], None]): The created warehouse details if successful, otherwise None.
 
     Examples:
         ```python
@@ -229,7 +229,7 @@ def update_warehouse(
     display_name: Optional[str] = None,
     description: Optional[str] = None,
     df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, str], None]:
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Updates the properties of the specified warehouse.
 
@@ -242,7 +242,7 @@ def update_warehouse(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The updated warehouse details if successful, otherwise None.
+        (Union[DataFrame, Dict[str, Any], None]): The updated warehouse details if successful, otherwise None.
 
     Examples:
         ```python

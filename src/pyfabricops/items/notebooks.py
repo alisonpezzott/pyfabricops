@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 from pandas import DataFrame
 
@@ -23,7 +23,7 @@ def list_notebooks(
     workspace: str,
     *,
     df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, str]], None]:
+) -> Union[DataFrame, List[Dict[str, Any]], None]:
     """
     Lists all notebooks in the specified workspace.
 
@@ -33,7 +33,7 @@ def list_notebooks(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, List[Dict[str, str]], None]): A list of notebooks, a DataFrame with flattened keys, or None if not found.
+        (Union[DataFrame, List[Dict[str, Any]], None]): A list of notebooks, a DataFrame with flattened keys, or None if not found.
 
     Examples:
         ```python
@@ -104,7 +104,7 @@ def get_notebook(
     notebook: str,
     *,
     df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, str], None]:
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Retrieves a notebook by its name or ID from the specified workspace.
 
@@ -115,7 +115,7 @@ def get_notebook(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The notebook details if found. If `df=True`, returns a DataFrame with flattened keys.
+        (Union[DataFrame, Dict[str, Any], None]): The notebook details if found. If `df=True`, returns a DataFrame with flattened keys.
 
     Examples:
         ```python
@@ -142,7 +142,7 @@ def update_notebook(
     display_name: Optional[str] = None,
     description: Optional[str] = None,
     df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, str], None]:
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Updates the properties of the specified notebook.
 
@@ -155,7 +155,7 @@ def update_notebook(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The updated notebook details if successful, otherwise None.
+        (Union[DataFrame, Dict[str, Any], None]): The updated notebook details if successful, otherwise None.
 
     Examples:
         ```python
@@ -216,7 +216,7 @@ def delete_notebook(workspace: str, notebook: str) -> None:
 
 def get_notebook_definition(
     workspace: str, notebook: str
-) -> Union[Dict[str, str], None]:
+) -> Union[Dict[str, Any], None]:
     """
     Retrieves the definition of a notebook by its name or ID from the specified workspace.
 
@@ -225,7 +225,7 @@ def get_notebook_definition(
         notebook (str): The name or ID of the notebook.
 
     Returns:
-        (Union[Dict[str, str], None]): The notebook definition if found, otherwise None.
+        (Union[Dict[str, Any], None]): The notebook definition if found, otherwise None.
 
     Examples:
         ```python
@@ -252,7 +252,7 @@ def update_notebook_definition(
     item_definition: str,
     *,
     df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, str], None]:
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Updates the definition of an existing notebook in the specified workspace.
     If the notebook does not exist, it returns None.
@@ -297,7 +297,7 @@ def create_notebook(
     description: Optional[str] = None,
     folder: Optional[str] = None,
     df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, str], None]:
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Creates a new notebook in the specified workspace.
 

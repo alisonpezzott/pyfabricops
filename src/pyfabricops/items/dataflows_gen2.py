@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 from pandas import DataFrame
 
@@ -23,7 +23,7 @@ def list_dataflows_gen2(
     workspace: str,
     *,
     df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, str]], None]:
+) -> Union[DataFrame, List[Dict[str, Any]], None]:
     """
     Lists all dataflows in a workspace.
 
@@ -98,7 +98,7 @@ def get_dataflow_gen2(
     dataflow: str,
     *,
     df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, str], None]:
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Gets a dataflow by its name or ID.
 
@@ -109,7 +109,7 @@ def get_dataflow_gen2(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The dataflow details if found, otherwise None.
+        (Union[DataFrame, Dict[str, Any], None]): The dataflow details if found, otherwise None.
 
     Examples:
         ```python
@@ -136,7 +136,7 @@ def update_dataflow_gen2(
     display_name: str = None,
     description: str = None,
     df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, str], None]:
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Updates the properties of the specified dataflow.
 
@@ -149,7 +149,7 @@ def update_dataflow_gen2(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The updated dataflow details if successful, otherwise None.
+        (Union[DataFrame, Dict[str, Any], None]): The updated dataflow details if successful, otherwise None.
 
     Examples:
         ```python
@@ -210,7 +210,7 @@ def delete_dataflow_gen2(workspace: str, dataflow: str) -> None:
 
 def get_dataflow_gen2_definition(
     workspace: str, dataflow: str
-) -> Union[Dict[str, str], None]:
+) -> Union[Dict[str, Any], None]:
     """
     Retrieves the definition of a dataflow by its name or ID from the specified workspace.
 
@@ -219,7 +219,7 @@ def get_dataflow_gen2_definition(
         dataflow (str): The name or ID of the dataflow.
 
     Returns:
-        (Union[Dict[str, str], None]): The dataflow definition if found, otherwise None.
+        (Union[Dict[str, Any], None]): The dataflow definition if found, otherwise None.
 
     Examples:
         ```python
@@ -244,9 +244,9 @@ def get_dataflow_gen2_definition(
 def update_dataflow_gen2_definition(
     workspace: str,
     dataflow: str,
-    item_definition: Dict[str, str],
+    item_definition: Dict[str, Any],
     df: Optional[bool] = True,
-) -> Union[Dict[str, str], None]:
+) -> Union[Dict[str, Any], None]:
     """
     Updates the definition of an existing dataflow in the specified workspace.
     If the dataflow does not exist, it returns None.
@@ -254,12 +254,12 @@ def update_dataflow_gen2_definition(
     Args:
         workspace (str): The workspace name or ID.
         dataflow (str): The name or ID of the dataflow to update.
-        item_definition (Dict[str, str]): The updated item definition.
+        item_definition (Dict[str, Any]): The updated item definition.
         df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[Dict[str, str], None]): The updated dataflow details if successful, otherwise None.
+        (Union[Dict[str, Any], None]): The updated dataflow details if successful, otherwise None.
 
     Examples:
         ```python
@@ -289,7 +289,7 @@ def update_dataflow_gen2_definition(
 def create_dataflow_gen2(
     workspace: str,
     display_name: str,
-    item_definition: Dict[str, str],
+    item_definition: Dict[str, Any],
     *,
     description: Optional[str] = None,
     folder: Optional[str] = None,
@@ -303,7 +303,7 @@ def create_dataflow_gen2(
         display_name (str): The display name of the dataflow.
         description (str, optional): A description for the dataflow.
         folder (str, optional): The folder to create the dataflow in.
-        item_definition (Dict[str, str]): The definition of the dataflow.
+        item_definition (Dict[str, Any]): The definition of the dataflow.
         df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 

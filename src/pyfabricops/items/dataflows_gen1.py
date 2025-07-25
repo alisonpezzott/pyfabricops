@@ -1,9 +1,9 @@
-from typing import Dict, List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from pandas import DataFrame
 
 from ..api.api import (
-    _api_request,
+    _base_api,
     _delete_request,
     _get_request,
     _list_request,
@@ -24,7 +24,7 @@ def list_dataflows_gen1(
     workspace: str,
     *,
     df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, str]], None]:
+) -> Union[DataFrame, List[Dict[str, Any]], None]:
     """
     Returns a list of Gen1 dataflows in a specified workspace.
 
@@ -34,7 +34,7 @@ def list_dataflows_gen1(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, List[Dict[str, str]], None]): A list of Gen1 dataflows or a DataFrame if df is True.
+        (Union[DataFrame, List[Dict[str, Any]], None]): A list of Gen1 dataflows or a DataFrame if df is True.
     """
     return _list_request(
         'dataflows_gen1', workspace_id=resolve_workspace(workspace)
@@ -89,7 +89,7 @@ def get_dataflow_gen1(
     dataflow: str,
     *,
     df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, str], None]:
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Get a Power BI dataflow.
 
@@ -100,7 +100,7 @@ def get_dataflow_gen1(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The dataflow.
+        (Union[DataFrame, Dict[str, Any], None]): The dataflow.
 
     Examples:
         ```python
@@ -145,8 +145,8 @@ def get_dataflow_gen1_definition(workspace: str, dataflow: str) -> dict | None:
 
 @df
 def update_dataflow_gen1_definition(
-    workspace: str, dataflow: str, item_definition: Dict[str, str]
-) -> Union[DataFrame, Dict[str, str], None]:
+    workspace: str, dataflow: str, item_definition: Dict[str, Any]
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Updates the definition of an existing dataflow in the specified workspace.
     If the dataflow does not exist, it returns None.
@@ -154,12 +154,12 @@ def update_dataflow_gen1_definition(
     Args:
         workspace (str): The workspace name or ID.
         dataflow (str): The name or ID of the dataflow to update.
-        item_definition (Dict[str, str]): The item_definition of the dataflow.
+        item_definition (Dict[str, Any]): The item_definition of the dataflow.
         df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The updated dataflow details if successful, otherwise None.
+        (Union[DataFrame, Dict[str, Any], None]): The updated dataflow details if successful, otherwise None.
 
     Examples:
         ```python
@@ -190,12 +190,12 @@ def update_dataflow_gen1_definition(
 def create_dataflow_gen1(
     workspace: str,
     display_name: str,
-    item_definition: Dict[str, str],
+    item_definition: Dict[str, Any],
     *,
     description: Optional[str] = None,
     folder: Optional[str] = None,
     df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, str], None]:
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Creates a new dataflow in the specified workspace.
 
@@ -204,12 +204,12 @@ def create_dataflow_gen1(
         display_name (str): The display name of the dataflow.
         description (str, optional): A description for the dataflow.
         folder (str, optional): The folder to create the dataflow in.
-        item_definition (Dict[str, str]): The definition of the dataflow.
+        item_definition (Dict[str, Any]): The definition of the dataflow.
         df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The created dataflow details.
+        (Union[DataFrame, Dict[str, Any], None]): The created dataflow details.
 
     Examples:
         ```python
@@ -252,7 +252,7 @@ def update_dataflow_gen1(
     display_name: Optional[str] = None,
     description: Optional[str] = None,
     df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, str], None]:
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Updates the properties of the specified dataflow.
 
@@ -264,7 +264,7 @@ def update_dataflow_gen1(
         df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
 
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The updated dataflow details if successful, otherwise None.
+        (Union[DataFrame, Dict[str, Any], None]): The updated dataflow details if successful, otherwise None.
 
     Examples:
         ```python
@@ -398,7 +398,7 @@ def get_dataflow_gen1_transactions(
     dataflow: str,
     *,
     df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, str]], None]:
+) -> Union[DataFrame, List[Dict[str, Any]], None]:
     """
     Get transactions for a dataflow in a workspace.
 
@@ -409,7 +409,7 @@ def get_dataflow_gen1_transactions(
             If False, returns a list of dictionaries.
 
     Returns:
-        Union[DataFrame, List[Dict[str, str]], None]: The dataflow transactions or None if not found.
+        Union[DataFrame, List[Dict[str, Any]], None]: The dataflow transactions or None if not found.
 
     Examples:
         ```python
@@ -435,7 +435,7 @@ def get_dataflows_gen1_datasources(
     dataflow: str,
     *,
     df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, str]], None]:
+) -> Union[DataFrame, List[Dict[str, Any]], None]:
     """
     Get the data sources for a dataflow in a workspace.
 
@@ -446,7 +446,7 @@ def get_dataflows_gen1_datasources(
             If False, returns a list of dictionaries.
 
     Returns:
-        Union[DataFrame, List[Dict[str, str]], None]: The dataflow datasources or None if not found.
+        Union[DataFrame, List[Dict[str, Any]], None]: The dataflow datasources or None if not found.
 
     Examples:
         ```python

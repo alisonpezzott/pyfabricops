@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 from pandas import DataFrame
 
@@ -21,7 +21,7 @@ logger = get_logger(__name__)
 @df
 def list_items(
     workspace: str, *, df: Optional[bool] = True
-) -> Union[DataFrame, List[Dict[str, str]], None]:
+) -> Union[DataFrame, List[Dict[str, Any]], None]:
     """
     Returns a list of items from the specified workspace.
     This API supports pagination.
@@ -32,7 +32,7 @@ def list_items(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, List[Dict[str, str]], None]): A list of items, excluding those that start with the specified prefixes. If `df=True`, returns a DataFrame with flattened keys.
+        (Union[DataFrame, List[Dict[str, Any]], None]): A list of items, excluding those that start with the specified prefixes. If `df=True`, returns a DataFrame with flattened keys.
 
     Examples:
         ```python
@@ -108,7 +108,7 @@ def get_item(
     item: str,
     *,
     df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, str], None]:
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Retrieves a specific item from the workspace.
 
@@ -119,7 +119,7 @@ def get_item(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The item details as a dictionary or DataFrame, or None if not found.
+        (Union[DataFrame, Dict[str, Any], None]): The item details as a dictionary or DataFrame, or None if not found.
 
     Examples:
         ```python
@@ -146,7 +146,7 @@ def update_item(
     display_name: Optional[str] = None,
     description: Optional[str] = None,
     df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, str], None]:
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Updates the properties of the specified semantic model.
 
@@ -159,7 +159,7 @@ def update_item(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The updated semantic model details if successful, otherwise None.
+        (Union[DataFrame, Dict[str, Any], None]): The updated semantic model details if successful, otherwise None.
 
     Examples:
         ```python
@@ -220,7 +220,7 @@ def delete_item(workspace: str, item: str) -> None:
 
 def get_item_definition(
     workspace: str, item: str
-) -> Union[Dict[str, str], None]:
+) -> Union[Dict[str, Any], None]:
     """
     Retrieves the definition of a item by its name or ID from the specified workspace.
 
@@ -229,7 +229,7 @@ def get_item_definition(
         item (str): The name or ID of the item.
 
     Returns:
-        (Union[Dict[str, str], None]): The item definition if found, otherwise None.
+        (Union[Dict[str, Any], None]): The item definition if found, otherwise None.
 
     Examples:
         ```python
@@ -253,9 +253,9 @@ def get_item_definition(
 def update_item_definition(
     workspace: str,
     item: str,
-    item_definition: Dict[str, str],
+    item_definition: Dict[str, Any],
     df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, str], None]:
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Updates the definition of an existing item in the specified workspace.
     If the item does not exist, it returns None.
@@ -263,10 +263,10 @@ def update_item_definition(
     Args:
         workspace (str): The workspace name or ID.
         item (str): The name or ID of the item to update.
-        item_definition (Dict[str, str]): The updated item definition.
+        item_definition (Dict[str, Any]): The updated item definition.
 
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The updated item details if successful, otherwise None.
+        (Union[DataFrame, Dict[str, Any], None]): The updated item details if successful, otherwise None.
 
     Examples:
         ```python
@@ -299,26 +299,26 @@ def update_item_definition(
 def create_item(
     workspace: str,
     display_name: str,
-    item_definition: Dict[str, str],
+    item_definition: Dict[str, Any],
     *,
     description: Optional[str] = None,
     folder: Optional[str] = None,
     df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, str], None]:
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Creates a new item in the specified workspace.
 
     Args:
         workspace (str): The workspace name or ID.
         display_name (str): The display name of the item.
-        item_definition (Dict[str, str]): The item definition.
+        item_definition (Dict[str, Any]): The item definition.
         description (str, optional): A description for the item.
         folder (str, optional): The folder to create the item in.
         df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The created item details.
+        (Union[DataFrame, Dict[str, Any], None]): The created item details.
 
     Examples:
         ```python
@@ -354,7 +354,7 @@ def delete_item(workspace: str, item: str) -> None:
         item (str): The name or ID of the item to delete.
 
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The deleted item details if successful, otherwise None.
+        (Union[DataFrame, Dict[str, Any], None]): The deleted item details if successful, otherwise None.
 
     Examples:
         ```python

@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 from pandas import DataFrame
 
@@ -21,7 +21,7 @@ logger = get_logger(__name__)
 def list_reports(
     workspace: str,
     df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, str]], None]:
+) -> Union[DataFrame, List[Dict[str, Any]], None]:
     """
     Returns a list of semantic models in a specified workspace.
 
@@ -31,7 +31,7 @@ def list_reports(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, List[Dict[str, str]], None]): A list of semantic models or a DataFrame if df is True.
+        (Union[DataFrame, List[Dict[str, Any]], None]): A list of semantic models or a DataFrame if df is True.
     """
     return _list_request('reports', workspace_id=resolve_workspace(workspace))
 
@@ -72,7 +72,7 @@ def resolve_report(
 @df
 def get_report(
     workspace: str, report: str, *, df: Optional[bool] = True
-) -> Union[DataFrame, Dict[str, str], None]:
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Retrieves a semantic model by its name or ID from the specified workspace.
 
@@ -83,7 +83,7 @@ def get_report(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The semantic model details if found. If `df=True`, returns a DataFrame with flattened keys.
+        (Union[DataFrame, Dict[str, Any], None]): The semantic model details if found. If `df=True`, returns a DataFrame with flattened keys.
 
     Examples:
         ```python
@@ -101,26 +101,26 @@ def get_report(
 def create_report(
     workspace: str,
     display_name: str,
-    item_definition: Dict[str, str],
+    item_definition: Dict[str, Any],
     *,
     description: Optional[str] = None,
     folder: Optional[str] = None,
     df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, str], None]:
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Creates a new semantic model in the specified workspace.
 
     Args:
         workspace (str): The workspace name or ID.
         display_name (str): The display name of the semantic model.
-        item_definition (Dict[str, str]): The definition of the semantic model.
+        item_definition (Dict[str, Any]): The definition of the semantic model.
         description (Optional[str]): A description for the semantic model.
         folder (Optional[str]): The ID of the folder to create the semantic model in.
         df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The created semantic model details.
+        (Union[DataFrame, Dict[str, Any], None]): The created semantic model details.
 
     Examples:
         ```python
@@ -156,7 +156,7 @@ def update_report(
     display_name: Optional[str] = None,
     description: Optional[str] = None,
     df: Optional[bool] = False,
-) -> Union[DataFrame, Dict[str, str], None]:
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Updates the properties of the specified semantic model.
 
@@ -169,7 +169,7 @@ def update_report(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The updated semantic model details if successful, otherwise None.
+        (Union[DataFrame, Dict[str, Any], None]): The updated semantic model details if successful, otherwise None.
 
     Examples:
         ```python
@@ -226,7 +226,7 @@ def delete_report(workspace: str, report: str) -> None:
 
 def get_report_definition(
     workspace: str, report: str
-) -> Union[Dict[str, str], None]:
+) -> Union[Dict[str, Any], None]:
     """
     Retrieves the definition of a semantic model by its name or ID from the specified workspace.
 
@@ -235,7 +235,7 @@ def get_report_definition(
         report (str): The name or ID of the semantic model.
 
     Returns:
-        ( Union[Dict[str, str], None]): The semantic model definition if found, otherwise None.
+        ( Union[Dict[str, Any], None]): The semantic model definition if found, otherwise None.
 
     Examples:
         ```python
@@ -261,10 +261,10 @@ def get_report_definition(
 def update_report_definition(
     workspace: str,
     report: str,
-    item_definition: Dict[str, str],
+    item_definition: Dict[str, Any],
     *,
     df: Optional[bool] = True,
-) -> Union[Dict[str, str], None]:
+) -> Union[Dict[str, Any], None]:
     """
     Updates the definition of an existing semantic model in the specified workspace.
     If the semantic model does not exist, it returns None.
@@ -272,12 +272,12 @@ def update_report_definition(
     Args:
         workspace (str): The workspace name or ID.
         report (str): The name or ID of the semantic model to update.
-        item_definition (Dict[str, str]): The new definition for the semantic model.
+        item_definition (Dict[str, Any]): The new definition for the semantic model.
         df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[Dict[str, str], None]): The updated semantic model details if successful, otherwise None.
+        (Union[Dict[str, Any], None]): The updated semantic model details if successful, otherwise None.
 
     Examples:
         ```python
