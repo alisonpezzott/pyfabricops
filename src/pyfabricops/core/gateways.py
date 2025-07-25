@@ -29,7 +29,7 @@ def list_gateways(
         list_gateways()
         ```
     """
-    return api_request('/gateways', support_pagination=True)  
+    return api_request('/gateways', support_pagination=True)
 
 
 def get_gateway_id(gateway_name: str) -> Union[str, None]:
@@ -89,12 +89,15 @@ def get_gateway(
         get_gateway('my-gateway')
         ```
     """
+    gateway_id = resolve_gateway(gateway)
+    if not gateway_id:
+        return None
     return api_request(
-        '/gateways/' + resolve_gateway(gateway),
-    )  
+        '/gateways/' + gateway_id,
+    )
 
 
-def get_gateway_public_key(gateway_id: str) -> dict | None:
+def get_gateway_public_key(gateway: str) -> dict | None:
     """
     Extracts the public key of a gateway by its ID.
 
@@ -109,7 +112,7 @@ def get_gateway_public_key(gateway_id: str) -> dict | None:
         get_gateway_public_key('123e4567-e89b-12d3-a456-426614174000')
         ```
     """
-    response = get_gateway(gateway_id, df=False)
+    response = get_gateway(gateway, df=False)
     if not response:
         return None
 
