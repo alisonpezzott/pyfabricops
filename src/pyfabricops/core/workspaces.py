@@ -1,14 +1,8 @@
-from typing import Dict, List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from pandas import DataFrame
 
-from ..api.api import (
-    _delete_request,
-    _get_request,
-    _list_request,
-    _patch_request,
-    _post_request,
-)
+from ..api.api import api_request
 from ..core.capacities import resolve_capacity
 from ..utils.decorators import df
 from ..utils.exceptions import OptionNotAvailableError
@@ -21,7 +15,7 @@ logger = get_logger(__name__)
 @df
 def list_workspaces(
     df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, str]], None]:
+) -> Union[DataFrame, List[Dict[str, Any]], None]:
     """
     Returns a list of workspaces.
 
@@ -38,7 +32,7 @@ def list_workspaces(
         list_workspaces(df=False) # Returns as list
         ```
     """
-    return _list_request('workspaces')
+    return api_request('/workspaces', support_pagination=True)
 
 
 def get_workspace_id(workspace: str) -> Union[str, None]:
@@ -79,7 +73,7 @@ def resolve_workspace(workspace: str) -> Union[str, None]:
 @df
 def get_workspace(
     workspace: str, df: Optional[bool] = True
-) -> Union[DataFrame, List[Dict[str, str]], None]:
+) -> Union[DataFrame, List[Dict[str, Any]], None]:
     """
     Returns the specified workspace.
 
@@ -89,7 +83,7 @@ def get_workspace(
                 If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, List[Dict[str, str]], None]) The details of the workspace if found, otherwise None. If `df=True`, returns a DataFrame with flattened keys.
+        (Union[DataFrame, List[Dict[str, Any]], None]) The details of the workspace if found, otherwise None. If `df=True`, returns a DataFrame with flattened keys.
 
     Examples:
         ```python
@@ -98,7 +92,7 @@ def get_workspace(
         get_workspace('MyProjectWorkspace', df=False) # Returns as list
         ```
     """
-    return _get_request('workspaces', item_id=resolve_workspace(workspace))
+    return api_request('/workspaces/' + resolve_workspace(workspace))
 
 
 @df
@@ -108,7 +102,7 @@ def create_workspace(
     capacity: Optional[str] = None,
     description: Optional[str] = None,
     df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, str], None]:
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Create a new workspace with the specified name, capacity and description.
 
@@ -120,7 +114,7 @@ def create_workspace(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The details of the created or updated workspace if successful, otherwise None.
+        (Union[DataFrame, Dict[str, Any], None]): The details of the created or updated workspace if successful, otherwise None.
 
     Examples:
         ```python
@@ -139,7 +133,7 @@ def create_workspace(
     if description:
         payload['description'] = description
 
-    return _post_request('workspaces', payload=payload)
+    return api_request('/workspaces', payload=payload)
 
 
 @df
@@ -149,7 +143,7 @@ def update_workspace(
     display_name: Optional[str] = None,
     description: Optional[str] = None,
     df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, str], None]:
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Updates the properties of a workspace.
 
@@ -194,8 +188,10 @@ def update_workspace(
     if description:
         payload['description'] = description
 
-    return _patch_request(
-        'workspaces', item_id=resolve_workspace(workspace), payload=payload
+    return api_request(
+        '/workspaces/' + resolve_workspace(workspace), 
+        payload=payload,
+        method='patch',
     )
 
 
@@ -217,7 +213,10 @@ def delete_workspace(workspace: str) -> None:
         delete_workspace('123e4567-e89b-12d3-a456-426614174000')
         ```
     """
-    return _delete_request('workspaces', item_id=resolve_workspace(workspace))
+    return api_request(
+        '/workspaces/' + resolve_workspace(workspace),
+        method='delete',
+    )
 
 
 @df
@@ -225,7 +224,7 @@ def list_workspace_role_assignments(
     workspace: str,
     *,
     df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, str]], None]:
+) -> Union[DataFrame, List[Dict[str, Any]], None]:
     """
     Lists all role assignments for a workspace.
 
@@ -235,7 +234,7 @@ def list_workspace_role_assignments(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, List[Dict[str, str]], None]): A list of role assignments.
+        (Union[DataFrame, List[Dict[str, Any]], None]): A list of role assignments.
 
 
     Examples:
@@ -243,10 +242,9 @@ def list_workspace_role_assignments(
         list_workspace_role_assignments('123e4567-e89b-12d3-a456-426614174000')
         ```
     """
-    return _list_request(
-        'workspaces',
-        item_id=resolve_workspace(workspace),
-        endpoint_suffix='/roleAssignments',
+    return api_request(
+        '/workspaces/' + resolve_workspace(workspace) + '/roleAssignments',
+        support_pagination=True, 
     )
 
 
@@ -256,7 +254,7 @@ def get_workspace_role_assignment(
     user_uuid: str,
     *,
     df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, str], None]:
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Retrieves the role of a user in a workspace.
 
@@ -267,7 +265,7 @@ def get_workspace_role_assignment(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The role assignment if found, otherwise None.
+        (Union[DataFrame, Dict[str, Any], None]): The role assignment if found, otherwise None.
 
     Examples:
         ```python
@@ -277,11 +275,8 @@ def get_workspace_role_assignment(
         )
         ```
     """
-    return _get_request(
-        'workspaces',
-        workspace_id=resolve_workspace(workspace),
-        item_id=user_uuid,
-        endpoint_suffix='roleAssignments',
+    return api_request(
+        '/workspaces/' + resolve_workspace(workspace) + '/roleAssignments/' + user_uuid
     )
 
 
@@ -295,7 +290,7 @@ def add_workspace_role_assignment(
     role: Literal['Admin', 'Contributor', 'Member', 'Viewer'] = 'Admin',
     *,
     df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, str], None]:
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Adds a permission to a workspace for a user.
 
@@ -308,7 +303,7 @@ def add_workspace_role_assignment(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The role assignment details if successful.
+        (Union[DataFrame, Dict[str, Any], None]): The role assignment details if successful.
 
     Raises:
         ResourceNotFoundError: If the specified workspace is not found.
@@ -337,13 +332,12 @@ def add_workspace_role_assignment(
         )
     payload = {'principal': {'id': user_uuid, 'type': user_type}, 'role': role}
 
-    return _post_request(
-        'workspaces',
-        item_id=resolve_workspace(workspace),
+    return api_request(
+        '/workspaces/' + resolve_workspace(workspace) + '/roleAssignments',
         payload=payload,
-        endpoint_suffix='/roleAssignments',
+        method='post',
     )
-
+ 
 
 @df
 def update_workspace_role_assignment(
@@ -352,7 +346,7 @@ def update_workspace_role_assignment(
     role: Literal['Admin', 'Contributor', 'Member', 'Viewer'] = 'Admin',
     *,
     df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, str], None]:
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Update a role to a existing workspace role assignment.
 
@@ -364,7 +358,7 @@ def update_workspace_role_assignment(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The updated role assignment details if successful, otherwise None.
+        (Union[DataFrame, Dict[str, Any], None]): The updated role assignment details if successful, otherwise None.
 
     Raises:
         ResourceNotFoundError: If the specified workspace or user is not found.
@@ -387,11 +381,10 @@ def update_workspace_role_assignment(
 
     workspace_id = resolve_workspace(workspace)
 
-    return _patch_request(
-        'workspaces',
-        item_id=workspace_id,
+    return api_request(
+        '/workspaces/' + workspace_id + '/roleAssignments/' + user_uuid,
         payload=payload,
-        endpoint_suffix=f'/roleAssignments/{user_uuid}',
+        method='patch',
     )
 
 
@@ -417,10 +410,9 @@ def delete_workspace_role_assignment(
         )
     ```
     """
-    return _delete_request(
-        'workspaces',
-        item_id=resolve_workspace(workspace),
-        endpoint_suffix=f'/roleAssignments/{user_uuid}',
+    return api_request(
+        '/workspaces/' + resolve_workspace(workspace) + '/roleAssignments/' + user_uuid,
+        method='delete',
     )
 
 
@@ -444,13 +436,13 @@ def assign_to_capacity(workspace: str, capacity: str) -> None:
         ```
     """
     payload = {'capacityId': resolve_capacity(capacity)}
-    response = _post_request(
-        'workspaces',
-        item_id=resolve_workspace(workspace),
+    response = api_request(
+        '/workspaces/' + resolve_workspace(workspace) + '/assignToCapacity',
         payload=payload,
-        endpoint_suffix='/assignToCapacity',
+        method='post',
     )
-    if not response:
+    if response.status_code == 202:
+        # Assuming the API returns a 202 status code for successful assignment
         logger.success(
             f'Workspace {workspace} assigned to capacity {capacity} successfully.'
         )
@@ -472,12 +464,11 @@ def unassign_from_capacity(workspace: str) -> None:
         unassign_from_capacity('123e4567-e89b-12d3-a456-426614174000')
         ```
     """
-    response = _post_request(
-        'workspaces',
-        item_id=resolve_workspace(workspace),
-        endpoint_suffix='/unassignFromCapacity',
+    response = api_request(
+        '/workspaces/' + resolve_workspace(workspace) + '/unassignFromCapacity',
+        method='post',
     )
-    if not response:
+    if response.status_code == 202:
         logger.success(
             f'Workspace {workspace} unassigned from capacity successfully.'
         )

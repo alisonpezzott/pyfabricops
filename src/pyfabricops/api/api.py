@@ -17,6 +17,7 @@ logger = get_logger(__name__)
 
 
 class ApiResult(NamedTuple):
+    """A named tuple to encapsulate the result of an API request.""" 
     success: bool
     status_code: int
     data: Optional[Any] = None
@@ -25,7 +26,7 @@ class ApiResult(NamedTuple):
     request_kwargs: Optional[dict] = None
 
 
-def _api_request(
+def _base_api(
     endpoint: str,
     *,  # Force keyword-only arguments after endpoint
     content_type: str = 'application/json',
@@ -34,56 +35,12 @@ def _api_request(
     params: Optional[dict] = None,
     audience: Literal['fabric', 'powerbi'] = 'fabric',
     credential_type: Literal['spn', 'user'] = 'spn',
-    method: Literal['get', 'post', 'patch', 'delete', 'put'] = 'get',
+    method: Literal['get', 'post', 'patch', 'delete'] = 'get',
     return_raw: bool = False,
     **kwargs,
 ) -> ApiResult:
     """
-    Makes a request to the Microsoft Fabric or Power BI API.
-    This function supports various HTTP methods and can handle both JSON payloads and form data.
-    It automatically retrieves an access token based on the specified audience and credential type.
-    It supports pagination by allowing query parameters to be passed in as a dictionary.
-    It also supports long-running operations (LRO) by checking the response headers for a 'Location' header.
-    It can return the raw response object or parsed JSON data based on the `return_raw` parameter.
-
-    Args:
-        endpoint (str): The API endpoint to call.
-        content_type (str): The content type of the request. Defaults to "application/json".
-        payload (Optional[dict]): The JSON payload to send with the request. Defaults to None.
-        data (Optional[dict]): The data to send with the request. Defaults to None.
-        params (Optional[dict]): Query parameters to append to the URL. Defaults to None.
-        audience (Literal["fabric", "powerbi"]): The API audience to target. Defaults to "fabric".
-        credential_type (Literal["spn", "user"]): The type of credentials to use for authentication. Defaults to "spn".
-        method (Literal["get", "post", "patch", "delete", "put"]): The HTTP method to use for the request. Defaults to "get".
-        return_raw (bool, optional): If True, returns the raw response object. Defaults to False.
-
-    Returns:
-        ApiResult (NamedTuple): The response object from the request.
-            success: bool
-            status_code: int
-            data: Optional[Any] = None
-            headers: Optional[dict] = None
-            error: Optional[str] = None
-            request_kwargs: Optional[dict] = None
-
-    Raises:
-        AuthenticationError: If the token retrieval fails.
-        InvalidParameterError: If the payload is not a dictionary or if both payload and data are provided.
-
-    Examples:
-        ```python
-        # Makes a GET request to the 'capacities' endpoint of the Microsoft Fabric API.
-        _api_request('capacities')
-
-        # Makes a POST request to the 'capacities' endpoint with a JSON payload.
-        _api_request('capacities', method='post', payload={'name': 'New Capacity'})
-
-        # Makes a DELETE request to the 'capacities' endpoint for the resource with ID '12345'.
-        _api_request('capacities/12345', method='delete')
-
-        # Makes a GET request to the Power BI API for dataflows in the specified group.
-        _api_request(audience="powerbi", endpoint=f"/groups/MyProject/dataflows")
-        ```
+    Base API function to the Microsoft Fabric or Power BI API.
     """
     # Base URL selection based on audience
     base_url = FABRIC_API if audience == 'fabric' else POWERBI_API
@@ -408,403 +365,111 @@ def _lro_handler(api_result: NamedTuple) -> ApiResult:
         )
 
 
-ENDPOINT_TEMPLATES = {
-    'workspaces': {
-        'endpoint': '/workspaces',
-        'requires_workspace_id': False,
-        'endpoint_prefix': None,
-        'audience': 'fabric',
-        'support_pagination': True,
-        'credential_type': 'spn',
-        'content_type': 'application/json',
-        'requires_item_definition': False,
-    },
-    'capacities': {
-        'endpoint': '/capacities',
-        'requires_workspace_id': False,
-        'endpoint_prefix': None,
-        'audience': 'fabric',
-        'support_pagination': True,
-        'credential_type': 'spn',
-        'content_type': 'application/json',
-        'requires_item_definition': False,
-    },
-    'connections': {
-        'endpoint': '/connections',
-        'requires_workspace_id': False,
-        'endpoint_prefix': None,
-        'audience': 'fabric',
-        'support_pagination': True,
-        'credential_type': 'spn',
-        'content_type': 'application/json',
-        'requires_item_definition': False,
-    },
-    'gateways': {
-        'endpoint': '/gateways',
-        'requires_workspace_id': False,
-        'endpoint_prefix': None,
-        'audience': 'fabric',
-        'support_pagination': True,
-        'credential_type': 'spn',
-        'content_type': 'application/json',
-        'requires_item_definition': False,
-    },
-    'git': {
-        'endpoint': '/git',
-        'requires_workspace_id': False,
-        'endpoint_prefix': None,
-        'audience': 'fabric',
-        'support_pagination': True,
-        'credential_type': 'spn',
-        'content_type': 'application/json',
-        'requires_item_definition': False,
-    },
-    'folders': {
-        'endpoint': '/folders',
-        'requires_workspace_id': True,
-        'endpoint_prefix': '/workspaces/',
-        'audience': 'fabric',
-        'support_pagination': True,
-        'credential_type': 'spn',
-        'content_type': 'application/json',
-        'requires_item_definition': False,
-    },
-    'data_pipelines': {
-        'endpoint': '/dataPipelines',
-        'requires_workspace_id': True,
-        'endpoint_prefix': '/workspaces/',
-        'audience': 'fabric',
-        'support_pagination': True,
-        'credential_type': 'spn',
-        'content_type': 'application/json',
-        'requires_item_definition': True,
-    },
-    'lakehouses': {
-        'endpoint': '/lakehouses',
-        'requires_workspace_id': True,
-        'endpoint_prefix': '/workspaces/',
-        'audience': 'fabric',
-        'support_pagination': True,
-        'credential_type': 'spn',
-        'content_type': 'application/json',
-        'requires_item_definition': False,
-    },
-    'warehouses': {
-        'endpoint': '/warehouses',
-        'requires_workspace_id': True,
-        'endpoint_prefix': '/workspaces/',
-        'audience': 'fabric',
-        'support_pagination': True,
-        'credential_type': 'spn',
-        'content_type': 'application/json',
-        'requires_item_definition': False,
-    },
-    'semantic_models': {
-        'endpoint': '/semanticModels',
-        'requires_workspace_id': True,
-        'endpoint_prefix': '/workspaces/',
-        'audience': 'fabric',
-        'support_pagination': True,
-        'credential_type': 'spn',
-        'content_type': 'application/json',
-        'requires_item_definition': True,
-    },
-    'notebooks': {
-        'endpoint': '/notebooks',
-        'requires_workspace_id': True,
-        'endpoint_prefix': '/workspaces/',
-        'audience': 'fabric',
-        'support_pagination': True,
-        'credential_type': 'spn',
-        'content_type': 'application/json',
-        'requires_item_definition': True,
-    },
-    'reports': {
-        'endpoint': '/reports',
-        'requires_workspace_id': True,
-        'endpoint_prefix': '/workspaces/',
-        'audience': 'fabric',
-        'support_pagination': True,
-        'credential_type': 'spn',
-        'content_type': 'application/json',
-        'requires_item_definition': True,
-    },
-    'shortcuts': {
-        'endpoint': '/shortcuts',
-        'requires_workspace_id': True,
-        'endpoint_prefix': '/workspaces/',
-        'audience': 'fabric',
-        'support_pagination': True,
-        'credential_type': 'spn',
-        'content_type': 'application/json',
-        'requires_item_definition': True,
-    },
-    'dataflows_gen1': {
-        'endpoint': '/dataflows',
-        'requires_workspace_id': True,
-        'endpoint_prefix': '/groups/',
-        'audience': 'powerbi',
-        'support_pagination': True,
-        'credential_type': 'spn',
-        'content_type': 'application/json',
-        'requires_item_definition': True,
-    },
-    'dataflows_gen2': {
-        'endpoint': '/dataflows',
-        'requires_workspace_id': True,
-        'endpoint_prefix': '/workspaces/',
-        'audience': 'fabric',
-        'support_pagination': True,
-        'credential_type': 'spn',
-        'content_type': 'application/json',
-        'requires_item_definition': True,
-    },
-    'items': {
-        'endpoint': '/items',
-        'requires_workspace_id': True,
-        'endpoint_prefix': '/workspaces/',
-        'audience': 'fabric',
-        'support_pagination': True,
-        'credential_type': 'spn',
-        'content_type': 'application/json',
-        'requires_item_definition': True,
-    },
-}
-
-
-def _list_request(
+def api_request(
     endpoint: str,
-    workspace_id: Optional[str] = None,
-    item_id: Optional[str] = None,
+    *,
+    content_type: str = 'application/json',
+    payload: Optional[dict] = None,
+    data: Optional[dict] = None,
+    params: Optional[dict] = None,
+    audience: Literal['fabric', 'powerbi'] = 'fabric',
+    credential_type: Literal['spn', 'user'] = 'spn',
+    method: Literal['get', 'post', 'patch', 'delete'] = 'get',
+    support_pagination: Optional[bool] = False,
+    support_lro: Optional[bool] = False,
+    return_raw: bool = False,
     **kwargs,
-) -> Union[List[Dict[str, str]], Dict[str, str], None]:
+) -> Union[List[Dict[str, Any]], Dict[str, Any], None]:
+    """
+    Makes a request to the Microsoft Fabric or Power BI API.
+    This function supports various HTTP methods and can handle both JSON payloads and form data.
+    It automatically retrieves an access token based on the specified audience and credential type.
+    It supports pagination by allowing query parameters to be passed in as a dictionary.
+    It also supports long-running operations (LRO) by checking the response headers for a 'Location' header.
+    It can return the raw response object or parsed JSON data based on the `return_raw` parameter.
 
-    if endpoint not in ENDPOINT_TEMPLATES:
-        raise RequestError(f'Unknown template name: {endpoint}')
+    Args:
+        endpoint (str): The API endpoint to call.
+        content_type (str): The content type of the request. Defaults to "application/json".
+        payload (Optional[dict]): The JSON payload to send with the request. Defaults to None.
+        data (Optional[dict]): The data to send with the request. Defaults to None.
+        params (Optional[dict]): Query parameters to append to the URL. Defaults to None.
+        audience (Literal["fabric", "powerbi"]): The API audience to target. Defaults to "fabric".
+        credential_type (Literal["spn", "user"]): The type of credentials to use for authentication. Defaults to "spn".
+        method (Literal["get", "post", "patch", "delete"]): The HTTP method to use for the request. Defaults to "get".
+        return_raw (bool, optional): If True, returns the raw response object. Defaults to False.
 
-    template = ENDPOINT_TEMPLATES[endpoint]
+    Returns:
+        ApiResult (NamedTuple): The response object from the request.
+            success: bool
+            status_code: int
+            data: Optional[Any] = None
+            headers: Optional[dict] = None
+            error: Optional[str] = None
+            request_kwargs: Optional[dict] = None
 
-    if template['requires_workspace_id'] and workspace_id is None:
-        raise RequestError(
-            f'Workspace ID is required for endpoint: {endpoint}'
-        )
+    Raises:
+        AuthenticationError: If the token retrieval fails.
+        InvalidParameterError: If the payload is not a dictionary or if both payload and data are provided.
 
-    if template['requires_workspace_id']:
-        endpoint = f"{template['endpoint_prefix']}{workspace_id}{template['endpoint']}"
-    else:
-        endpoint = f"{template['endpoint']}"
+    Examples:
+        ```python
+        # Makes a GET request to the 'capacities' endpoint of the Microsoft Fabric API.
+        _base_api('capacities')
 
-    if item_id is not None:
-        endpoint += f"/{item_id}"
+        # Makes a POST request to the 'capacities' endpoint with a JSON payload.
+        _base_api('capacities', method='post', payload={'name': 'New Capacity'})
 
-    if not kwargs.get('endpoint_suffix', '') is None:
-        endpoint += kwargs.get('endpoint_suffix', '')
+        # Makes a DELETE request to the 'capacities' endpoint for the resource with ID '12345'.
+        _base_api('capacities/12345', method='delete')
 
-    response = _api_request(
+        # Makes a GET request to the Power BI API for dataflows in the specified group.
+        _base_api(audience="powerbi", endpoint=f"/groups/MyProject/dataflows")
+        ```
+    """
+    response = _base_api(
         endpoint=endpoint,
-        audience=template['audience'],
-        content_type=template['content_type'],
-        method='get',
+        content_type=content_type,
+        payload=payload,
+        data=data,
+        params=params,
+        audience=audience,
+        credential_type=credential_type,
+        method=method,
+        return_raw=return_raw,
         **kwargs,
     )
-
-    if kwargs.get('return_raw'):
+    # If return_raw is True, return the raw response object
+    if return_raw:
         return response
 
     if not response.success:
         logger.warning(f'{response.status_code}: {response.error}.')
         return None
-
-    if template['support_pagination']:
-        paginated_response = _pagination_handler(response)
-        return paginated_response.data.get('value', [])
-
-
-def _get_request(
-    endpoint: str,
-    workspace_id: Optional[str] = None,
-    item_id: Optional[str] = None,
-    **kwargs,
-) -> Union[List[Dict[str, str]], Dict[str, str], None]:
-    if endpoint not in ENDPOINT_TEMPLATES:
-        raise RequestError(f'Unknown template name: {endpoint}')
-
-    template = ENDPOINT_TEMPLATES[endpoint]
-
-    if template['requires_workspace_id'] and workspace_id is None:
-        raise RequestError(
-            f'Workspace ID is required for endpoint: {endpoint}'
-        )
-
-    if template['requires_workspace_id']:
-        endpoint = f"{template['endpoint_prefix']}{workspace_id}{template['endpoint']}/{item_id}"
-    else:
-        endpoint = f"{template['endpoint']}/{item_id}"
     
-    if not kwargs.get('endpoint_suffix', '') is None:
-        endpoint += kwargs.get('endpoint_suffix', '')
-
-    response = _api_request(
-        endpoint=endpoint,
-        audience=template['audience'],
-        content_type=template['content_type'],
-        method='get',
-    )
-
-    if kwargs.get('return_raw'):
-        return response
-
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
+    if method == 'delete' and response.status_code == 200:
+        logger.success(f'Deleted {endpoint} successfully.')
         return None
 
-    return response.data
+    # Handle pagination if supported
+    if support_pagination:
+        return _pagination_handler(response).data.get('value', [])
 
-
-def _delete_request(
-    endpoint: str,
-    workspace_id: Optional[str] = None,
-    item_id: Optional[str] = None,
-    **kwargs,
-) -> Union[List[Dict[str, str]], Dict[str, str], None]:
-    if endpoint not in ENDPOINT_TEMPLATES:
-        raise RequestError(f'Unknown template name: {endpoint}')
-
-    template = ENDPOINT_TEMPLATES[endpoint]
-
-    if template['requires_workspace_id'] and workspace_id is None:
-        raise RequestError(
-            f'Workspace ID is required for endpoint: {endpoint}'
-        )
-
-    if template['requires_workspace_id']:
-        endpoint = f"{template['endpoint_prefix']}{workspace_id}{template['endpoint']}/{item_id}"
-    else:
-        endpoint = f"{template['endpoint']}/{item_id}"
-
-    response = _api_request(
-        endpoint=endpoint,
-        audience=template['audience'],
-        content_type=template['content_type'],
-        method='delete',
-    )
-
-    if kwargs.get('return_raw'):
-        return response
-
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-
-    logger.success(f'Deleted {endpoint} with ID: {item_id}')
-    return None
-
-
-def _post_request(
-    endpoint: str,
-    workspace_id: Optional[str] = None,
-    item_id: Optional[str] = None,
-    payload: Optional[dict] = None,
-    **kwargs,
-) -> Union[List[Dict[str, str]], Dict[str, str], None]:
-    if endpoint not in ENDPOINT_TEMPLATES:
-        raise RequestError(f'Unknown template name: {endpoint}')
-
-    template = ENDPOINT_TEMPLATES[endpoint]
-
-    if template['requires_workspace_id'] and workspace_id is None:
-        raise RequestError(
-            f'Workspace ID is required for endpoint: {endpoint}'
-        )
-
-    if template['requires_workspace_id']:
-        endpoint = f"{template['endpoint_prefix']}{workspace_id}{template['endpoint']}"
-    else:
-        endpoint = template['endpoint']
-
-    if not item_id is None:
-        endpoint += f'/{item_id}'
-
-    if not kwargs.get('endpoint_suffix', '') is None:
-        endpoint += kwargs.get('endpoint_suffix', '')
-
-    response = _api_request(
-        endpoint=endpoint,
-        audience=template['audience'],
-        content_type=template['content_type'],
-        payload=payload,
-        method='post',
-    )
-
-    if kwargs.get('return_raw'):
-        return response
-
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-
-    if response.status_code == 202:
-        logger.debug('Long-running operation detected, handling LRO...')
-        lro_response = _lro_handler(response)
-        if not lro_response.success:
-            logger.warning(
-                f'{lro_response.status_code}: {lro_response.error}.'
-            )
-            return None
-        elif not lro_response.data:
-            logger.info(f'Long-running operation returned no data.')
-            return None
-        return lro_response.data
-
-    return response.data
-
-
-def _patch_request(
-    endpoint: str,
-    workspace_id: Optional[str] = None,
-    item_id: Optional[str] = None,
-    payload: Optional[dict] = None,
-    **kwargs,
-) -> Union[List[Dict[str, str]], Dict[str, str], None]:
-    if endpoint not in ENDPOINT_TEMPLATES:
-        raise RequestError(f'Unknown template name: {endpoint}')
-
-    template = ENDPOINT_TEMPLATES[endpoint]
-
-    if template['requires_workspace_id']:
-        endpoint = f"{template['endpoint_prefix']}{workspace_id}{template['endpoint']}"
-    else:
-        endpoint = template['endpoint']
-
-    if not item_id is None:
-        endpoint += f'/{item_id}'
-
-    if not kwargs.get('endpoint_suffix', '') is None:
-        endpoint += kwargs.get('endpoint_suffix', '')
-
-    response = _api_request(
-        endpoint=endpoint,
-        audience=template['audience'],
-        content_type=template['content_type'],
-        payload=payload,
-        method='patch',
-    )
-
-    if kwargs.get('return_raw'):
-        return response
-
-    if not response.success:
-        logger.warning(f'{response.status_code}: {response.error}.')
-        return None
-
-    if response.status_code == 202:
-        logger.debug('Long-running operation detected, handling LRO...')
-        lro_response = _lro_handler(response)
-        if not lro_response.success:
-            logger.warning(
-                f'{lro_response.status_code}: {lro_response.error}.'
-            )
-            return None
-        return lro_response.data
-
+    # Handle long-running operations (LRO) if supported
+    if support_lro:
+        if response.status_code == 202:
+            logger.debug('Long-running operation detected, handling LRO...')
+            lro_response = _lro_handler(response)
+            if not lro_response.success:
+                logger.warning(
+                    f'{lro_response.status_code}: {lro_response.error}.'
+                )
+                return None
+            elif not lro_response.data:
+                logger.info(f'Long-running operation returned no data.')
+                return None
+            return lro_response.data
+        return response.data
+    
+    # Otherwise, return the parsed data
     return response.data

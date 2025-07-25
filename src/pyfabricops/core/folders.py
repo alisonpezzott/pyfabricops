@@ -1,14 +1,8 @@
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 from pandas import DataFrame
 
-from ..api.api import (
-    _delete_request,
-    _get_request,
-    _list_request,
-    _patch_request,
-    _post_request,
-)
+from ..api.api import api_request
 from ..core.workspaces import resolve_workspace
 from ..utils.decorators import df
 from ..utils.logging import get_logger
@@ -22,7 +16,7 @@ def list_folders(
     workspace: str,
     *,
     df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, str]], None]:
+) -> Union[DataFrame, List[Dict[str, Any]], None]:
     """
     List folders in a workspace
 
@@ -32,14 +26,17 @@ def list_folders(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, List[Dict[str, str]], None]): A list of folders in the workspace.
+        (Union[DataFrame, List[Dict[str, Any]], None]): A list of folders in the workspace.
 
     Examples:
         ```python
         list_folders('123e4567-e89b-12d3-a456-426614174000')
         ```
     """
-    return _list_request('folders', workspace_id=resolve_workspace(workspace))
+    return api_request(
+        '/workspaces/' + resolve_workspace(workspace) + 'folders',
+        support_pagination=True,
+    ) 
 
 
 def get_folder_id(workspace: str, folder_name: str) -> Union[str, None]:
@@ -85,7 +82,7 @@ def resolve_folder(workspace: str, folder: str) -> Union[str, None]:
 @df
 def get_folder(
     workspace: str, folder: str, *, df: Optional[bool] = True
-) -> Union[DataFrame, Dict[str, str], None]:
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Get a folder in a workspace.
 
@@ -96,7 +93,7 @@ def get_folder(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The folder details if found, otherwise None.
+        (Union[DataFrame, Dict[str, Any], None]): The folder details if found, otherwise None.
 
     Examples:
         ```python
@@ -107,10 +104,8 @@ def get_folder(
         ```
     """
     workspace_id = resolve_workspace(workspace)
-    return _get_request(
-        'folders',
-        workspace_id=workspace_id,
-        item_id=resolve_folder(workspace_id, folder),
+    return api_request(
+        '/workspaces/' + workspace_id + '/folders/' + resolve_folder(workspace_id, folder),
     )
 
 
@@ -121,7 +116,7 @@ def create_folder(
     *,
     parent_folder: str = None,
     df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, str], None]:
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Create a new folder in the specified workspace.
 
@@ -133,7 +128,7 @@ def create_folder(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The created folder details if successful, otherwise None.
+        (Union[DataFrame, Dict[str, Any], None]): The created folder details if successful, otherwise None.
 
     Examples:
         ```python
@@ -151,11 +146,11 @@ def create_folder(
     if parent_folder:
         payload['parentFolderId'] = resolve_folder(workspace_id, parent_folder)
 
-    return _post_request(
-        'folders',
-        workspace_id,
+    return api_request(
+        '/workspaces/' + workspace_id + '/folders',
         payload=payload,
-    )
+        method='post',
+    ) 
 
 
 def delete_folder(workspace: str, folder: str) -> None:
@@ -179,11 +174,10 @@ def delete_folder(workspace: str, folder: str) -> None:
     """
     workspace_id = resolve_workspace(workspace)
 
-    return _delete_request(
-        'folders',
-        workspace_id=workspace_id,
-        item_id=resolve_folder(workspace_id, folder),
-    )
+    return api_request(
+        '/workspaces/' + workspace_id + '/folders/' + resolve_folder(workspace_id, folder),
+        method='delete'
+    )  
 
 
 @df
@@ -193,7 +187,7 @@ def update_folder(
     display_name: str,
     *,
     df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, str], None]:
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Update a existing folder in the specified workspace.
 
@@ -205,7 +199,7 @@ def update_folder(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The updated folder details if successful, otherwise None.
+        (Union[DataFrame, Dict[str, Any], None]): The updated folder details if successful, otherwise None.
 
     Examples:
         ```python
@@ -220,11 +214,10 @@ def update_folder(
 
     payload = {'displayName': display_name}
 
-    return _patch_request(
-        'folders',
-        workspace_id=workspace_id,
-        item_id=resolve_folder(workspace_id, folder),
+    return api_request(
+        '/workspaces/' + workspace_id + '/folders/' + resolve_folder(workspace_id, folder),
         payload=payload,
+        method='patch',
     )
 
 
@@ -235,7 +228,7 @@ def move_folder(
     *,
     target_folder: Optional[str] = None,
     df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, str], None]:
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Move a existing folder into other or root folder.
 
@@ -248,7 +241,7 @@ def move_folder(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The moved folder details if successful, otherwise None.
+        (Union[DataFrame, Dict[str, Any], None]): The moved folder details if successful, otherwise None.
 
     Examples:
         ```python
@@ -266,10 +259,8 @@ def move_folder(
     if target_folder:
         payload = {'targetFolderId': resolve_folder(workspace_id, target_folder)}
 
-    return _post_request(
-        'folders',
-        workspace_id=workspace_id,
-        item_id=resolve_folder(workspace_id, folder),
+    return api_request(
+        '/workspaces/' + workspace_id + '/folders/' + resolve_folder(workspace_id, folder) + '/move',
         payload=payload,
-        endpoint_suffix='/move',
+        method='post'
     )

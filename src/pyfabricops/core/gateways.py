@@ -1,11 +1,8 @@
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 from pandas import DataFrame
 
-from ..api.api import (
-    _get_request,
-    _list_request,
-)
+from ..api.api import api_request
 from ..utils.decorators import df
 from ..utils.logging import get_logger
 from ..utils.utils import is_valid_uuid
@@ -16,7 +13,7 @@ logger = get_logger(__name__)
 @df
 def list_gateways(
     df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, str]], None]:
+) -> Union[DataFrame, List[Dict[str, Any]], None]:
     """
     Lists all available gateways.
 
@@ -25,42 +22,14 @@ def list_gateways(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, List[Dict[str, str]], None]): The list of gateways.
+        (Union[DataFrame, List[Dict[str, Any]], None]): The list of gateways.
 
     Examples:
         ```python
         list_gateways()
         ```
     """
-    return _list_request('gateways')
-
-
-@df
-def _get_gateway(
-    gateway_id: str,
-    *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, str], None]:
-    """
-    Retrieves the details of a gateway by its ID.
-
-    Args:
-        gateway_id (str): The ID of the gateway to retrieve.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
-            If False, returns a list of dictionaries.
-
-    Returns:
-        (Union[DataFrame, Dict[str, str], None]): The gateway details if found, otherwise None.
-
-    Examples:
-        ```python
-        get_gateway('123e4567-e89b-12d3-a456-426614174000')
-        ```
-    """
-    return _get_request(
-        'gateways',
-        gateway_id,
-    )
+    return api_request('/gateways', support_pagination=True)  
 
 
 def get_gateway_id(gateway_name: str) -> Union[str, None]:
@@ -102,7 +71,7 @@ def get_gateway(
     gateway: str,
     *,
     df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, str], None]:
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Retrieves the details of a gateway by its ID.
 
@@ -112,7 +81,7 @@ def get_gateway(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The gateway details if found, otherwise None.
+        (Union[DataFrame, Dict[str, Any], None]): The gateway details if found, otherwise None.
 
     Examples:
         ```python
@@ -120,7 +89,9 @@ def get_gateway(
         get_gateway('my-gateway')
         ```
     """
-    return _get_request('gateways', resolve_gateway(gateway))
+    return api_request(
+        '/gateways/' + resolve_gateway(gateway),
+    )  
 
 
 def get_gateway_public_key(gateway_id: str) -> dict | None:

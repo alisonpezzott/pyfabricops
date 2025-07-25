@@ -1,14 +1,10 @@
-from typing import Dict, List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from pandas import DataFrame
 
-from ..api.api import (
-    _delete_request,
-    _get_request,
-    _list_request,
-    _patch_request,
-    _post_request,
-)
+from pyfabricops import api
+
+from ..api.api import api_request
 from ..utils.decorators import df
 from ..utils.logging import get_logger
 from ..utils.utils import is_valid_uuid
@@ -19,7 +15,7 @@ logger = get_logger(__name__)
 @df
 def list_connections(
     df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, str]], None]:
+) -> Union[DataFrame, List[Dict[str, Any]], None]:
     """
     Returns the list of connections.
 
@@ -28,14 +24,14 @@ def list_connections(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, List[Dict[str, str]], None]): A list of connections.
+        (Union[DataFrame, List[Dict[str, Any]], None]): A list of connections.
 
     Examples:
         ```python
         list_connections()
         ```
     """
-    return _list_request('connections')
+    return api('/connections', support_pagination=True)
 
 
 def get_connection_id(connection: str) -> str | None:
@@ -77,7 +73,7 @@ def resolve_connection(connection: str) -> str | None:
 @df
 def get_connection(
     connection: str, df: Optional[bool] = True
-) -> Union[DataFrame, List[Dict[str, str]], None]:
+) -> Union[DataFrame, List[Dict[str, Any]], None]:
     """
     Returns the specified connection.
 
@@ -87,7 +83,7 @@ def get_connection(
                 If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, List[Dict[str, str]], None]) The details of the connection if found, otherwise None. If `df=True`, returns a DataFrame with flattened keys.
+        (Union[DataFrame, List[Dict[str, Any]], None]) The details of the connection if found, otherwise None. If `df=True`, returns a DataFrame with flattened keys.
 
     Examples:
         ```python
@@ -96,7 +92,7 @@ def get_connection(
         get_connection('MyProjectConnection', df=False) # Returns as list
         ```
     """
-    return _get_request('connections', item_id=resolve_connection(connection))
+    return api_request('/connections/' + resolve_connection(connection))
 
 
 def delete_connection(connection: str) -> None:
@@ -114,8 +110,9 @@ def delete_connection(connection: str) -> None:
         delete_connection("123e4567-e89b-12d3-a456-426614174000")
         ```
     """
-    return _delete_request(
-        'connections', item_id=resolve_connection(connection)
+    return api_request(
+        '/connections/' + resolve_connection(connection),
+        method='delete'
     )
 
 
@@ -124,7 +121,7 @@ def list_connection_role_assignments(
     connection: str,
     *,
     df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, str]], None]:
+) -> Union[DataFrame, List[Dict[str, Any]], None]:
     """
     Lists all role assignments for a connection.
 
@@ -134,18 +131,17 @@ def list_connection_role_assignments(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, List[Dict[str, str]], None]): The list of role assignments for the connection.
+        (Union[DataFrame, List[Dict[str, Any]], None]): The list of role assignments for the connection.
 
     Examples:
         ```python
         list_connection_role_assignments("123e4567-e89b-12d3-a456-426614174000")
         ```
     """
-    return _list_request(
-        'connections',
-        item_id=resolve_connection(connection),
-        endpoint_suffix='/roleAssignments',
-    )
+    return api_request(
+        '/connections/' + resolve_connection(connection) + '/roleAssignments',
+        support_pagination=True,
+    )  
 
 
 @df
@@ -158,7 +154,7 @@ def add_connection_role_assignment(
     role: Literal['Owner', 'User', 'UserWithReshare'] = 'User',
     *,
     df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, str], None]:
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Adds a role to a connection.
 
@@ -170,7 +166,7 @@ def add_connection_role_assignment(
         df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.  If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The role assignment details.
+        (Union[DataFrame, Dict[str, Any], None]): The role assignment details.
 
     Examples:
         ```python
@@ -182,21 +178,22 @@ def add_connection_role_assignment(
         )
         ```
     """
-    return _post_request(
-        'connections',
-        item_id=resolve_connection(connection),
-        payload={
-            'principal': {'id': user_uuid, 'type': user_type},
-            'role': role,
-        },
-        endpoint_suffix='/roleAssignments',
+    payload = {
+        'principal': {'id': user_uuid, 'type': user_type},
+        'role': role,
+    }
+
+    return api_request(
+        '/connections/' + resolve_connection(connection) + '/roleAssignments',
+        method='post',
+        payload=payload,
     )
 
 
 @df
 def get_connection_role_assignment(
     connection: str, user_uuid: str, *, df: Optional[bool] = True
-) -> Union[DataFrame, Dict[str, str], None]:
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Retrieves a role assignment for a connection.
 
@@ -207,7 +204,7 @@ def get_connection_role_assignment(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The role assignment details.
+        (Union[DataFrame, Dict[str, Any], None]): The role assignment details.
 
     Examples:
         ```python
@@ -217,10 +214,8 @@ def get_connection_role_assignment(
         )
         ```
     """
-    return _get_request(
-        'connections',
-        item_id=resolve_connection(connection),
-        endpoint_suffix=f'/roleAssignments/{user_uuid}',
+    return api_request(
+        '/connections/' + resolve_connection(connection) + '/roleAssignments/' + user_uuid,
     )
 
 
@@ -234,7 +229,7 @@ def update_connection_role_assignment(
     role: Literal['Owner', 'User', 'UserWithReshare'] = 'User',
     *,
     df: Optional[bool] = False,
-) -> Union[DataFrame, Dict[str, str], None]:
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Updates a role assignment for a connection.
 
@@ -247,7 +242,7 @@ def update_connection_role_assignment(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, Dict[str, str], None]): The updated role assignment details.
+        (Union[DataFrame, Dict[str, Any], None]): The updated role assignment details.
 
     Examples:
         ```python
@@ -259,14 +254,14 @@ def update_connection_role_assignment(
         )
         ```
     """
-    return _patch_request(
-        'connections',
-        item_id=resolve_connection(connection),
-        payload={
+    payload={
             'principal': {'id': user_uuid, 'type': user_type},
             'role': role,
         },
-        endpoint_suffix=f'/roleAssignments/{user_uuid}',
+    return api_request(
+        '/connections/' + resolve_connection(connection) + '/roleAssignments/' + user_uuid,
+        method='patch',
+        payload=payload,
     )
 
 
@@ -292,8 +287,7 @@ def delete_connection_role_assignment(
         )
         ```
     """
-    return _delete_request(
-        'connections',
-        item_id=resolve_connection(connection),
-        endpoint_suffix=f'/roleAssignments/{user_uuid}',
-    )
+    return api_request(
+        '/connections/' + resolve_connection(connection) + '/roleAssignments/' + user_uuid,
+        method='delete',
+    ) 

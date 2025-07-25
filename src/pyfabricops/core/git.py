@@ -1,7 +1,9 @@
 import time
-from typing import Dict, List, Literal, Union
+from typing import Dict, List, Literal, Union, Optional
 
-from ..api.api import _api_request, _lro_handler
+from pandas import DataFrame
+
+from ..api.api import api_request
 from ..utils.decorators import df
 from ..utils.logging import get_logger
 from .connections import resolve_connection
@@ -73,7 +75,7 @@ def github_connect(
             'connectionId': connection_id,
         },
     }
-    response = _api_request(
+    response = api_request(
         endpoint=f'/workspaces/{workspace_id}/git/connect',
         method='post',
         payload=payload,
@@ -101,8 +103,8 @@ def git_init(
     ] = 'PreferWorkspace',
     provider: Literal['GitHub', 'AzureDevOps'] = 'GitHub',
     credential_type: Literal['spn', 'user'] = 'user',
-    df: bool = False,
-) -> dict:
+    df: Optional[bool] = False,
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Initializes a Fabric workspace to use Git for version control.
 
@@ -114,10 +116,12 @@ def git_init(
             The Git provider to use. Defaults to "GitHub".
         credential_type (Literal["spn", "user"], optional):
             The type of credentials to use for the Git connection. Defaults to "user".
-        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
+            If False, returns a list of dictionaries.
+
 
     Returns:
-        dict: The response data from the API if successful, or None if the workspace cannot be resolved.
+        (Union[DataFrame, Dict[str, Any], None]): The response data from the API if successful, or None if the workspace cannot be resolved.
 
     Raises:
         ValueError: If the workspace cannot be resolved.
@@ -137,34 +141,13 @@ def git_init(
 
     payload = {'initializationStrategy': initialize_strategy}
 
-    response = _api_request(
+    return api_request(
         method='post',
         endpoint=f'/workspaces/{workspace_id}/git/initializeConnection',
         payload=payload,
         credential_type=credential_type,
+        support_lro=True,
     )
-
-    if not response.status_code in [200, 202]:
-        logger.error(
-            f'Failed to initialize Git connection: {response.status_code} - {response.error}'
-        )
-        return False
-    elif response.status_code == 202:
-        # If the response is a long-running operation, handle it
-        lro_response = _lro_handler(response)
-        if not lro_response.success:
-            logger.warning(
-                f'{lro_response.status_code}: {lro_response.error}.'
-            )
-            return None
-        else:
-            return lro_response.data
-    elif response.status_code == 200:
-        # If the response is successful, we can process it
-        logger.success(
-            f'Successfully initialized Git connection for workspace.'
-        )
-        return response.data
 
 
 @df
@@ -173,8 +156,8 @@ def git_status(
     *,
     provider: Literal['GitHub', 'AzureDevOps'] = 'GitHub',
     credential_type: Literal['spn', 'user'] = 'user',
-    df: bool = False,
-) -> dict:
+    df: Optional[bool] = False,
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Retrieve the Git status of the workspace.
 
@@ -184,10 +167,11 @@ def git_status(
             The Git provider to use. Defaults to "GitHub".
         credential_type (Literal["spn", "user"], optional):
             The type of credentials to use for the Git connection. Defaults to "user".
-        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
+            If False, returns a list of dictionaries.
 
     Returns:
-        dict: The Git status of the workspace if successful, or None if the workspace cannot be resolved.
+        (Union[DataFrame, Dict[str, Any], None]): The Git status of the workspace if successful, or None if the workspace cannot be resolved.
 
     Raises:
         ValueError: If the workspace cannot be resolved.
@@ -204,30 +188,11 @@ def git_status(
     if not workspace_id:
         return None
 
-    response = _api_request(
+    return api_request(
         endpoint=f'/workspaces/{workspace_id}/git/status',
         credential_type=credential_type,
+        support_lro=True,
     )
-
-    if not response.status_code in [200, 202]:
-        logger.error(
-            f'Failed to get status: {response.status_code} - {response.error}'
-        )
-        return False
-    elif response.status_code == 202:
-        # If the response is a long-running operation, handle it
-        lro_response = _lro_handler(response)
-        if not lro_response.success:
-            logger.warning(
-                f'{lro_response.status_code}: {lro_response.error}.'
-            )
-            return None
-        else:
-            return lro_response.data
-    elif response.status_code == 200:
-        # If the response is successful, we can process it
-        logger.info(f'Successfully Git status retrieved for workspace.')
-        return response.data
 
 
 def update_from_git(
@@ -311,7 +276,7 @@ def update_from_git(
             },
             'options': {'allowOverrideItems': allow_override_items},
         }
-        resp = _api_request(
+        resp = api_request(
             method='post',
             endpoint=f'/workspaces/{workspace_id}/git/updateFromGit',
             payload=payload,
@@ -365,8 +330,8 @@ def commit_to_git(
     comment: str = None,
     selective_payload: dict = None,
     credential_type: Literal['spn', 'user'] = 'user',
-    df: bool = False,
-) -> dict:
+    df: Optional[bool] = False,
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Commits all changes from a Fabric/Power BI workspace to Git.
 
@@ -381,10 +346,11 @@ def commit_to_git(
         comment (str, optional): A comment for the commit. Defaults to None.
         credential_type (Literal["spn", "user"], optional):
             The type of credentials to use for the Git connection. Defaults to "user".
-        df (bool, optional): Keyword-only. If True, returns a DataFrame with flattened keys. Defaults to False.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
+            If False, returns a list of dictionaries.
 
     Returns:
-        dict: The response data from the API if successful, or None if the workspace cannot be resolved.
+        (Union[DataFrame, Dict[str, Any], None]): The response data from the API if successful, or None if the workspace cannot be resolved.
 
     Raises:
         ValueError: If the workspace cannot be resolved.
@@ -400,37 +366,23 @@ def commit_to_git(
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return None
+    
     payload = {'mode': mode}
+    
     if comment:
         payload['comment'] = comment
+    
     if mode == 'Selective' and selective_payload:
         # If in selective mode, include the specific changes to commit
         payload.update(selective_payload)
-    response = _api_request(
+    
+    return api_request(
         method='post',
         endpoint=f'/workspaces/{workspace_id}/git/commitToGit',
         payload=payload,
         credential_type=credential_type,
+        support_lro=True,
     )
-    if not response.status_code in [200, 202]:
-        logger.error(
-            f'Failed to commit changes to git: {response.status_code} - {response.error}'
-        )
-        return False
-    elif response.status_code == 202:
-        # If the response is a long-running operation, handle it
-        lro_response = _lro_handler(response)
-        if not lro_response.success:
-            logger.warning(
-                f'{lro_response.status_code}: {lro_response.error}.'
-            )
-            return None
-        else:
-            return lro_response.data
-    elif response.status_code == 200:
-        # If the response is successful, we can process it
-        logger.success(f'Successfully committed changes to git.')
-        return response.data
 
 
 def git_disconnect(
@@ -457,23 +409,12 @@ def git_disconnect(
         )
         ```
     """
-    workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
-    response = _api_request(
+    return api_request(
+        '/workspaces/' + resolve_workspace(workspace) + '/git/disconnect',
         method='post',
-        audience='fabric',
-        endpoint=f'/workspaces/{workspace_id}/git/disconnect',
         credential_type=credential_type,
         return_raw=True,
-    )
-    if response.status_code != 200:
-        logger.error(
-            f'Failed to disconnect workspace from git: {response.status_code} - {response.error}'
-        )
-        return False
-    logger.success(f'Successfully disconnected workspace from git.')
-    return True
+    ) 
 
 
 @df
@@ -505,20 +446,10 @@ def get_git_connection(
         )
         ```
     """
-    workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
-    response = _api_request(
-        endpoint=f'/workspaces/{workspace_id}/git/connection',
+    return api_request(
+        endpoint='/workspaces/' + resolve_workspace(workspace) + '/git/connection',
         credential_type=credential_type,
     )
-    if response.status_code != 200:
-        logger.warning(
-            f'Failed to retrieve Git connections: {response.status_code} - {response.error}'
-        )
-        return None
-    else:
-        return response.data
 
 
 @df
@@ -550,20 +481,10 @@ def get_my_git_credentials(
         )
         ```
     """
-    workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
-    response = _api_request(
-        endpoint=f'/workspaces/{workspace_id}/git/myGitCredentials',
+    return api_request(
+        endpoint='/workspaces/' + resolve_workspace(workspace) + '/git/myGitCredentials',
         credential_type=credential_type,
     )
-    if response.status_code != 200:
-        logger.warning(
-            f'Failed to retrieve Git credentials: {response.status_code} - {response.error}'
-        )
-        return None
-    else:
-        return response.data
 
 
 def update_my_git_connection(
@@ -602,9 +523,6 @@ def update_my_git_connection(
         )
         ```
     """
-    workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
     payload_automatic = {'source': 'Automatic'}
     payload_configured = {
         'source': 'ConfiguredConnection',
@@ -620,19 +538,13 @@ def update_my_git_connection(
         payload = payload_configured
     elif request_body_type == 'UpdateGitCredentialsToNoneRequest':
         payload = payload_none
-    response = _api_request(
+    
+    return api_request(
+        endpoint=f'/workspaces/' + resolve_workspace(workspace) + '/git/myGitCredentials',
         method='patch',
-        endpoint=f'/workspaces/{workspace_id}/git/myGitCredentials',
         payload=payload,
         credential_type=credential_type,
     )
-    if response.status_code != 200:
-        logger.error(
-            f'Failed to update Git connection: {response.status_code} - {response.error}'
-        )
-        return False
-    else:
-        return response.data
 
 
 def ado_connect(
@@ -676,9 +588,6 @@ def ado_connect(
         )
         ```
     """
-    workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
-        return None
     payload = {
         'gitProviderDetails': {
             'gitProviderType': 'AzureDevOps',
@@ -689,19 +598,9 @@ def ado_connect(
             'directoryName': directory_name,
         }
     }
-    response = _api_request(
-        endpoint=f'/workspaces/{workspace_id}/git/connect',
+    return api_request(
+        endpoint='/workspaces/' + resolve_workspace(workspace) + '/git/connect',
         method='post',
         payload=payload,
         credential_type=credential_type,
     )
-    if not response.status_code == 200:
-        logger.error(
-            f"Failed to connect Azure DevOps repository: {response.json().get('errorCode')} - {response.json().get('message')}"
-        )
-        return False
-    else:
-        logger.success(
-            f"Successfully connected Azure DevOps repository '{repository_name}' to workspace '{workspace}'."
-        )
-        return True

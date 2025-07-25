@@ -1,8 +1,8 @@
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 from pandas import DataFrame
 
-from ..api.api import _list_request
+from ..api.api import api_request
 from ..utils.decorators import df
 from ..utils.logging import get_logger
 from ..utils.utils import is_valid_uuid
@@ -13,7 +13,7 @@ logger = get_logger(__name__)
 @df
 def list_capacities(
     df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, str]], None]:
+) -> Union[DataFrame, List[Dict[str, Any]], None]:
     """
     Returns a list of capacities.
 
@@ -22,10 +22,10 @@ def list_capacities(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, List[Dict[str, str]], None]): A DataFrame with the list of capacities.
+        (Union[DataFrame, List[Dict[str, Any]], None]): A DataFrame with the list of capacities.
         If `df=False`, returns a list of dictionaries. If no capacities are found, returns None.
     """
-    return _list_request('capacities')
+    return api_request('/capacities', support_pagination=True) 
 
 
 def get_capacity_id(capacity_name: str) -> str | None:
