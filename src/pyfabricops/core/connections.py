@@ -2,8 +2,6 @@ from typing import Any, Dict, List, Literal, Optional, Union
 
 from pandas import DataFrame
 
-from pyfabricops import api
-
 from ..api.api import api_request
 from ..utils.decorators import df
 from ..utils.logging import get_logger
@@ -31,7 +29,7 @@ def list_connections(
         list_connections()
         ```
     """
-    return api('/connections', support_pagination=True)
+    return api_request('/connections', support_pagination=True)
 
 
 def get_connection_id(connection: str) -> str | None:
@@ -111,8 +109,7 @@ def delete_connection(connection: str) -> None:
         ```
     """
     return api_request(
-        '/connections/' + resolve_connection(connection),
-        method='delete'
+        '/connections/' + resolve_connection(connection), method='delete'
     )
 
 
@@ -141,7 +138,7 @@ def list_connection_role_assignments(
     return api_request(
         '/connections/' + resolve_connection(connection) + '/roleAssignments',
         support_pagination=True,
-    )  
+    )
 
 
 @df
@@ -215,7 +212,10 @@ def get_connection_role_assignment(
         ```
     """
     return api_request(
-        '/connections/' + resolve_connection(connection) + '/roleAssignments/' + user_uuid,
+        '/connections/'
+        + resolve_connection(connection)
+        + '/roleAssignments/'
+        + user_uuid,
     )
 
 
@@ -223,9 +223,6 @@ def get_connection_role_assignment(
 def update_connection_role_assignment(
     connection: str,
     user_uuid: str,
-    user_type: Literal[
-        'User', 'Group', 'ServicePrincipal', 'ServicePrincipalProfile'
-    ] = 'User',
     role: Literal['Owner', 'User', 'UserWithReshare'] = 'User',
     *,
     df: Optional[bool] = False,
@@ -254,12 +251,12 @@ def update_connection_role_assignment(
         )
         ```
     """
-    payload={
-            'principal': {'id': user_uuid, 'type': user_type},
-            'role': role,
-        },
+    payload = {'role': role}
     return api_request(
-        '/connections/' + resolve_connection(connection) + '/roleAssignments/' + user_uuid,
+        '/connections/'
+        + resolve_connection(connection)
+        + '/roleAssignments/'
+        + user_uuid,
         method='patch',
         payload=payload,
     )
@@ -288,6 +285,9 @@ def delete_connection_role_assignment(
         ```
     """
     return api_request(
-        '/connections/' + resolve_connection(connection) + '/roleAssignments/' + user_uuid,
+        '/connections/'
+        + resolve_connection(connection)
+        + '/roleAssignments/'
+        + user_uuid,
         method='delete',
-    ) 
+    )
