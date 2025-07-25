@@ -454,22 +454,27 @@ def api_request(
     # Handle pagination if supported
     if support_pagination:
         return _pagination_handler(response).data.get('value', [])
-
+ 
     # Handle long-running operations (LRO) if supported
-    if support_lro:
-        if response.status_code == 202:
-            logger.debug('Long-running operation detected, handling LRO...')
-            lro_response = _lro_handler(response)
-            if not lro_response.success:
-                logger.warning(
-                    f'{lro_response.status_code}: {lro_response.error}.'
-                )
+    if support_lro and response.status_code == 202:
+        logger.info('Long-running operation detected, handling LRO...')
+
+        # Call the LRO handler
+        lro_response = _lro_handler(response)
+
+        # Checking the LRO response
+        if lro_response.success or lro_response.status_code == 200:
+            if lro_response.data:
+                return lro_response.data
+            else:
+                logger.success('Long-running operation completed successfully but without data.')
                 return None
-            elif not lro_response.data:
-                logger.info(f'Long-running operation returned no data.')
-                return None
-            return lro_response.data
-        return response.data
+            
+        else:
+            logger.warning(
+                f'{lro_response.status_code}: {lro_response.error}.'
+            )
+            return None
     
     # Otherwise, return the parsed data
     return response.data

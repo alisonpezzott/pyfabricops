@@ -65,6 +65,8 @@ def get_lakehouse_id(workspace: str, lakehouse: str) -> Union[str, None]:
     for lakehouse_ in lakehouses:
         if lakehouse_['displayName'] == lakehouse:
             return lakehouse_['id']
+
+    logger.warning(f'Lakehouse {lakehouse} not found in workspace {workspace}.')
     return None
 
 
@@ -120,41 +122,16 @@ def get_lakehouse(
         ```
     """
     workspace_id = resolve_workspace(workspace)
-    lakehouse_id = resolve_lakehouse(workspace_id, lakehouse)
+    if not workspace_id:
+        return None
 
-    response = api_request(
+    lakehouse_id = resolve_lakehouse(workspace_id, lakehouse)
+    if not lakehouse_id:
+        return None
+
+    return api_request(
         endpoint='/workspaces/' + workspace_id + '/lakehouses/' + lakehouse_id,
     )
-
-    if response.data:
-        lakehouse_sql_endpoint_id = response.data['properties'][
-            'sqlEndpointProperties'
-        ]['id']
-
-    if lakehouse_sql_endpoint_id:
-        return response.data
-
-    else:
-        MAX_RETRIES = 10
-        RETRY_INTERVAL = 10
-        logger.info(f'Checking lakehouse SQL endpoint...')
-        for attempt in range(1, MAX_RETRIES + 1):
-            response = api_request(
-                endpoint='/workspaces/' + workspace_id + '/lakehouses/' + lakehouse_id,
-            )
-            if not response.success:
-                logger.warning(
-                    f'Failed to retrieve lakehouse {lakehouse} in workspace {workspace}.'
-                )
-                return None
-            lakehouse_sql_endpoint_id = response.data['properties'][
-                'sqlEndpointProperties'
-            ]['id']
-            if lakehouse_sql_endpoint_id:
-                logger.success('Lakehouse SQL endpoint is now available.')
-                break
-            time.sleep(RETRY_INTERVAL)
-        return response.data
 
 
 @df

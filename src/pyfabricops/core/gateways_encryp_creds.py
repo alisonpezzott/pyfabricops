@@ -14,7 +14,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.asymmetric.padding import MGF1, OAEP
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
-from ..core.gateways import get_gateway_public_key
+from .gateways import get_gateway_public_key
 from ..utils.logging import get_logger
 
 logger = get_logger(__name__)

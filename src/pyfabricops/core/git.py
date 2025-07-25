@@ -152,7 +152,7 @@ def git_status(
     workspace: str,
     *,
     credential_type: Literal['spn', 'user'] = 'spn',
-    df: Optional[bool] = False,
+    df: Optional[bool] = True,
 ) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Retrieve the Git status of the workspace.
@@ -237,7 +237,7 @@ def update_from_git(
 
     for attempt in range(1, MAX_RETRIES + 1):
         logger.info(f'Attempt {attempt}/{MAX_RETRIES}: Checking Git status...')
-        status = git_status(workspace_id)
+        status = git_status(workspace_id, df=False)
 
         if not status:
             logger.info('No status retrieved; retrying after delay...')
@@ -293,7 +293,7 @@ def update_from_git(
         time.sleep(RETRY_INTERVAL)
 
         # Re-check status after sending update
-        status_after = git_status(workspace_id)
+        status_after = git_status(workspace_id, df=False)
         if status_after:
             remote_after = status_after.get('remoteCommitHash') or None
             head_after = status_after.get('workspaceHead') or None
@@ -316,7 +316,7 @@ def update_from_git(
     return False
 
 
-@df
+
 def commit_to_git(
     workspace: str,
     *,
@@ -371,8 +371,8 @@ def commit_to_git(
         payload.update(selective_payload)
     
     return api_request(
-        method='post',
         endpoint=f'/workspaces/{workspace_id}/git/commitToGit',
+        method='post',
         payload=payload,
         credential_type=credential_type,
         support_lro=True,

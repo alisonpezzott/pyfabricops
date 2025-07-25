@@ -3,6 +3,9 @@ from .api.auth import set_auth_provider
 from .core.capacities import get_capacity_id, list_capacities, resolve_capacity
 from .core.connections import (
     add_connection_role_assignment,
+    create_github_source_control_connection,
+    create_sql_cloud_connection,
+    create_sql_on_premises_connection,
     delete_connection,
     delete_connection_role_assignment,
     get_connection,
