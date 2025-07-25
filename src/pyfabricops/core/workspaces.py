@@ -133,7 +133,7 @@ def create_workspace(
     if description:
         payload['description'] = description
 
-    return api_request('/workspaces', payload=payload)
+    return api_request('/workspaces', payload=payload, method='post')
 
 
 @df
@@ -189,7 +189,7 @@ def update_workspace(
         payload['description'] = description
 
     return api_request(
-        '/workspaces/' + resolve_workspace(workspace), 
+        '/workspaces/' + resolve_workspace(workspace),
         payload=payload,
         method='patch',
     )
@@ -213,6 +213,11 @@ def delete_workspace(workspace: str) -> None:
         delete_workspace('123e4567-e89b-12d3-a456-426614174000')
         ```
     """
+    workspace_id = resolve_workspace(workspace)
+
+    if not workspace_id:
+        return None
+
     return api_request(
         '/workspaces/' + resolve_workspace(workspace),
         method='delete',
@@ -244,7 +249,7 @@ def list_workspace_role_assignments(
     """
     return api_request(
         '/workspaces/' + resolve_workspace(workspace) + '/roleAssignments',
-        support_pagination=True, 
+        support_pagination=True,
     )
 
 
@@ -276,7 +281,10 @@ def get_workspace_role_assignment(
         ```
     """
     return api_request(
-        '/workspaces/' + resolve_workspace(workspace) + '/roleAssignments/' + user_uuid
+        '/workspaces/'
+        + resolve_workspace(workspace)
+        + '/roleAssignments/'
+        + user_uuid
     )
 
 
@@ -337,7 +345,7 @@ def add_workspace_role_assignment(
         payload=payload,
         method='post',
     )
- 
+
 
 @df
 def update_workspace_role_assignment(
@@ -411,7 +419,10 @@ def delete_workspace_role_assignment(
     ```
     """
     return api_request(
-        '/workspaces/' + resolve_workspace(workspace) + '/roleAssignments/' + user_uuid,
+        '/workspaces/'
+        + resolve_workspace(workspace)
+        + '/roleAssignments/'
+        + user_uuid,
         method='delete',
     )
 
@@ -440,13 +451,17 @@ def assign_to_capacity(workspace: str, capacity: str) -> None:
         '/workspaces/' + resolve_workspace(workspace) + '/assignToCapacity',
         payload=payload,
         method='post',
+        return_raw=True,
     )
     if response.status_code == 202:
         # Assuming the API returns a 202 status code for successful assignment
         logger.success(
             f'Workspace {workspace} assigned to capacity {capacity} successfully.'
         )
-    return response
+        return None
+    else:
+        logger.error(f'{response.status_code}: {response.error}')
+        return None
 
 
 def unassign_from_capacity(workspace: str) -> None:
@@ -465,11 +480,17 @@ def unassign_from_capacity(workspace: str) -> None:
         ```
     """
     response = api_request(
-        '/workspaces/' + resolve_workspace(workspace) + '/unassignFromCapacity',
+        '/workspaces/'
+        + resolve_workspace(workspace)
+        + '/unassignFromCapacity',
         method='post',
+        return_raw=True,
     )
     if response.status_code == 202:
         logger.success(
             f'Workspace {workspace} unassigned from capacity successfully.'
         )
-    return response
+        return None
+    else:
+        logger.error(f'{response.status_code}: {response.error}')
+        return None
