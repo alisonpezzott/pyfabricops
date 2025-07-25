@@ -34,9 +34,9 @@ def list_folders(
         ```
     """
     return api_request(
-        '/workspaces/' + resolve_workspace(workspace) + 'folders',
+        '/workspaces/' + resolve_workspace(workspace) + '/folders',
         support_pagination=True,
-    ) 
+    )
 
 
 def get_folder_id(workspace: str, folder_name: str) -> Union[str, None]:
@@ -105,7 +105,10 @@ def get_folder(
     """
     workspace_id = resolve_workspace(workspace)
     return api_request(
-        '/workspaces/' + workspace_id + '/folders/' + resolve_folder(workspace_id, folder),
+        '/workspaces/'
+        + workspace_id
+        + '/folders/'
+        + resolve_folder(workspace_id, folder),
     )
 
 
@@ -150,7 +153,7 @@ def create_folder(
         '/workspaces/' + workspace_id + '/folders',
         payload=payload,
         method='post',
-    ) 
+    )
 
 
 def delete_folder(workspace: str, folder: str) -> None:
@@ -175,9 +178,12 @@ def delete_folder(workspace: str, folder: str) -> None:
     workspace_id = resolve_workspace(workspace)
 
     return api_request(
-        '/workspaces/' + workspace_id + '/folders/' + resolve_folder(workspace_id, folder),
-        method='delete'
-    )  
+        '/workspaces/'
+        + workspace_id
+        + '/folders/'
+        + resolve_folder(workspace_id, folder),
+        method='delete',
+    )
 
 
 @df
@@ -215,7 +221,10 @@ def update_folder(
     payload = {'displayName': display_name}
 
     return api_request(
-        '/workspaces/' + workspace_id + '/folders/' + resolve_folder(workspace_id, folder),
+        '/workspaces/'
+        + workspace_id
+        + '/folders/'
+        + resolve_folder(workspace_id, folder),
         payload=payload,
         method='patch',
     )
@@ -257,10 +266,16 @@ def move_folder(
     payload = {}
 
     if target_folder:
-        payload = {'targetFolderId': resolve_folder(workspace_id, target_folder)}
+        payload = {
+            'targetFolderId': resolve_folder(workspace_id, target_folder)
+        }
 
     return api_request(
-        '/workspaces/' + workspace_id + '/folders/' + resolve_folder(workspace_id, folder) + '/move',
+        '/workspaces/'
+        + workspace_id
+        + '/folders/'
+        + resolve_folder(workspace_id, folder)
+        + '/move',
         payload=payload,
-        method='post'
+        method='post',
     )
