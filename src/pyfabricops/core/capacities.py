@@ -25,7 +25,7 @@ def list_capacities(
         (Union[DataFrame, List[Dict[str, Any]], None]): A DataFrame with the list of capacities.
         If `df=False`, returns a list of dictionaries. If no capacities are found, returns None.
     """
-    return api_request('/capacities', support_pagination=True) 
+    return api_request('/capacities', support_pagination=True)
 
 
 def get_capacity_id(capacity_name: str) -> str | None:
