@@ -61,6 +61,13 @@ from .core.workspaces import (
     update_workspace,
     update_workspace_role_assignment,
 )
+from .helpers.folders import (
+    generate_folders_paths,
+    get_folders_paths,
+)
+from .helpers.workspaces import (
+    get_workspace_details,
+)
 from .items.data_pipelines import (
     create_data_pipeline,
     delete_data_pipeline,
@@ -168,8 +175,9 @@ from .items.warehouses import (
 from .utils.logging import setup_logging
 from .utils.utils import (
     dataframe_to_list,
-    generate_full_folders_path,
     read_json,
+    get_current_branch,
+    get_workspace_suffix,
 )
 
 __all__ = [
@@ -210,7 +218,7 @@ __all__ = [
     'delete_warehouse',
     'delete_workspace',
     'delete_workspace_role_assignment',
-    'generate_full_folders_path',
+    'generate_folders_paths',
     'get_capacity_id',
     'get_connection',
     'get_connection_id',
@@ -229,6 +237,7 @@ __all__ = [
     'get_dataflows_gen1_datasources',
     'get_folder',
     'get_folder_id',
+    'get_folders_paths',
     'get_gateway',
     'get_gateway_id',
     'get_gateway_public_key',
@@ -254,6 +263,7 @@ __all__ = [
     'get_warehouse',
     'get_warehouse_id',
     'get_workspace',
+    'get_workspace_details',
     'get_workspace_id',
     'get_workspace_role_assignment',
     'get_workspace_suffix',

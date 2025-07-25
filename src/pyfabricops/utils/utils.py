@@ -6,7 +6,7 @@ import re
 import shutil
 import subprocess
 import uuid
-from functools import lru_cache
+
 from pathlib import Path
 
 import json5
@@ -153,15 +153,14 @@ def get_current_branch(branch: str = None) -> str:
 
 
 def get_workspace_suffix(
-    branch: str = None, workspace_suffix: str = None, path: str = None
+    branch: str, branches_path: str
 ) -> str:
     """
     Returns the workspace suffix configured in branches.json
 
     Args:
-        branch(str, optional): Branch to bypass auto capture of current.
-        workspace_suffix(str, optional): Bypass the return of branches.json.
-        path(str, optional): The path of branches.json.
+        branch(str): Branch of the repository.
+        branches_path(str): The path of branches.json.
 
     Returns:
         str: The workspace name suffix
@@ -171,29 +170,18 @@ def get_workspace_suffix(
         get_workspace_suffix('main')
         ```
     """
-    if workspace_suffix:
-        return workspace_suffix
-
-    if not branch:
-        branch = get_current_branch()
-        if not branch:
-            return None
-
-    if not path:
-        try:
-            path = os.path.join(get_root_path(), 'branches.json')
-        except:
-            raise ResourceNotFoundError(
-                'branches.json not configured in the root path.'
-            )
-
-    branches = read_json(path)
-
     try:
-        suffix = branches[branch]
+        branches_dict = read_json(branches_path)
     except:
         raise ResourceNotFoundError(
-            'The branch is not configured in branches.json'
+            f'Dict not found at {branches_path}'
+        )
+    
+    try:
+        suffix = branches_dict[branch]
+    except KeyError:
+        raise ResourceNotFoundError(
+            'The branch is not configured in branches dictionary.'
         )
 
     return suffix
@@ -682,51 +670,6 @@ def json_to_df(data: dict | list) -> DataFrame:
         raise TypeError(
             'Input type must be a dictionary or a list of dictionaries.'
         )
-
-
-def generate_full_folders_path(
-    folders_df: DataFrame,
-) -> DataFrame:
-    """
-    Returns the full path for the folder `folder_id` recursively concatenating the names of its parents.
-
-    Args:
-        folders_df (DataFrame): The DataFrame containing folder information.
-
-    Returns:
-        DataFrame: The full folder paths.
-    """
-
-    df = folders_df
-
-    # Create a dict to lookup: id → {displayName, parentFolderId}
-    folder_map = df.set_index('id')[['displayName', 'parentFolderId']].to_dict(
-        'index'
-    )
-
-    # Recursive function with cache to build the full path
-    @lru_cache(maxsize=None)
-    def build_full_path(folder_id: str) -> str:
-        """
-        Returns the full path for the folder `folder_id`,
-        recursively concatenating the names of its parents.
-        """
-        node = folder_map.get(folder_id)
-        if node is None:
-            return ''  # id not found
-        name = node['displayName']
-        parent = node['parentFolderId']
-        # If without parente, is root
-        if pandas.isna(parent) or parent == '':
-            return name
-        # Otherwise, joins the parent path with self name
-        return build_full_path(parent) + '/' + name
-
-    # Apply the function by each dataframe row
-    df['full_folder_path'] = df['id'].apply(lambda x: build_full_path(x))
-
-    df = df.rename(columns={'id': 'folder_id'})
-    return df[['folder_id', 'full_folder_path']]
 
 
 def dataframe_to_list(df: DataFrame) -> list[dict]:
