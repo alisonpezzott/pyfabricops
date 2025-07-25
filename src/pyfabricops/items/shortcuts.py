@@ -2,12 +2,7 @@ from typing import Any, Dict, List, Literal, Optional, Union
 
 from pandas import DataFrame
 
-from ..api.api import (
-    _delete_request,
-    _get_request,
-    _list_request,
-    _post_request,
-)
+from ..api.api import api_request
 from ..core.workspaces import resolve_workspace
 from ..utils.decorators import df
 from ..utils.logging import get_logger
@@ -87,11 +82,9 @@ def list_shortcuts(
 
     lakehouse_id = resolve_lakehouse(workspace_id, lakehouse)
 
-    return _list_request(
-        endpoint='items',
-        workspace_id=workspace_id,
-        lakehouse_id=lakehouse_id,
-        endpoint_suffix='/shortcuts',
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/lakehouses/' + lakehouse_id + '/shortcuts',
+        support_pagination=True,
     )
 
 
@@ -126,11 +119,8 @@ def get_shortcut(
     """
     workspace_id = resolve_workspace(workspace)
     lakehouse_id = resolve_lakehouse(workspace_id, lakehouse)
-    return _get_request(
-        endpoint='items',
-        workspace_id=workspace_id,
-        lakehouse_id=lakehouse_id,
-        endpoint_suffix=f'/shortcuts/{shortcut_path}/{shortcut_name}',
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/lakehouses/' + lakehouse_id + '/shortcuts/' + shortcut_path + '/' + shortcut_name,
     )
 
 
@@ -157,11 +147,9 @@ def delete_shortcut(
     """
     workspace_id = resolve_workspace(workspace)
     lakehouse_id = resolve_lakehouse(workspace_id, lakehouse)
-    return _delete_request(
-        endpoint='items',
-        workspace_id=workspace_id,
-        lakehouse_id=lakehouse_id,
-        endpoint_suffix=f'/shortcuts/{shortcut_path}/{shortcut_name}',
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/lakehouses/' + lakehouse_id + '/shortcuts/' + shortcut_path + '/' + shortcut_name,
+        method='delete'
     )
 
 
@@ -305,11 +293,9 @@ def create_shortcut(
 
     params = {'shortcutConflictPolicy': conflict_policy}
 
-    return _post_request(
-        endpoint='items',
-        workspace_id=workspace_id,
-        item_id=lakehouse_id,
-        endpoint_suffix='/shortcuts',
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/lakehouses/' + lakehouse_id + '/shortcuts',
+        method='post',
         payload=payload,
         params=params,
     )

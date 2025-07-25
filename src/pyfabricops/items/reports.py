@@ -2,12 +2,7 @@ from typing import Any, Dict, List, Optional, Union
 
 from pandas import DataFrame
 
-from ..api.api import (
-    _delete_request,
-    _get_request,
-    _list_request,
-    _post_request,
-)
+from ..api.api import api_request
 from ..core.folders import resolve_folder
 from ..core.workspaces import resolve_workspace
 from ..utils.decorators import df
@@ -33,7 +28,10 @@ def list_reports(
     Returns:
         (Union[DataFrame, List[Dict[str, Any]], None]): A list of semantic models or a DataFrame if df is True.
     """
-    return _list_request('reports', workspace_id=resolve_workspace(workspace))
+    return api_request(
+        endpoint='/workspaces/' + resolve_workspace(workspace) + '/reports',
+        support_pagination=True,
+    )
 
 
 def get_report_id(workspace: str, report_name: str) -> Union[str, None]:
@@ -92,8 +90,8 @@ def get_report(
     """
     workspace_id = resolve_workspace(workspace)
     report_id = resolve_report(workspace, report)
-    return _get_request(
-        'reports', workspace_id=workspace_id, item_id=report_id
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/reports/' + report_id,
     )
 
 
@@ -145,7 +143,12 @@ def create_report(
         if folder_id:
             payload['folderId'] = folder_id
 
-    return _post_request('reports', workspace_id=workspace_id, payload=payload)
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/reports',
+        method='post',
+        payload=payload,
+        support_lro=True,
+    )
 
 
 @df
@@ -192,10 +195,9 @@ def update_report(
     if description:
         payload['description'] = description
 
-    return _post_request(
-        'reports',
-        workspace_id=workspace_id,
-        item_id=report_id,
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/reports/' + report_id,
+        method='patch',
         payload=payload,
     )
 
@@ -219,8 +221,9 @@ def delete_report(workspace: str, report: str) -> None:
     workspace_id = resolve_workspace(workspace)
     report_id = resolve_report(workspace, report)
 
-    return _delete_request(
-        'reports', workspace_id=workspace_id, item_id=report_id
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/reports/' + report_id,
+        method='delete'
     )
 
 
@@ -249,11 +252,10 @@ def get_report_definition(
 
     report_id = resolve_report(workspace, report)
 
-    return _post_request(
-        'reports',
-        workspace_id=workspace_id,
-        item_id=report_id,
-        endpoint_suffix='/getDefinition',
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/reports/' + report_id + '/getDefinition',
+        method='post',
+        support_lro=True,
     )
 
 
@@ -292,11 +294,10 @@ def update_report_definition(
     report_id = resolve_report(workspace, report)
     params = {'updateMetadata': True}
     payload = {'definition': item_definition}
-    return _post_request(
-        'reports',
-        workspace_id=workspace_id,
-        item_id=report_id,
+    return api_request(
+        endpoint='/workspaces/' + workspace_id + '/reports/' + report_id + '/updateDefinition',
+        method='post',
         payload=payload,
         params=params,
-        endpoint_suffix='/updateDefinition',
-    )
+        support_lro=True,
+    ) 
