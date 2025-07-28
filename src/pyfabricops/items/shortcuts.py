@@ -66,7 +66,7 @@ def list_shortcuts(
     Args:
         workspace (str): The workspace name or ID.
         lakehouse (str): The lakehouse name or ID.
-        ddf (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
@@ -85,7 +85,7 @@ def list_shortcuts(
     return api_request(
         endpoint='/workspaces/'
         + workspace_id
-        + '/lakehouses/'
+        + '/items/'
         + lakehouse_id
         + '/shortcuts',
         support_pagination=True,
@@ -126,7 +126,7 @@ def get_shortcut(
     return api_request(
         endpoint='/workspaces/'
         + workspace_id
-        + '/lakehouses/'
+        + '/items/'
         + lakehouse_id
         + '/shortcuts/'
         + shortcut_path
@@ -161,7 +161,7 @@ def delete_shortcut(
     return api_request(
         endpoint='/workspaces/'
         + workspace_id
-        + '/lakehouses/'
+        + '/items/'
         + lakehouse_id
         + '/shortcuts/'
         + shortcut_path
@@ -314,7 +314,7 @@ def create_shortcut(
     return api_request(
         endpoint='/workspaces/'
         + workspace_id
-        + '/lakehouses/'
+        + '/items/'
         + lakehouse_id
         + '/shortcuts',
         method='post',

@@ -1,8 +1,15 @@
+import os
 from functools import lru_cache
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
+
 import pandas
 from pandas import DataFrame
 
 from ..core.folders import list_folders
+from ..utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def generate_folders_paths(
@@ -66,3 +73,52 @@ def get_folders_paths(workspace: str) -> DataFrame:
         folders_df['parentFolderId'] = ''
 
     return generate_folders_paths(folders_df)
+
+
+def get_folders_config(workspace: str) -> Union[Dict[str, Any], None]:
+    """
+    Get the folder configuration for a specific workspace.
+
+    Args:
+        workspace (str): The workspace name or ID.
+
+    Returns:
+        (Union[Dict[str, Any], None]): The folder configuration or None if not found.
+    """
+    folders = get_folders_paths(workspace)
+    if folders is None:
+        return None
+
+    return folders.to_dict(orient='records')
+
+
+def export_folders(workspace: str, path: Union[str, Path]) -> None:
+    """
+    Export all folders from a workspace to a specified path
+    """
+    folders = get_folders_paths(workspace)
+    folders_list = folders.to_dict(orient='records')
+    for folder in folders_list:
+        os.makedirs(Path(path) / folder['folder_path'], exist_ok=True)
+    logger.success(f'All folders exported to {path} successfully.')
+
+
+def resolve_folder_from_id_to_path(
+    workspace: str, folder_id: str
+) -> Union[str, None]:
+    """
+    Return the folder path to the folder_id given for a specified worspace.
+    """
+    folders = get_folders_paths(workspace)
+    if folders is None:
+        return None
+
+    folder_path = folders[folders['folder_id'] == folder_id][
+        'folder_path'
+    ].iloc[0]
+
+    if folder_path is None:
+        logger.info(f'{folder_id} not found in the workspace {workspace}')
+        return None
+
+    return folder_path

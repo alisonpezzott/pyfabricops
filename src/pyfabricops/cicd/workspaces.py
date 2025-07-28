@@ -269,4 +269,3 @@ def _resolve_workspace_path(
         workspace_path = workspace_alias
 
     return workspace_path
-

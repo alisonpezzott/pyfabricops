@@ -37,6 +37,7 @@ def list_items(
     workspace_id = resolve_workspace(workspace)
     return api_request(
         endpoint='/workspaces/' + workspace_id + '/items',
+        support_pagination=True,
     )
 
 

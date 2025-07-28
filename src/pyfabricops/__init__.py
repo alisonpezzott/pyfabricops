@@ -62,11 +62,24 @@ from .core.workspaces import (
     update_workspace_role_assignment,
 )
 from .helpers.folders import (
+    export_folders,
     generate_folders_paths,
+    get_folders_config,
     get_folders_paths,
+    resolve_folder_from_id_to_path,
+)
+from .helpers.lakehouses import (
+    export_all_lakehouses_from_workspace,
+    generate_lakehouse_platform,
+    generate_lakehouse_shortcuts_metadata,
+    get_lakehouse_config,
+    get_lakehouses_config,
+    list_valid_lakehouses,
+    save_lakehouse_metadata_json,
+    save_lakehouse_platform,
 )
 from .helpers.workspaces import (
-    get_workspace_details,
+    get_workspace_config,
 )
 from .items.data_pipelines import (
     create_data_pipeline,
@@ -175,9 +188,11 @@ from .items.warehouses import (
 from .utils.logging import setup_logging
 from .utils.utils import (
     dataframe_to_list,
-    read_json,
     get_current_branch,
     get_workspace_suffix,
+    read_json,
+    unpack_item_definition,
+    write_json,
 )
 
 __all__ = [
@@ -238,6 +253,7 @@ __all__ = [
     'get_folder',
     'get_folder_id',
     'get_folders_paths',
+    'get_folders_config',
     'get_gateway',
     'get_gateway_id',
     'get_gateway_public_key',
@@ -263,7 +279,7 @@ __all__ = [
     'get_warehouse',
     'get_warehouse_id',
     'get_workspace',
-    'get_workspace_details',
+    'get_workspace_config',
     'get_workspace_id',
     'get_workspace_role_assignment',
     'get_workspace_suffix',
@@ -285,6 +301,7 @@ __all__ = [
     'list_reports',
     'list_semantic_models',
     'list_shortcuts',
+    'list_valid_lakehouses',
     'list_warehouses',
     'list_workspace_role_assignments',
     'list_workspaces',
@@ -308,6 +325,7 @@ __all__ = [
     'setup_logging',
     'takeover_dataflow_gen1',
     'unassign_from_capacity',
+    'unpack_item_definition',
     'update_connection_role_assignment',
     'update_data_pipeline',
     'update_data_pipeline_definition',
@@ -330,4 +348,14 @@ __all__ = [
     'update_warehouse',
     'update_workspace',
     'update_workspace_role_assignment',
+    'write_json',
+    'export_all_lakehouses_from_workspace',
+    'get_lakehouse_config',
+    'generate_lakehouse_platform',
+    'generate_lakehouse_shortcuts_metadata',
+    'get_lakehouses_config',
+    'save_lakehouse_metadata_json',
+    'save_lakehouse_platform',
+    'export_folders',
+    'resolve_folder_from_id_to_path',
 ]

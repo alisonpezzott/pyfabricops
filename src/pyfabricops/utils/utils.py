@@ -6,7 +6,6 @@ import re
 import shutil
 import subprocess
 import uuid
-
 from pathlib import Path
 
 import json5
@@ -152,9 +151,7 @@ def get_current_branch(branch: str = None) -> str:
         return 'main'  # default fallback
 
 
-def get_workspace_suffix(
-    branch: str, branches_path: str
-) -> str:
+def get_workspace_suffix(branch: str, branches_path: str) -> str:
     """
     Returns the workspace suffix configured in branches.json
 
@@ -173,10 +170,8 @@ def get_workspace_suffix(
     try:
         branches_dict = read_json(branches_path)
     except:
-        raise ResourceNotFoundError(
-            f'Dict not found at {branches_path}'
-        )
-    
+        raise ResourceNotFoundError(f'Dict not found at {branches_path}')
+
     try:
         suffix = branches_dict[branch]
     except KeyError:

@@ -1,8 +1,10 @@
 from typing import Any, Dict
+
 from ..core.workspaces import get_workspace, list_workspace_role_assignments
 from ..utils.exceptions import ResourceNotFoundError
 
-def get_workspace_details(
+
+def get_workspace_config(
     workspace: str,
 ) -> Dict[str, Any]:
     """
@@ -33,7 +35,7 @@ def get_workspace_details(
 
     # Retrieving workspace roles
     # Retrieve details
-    roles_details = list_workspace_role_assignments(workspace_id, df=False) 
+    roles_details = list_workspace_role_assignments(workspace_id, df=False)
 
     # Init a empty list
     roles = []
