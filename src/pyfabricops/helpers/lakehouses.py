@@ -1,12 +1,11 @@
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
 from pandas import DataFrame
-
-from pyfabricops.items import shortcuts
 
 from ..core.workspaces import resolve_workspace
 from ..helpers.folders import resolve_folder_from_id_to_path
@@ -87,23 +86,27 @@ def get_lakehouse_config(
     Returns:
         (Union[Dict[str, Any], None]): The dict config from the lakehouse
     """
-    lakehouse_properties = get_lakehouse(workspace, lakehouse, df=False)
+    item = lakehouse
+    item_data = get_lakehouse(workspace, item, df=False)
 
-    if lakehouse_properties is None:
+    if item_data is None:
         return None
 
     else:
         config = {}
-        config = config[lakehouse_properties.get('displayName')] = {}
+        config = config[item_data.get('displayName')] = {}
 
         config = {
-            'id': lakehouse_properties['id'],
-            'description': lakehouse_properties.get('description', ''),
-            'folder_id': lakehouse_properties.get('folderId', ''),
-            'sql_endpoint_connection_string': lakehouse_details_properties.get(
+            'id': item_data['id'],
+            'description': item_data.get('description', None),
+            'folder_id': ''
+            if item_data.get('folderId') is None
+            or pd.isna(item_data.get('folderId'))
+            else item_data['folderId'],
+            'sql_endpoint_connection_string': item_data.get(
                 'properties_sqlEndpointProperties_connectionString'
             ),
-            'sql_endpoint_id': lakehouse_details_properties.get(
+            'sql_endpoint_id': item_data.get(
                 'properties_sqlEndpointProperties_id'
             ),
         }
@@ -121,28 +124,29 @@ def get_lakehouses_config(workspace: str) -> Union[Dict[str, Any], None]:
     Returns:
         (Union[Dict[str, Any], None]): The dict config from the lakehouses of the workspace
     """
-    lakehouses = list_valid_lakehouses(workspace)
+    items = list_valid_lakehouses(workspace, df=False)
 
-    if lakehouses is None:
+    if items is None:
         return None
 
     config = {}
-    config['lakehouses'] = {}
 
-    for index, row in lakehouses.iterrows():
+    for item in items:
 
-        lakehouse_details_properties = get_lakehouse(workspace, row['id'])
+        item_data = get_lakehouse(workspace, item['id'], df=False)
 
-        config['lakehouses'][row['displayName']] = {
-            'id': row['id'],
-            'description': row.get('description', ''),
-            'folder_id': row.get('folderId', ''),
-            'sql_endpoint_connection_string': lakehouse_details_properties[
-                'properties_sqlEndpointProperties_connectionString'
-            ].loc[0],
-            'sql_endpoint_id': lakehouse_details_properties[
-                'properties_sqlEndpointProperties_id'
-            ].loc[0],
+        config[item['displayName']] = {
+            'id': item['id'],
+            'description': item.get('description', None),
+            'folder_id': ''
+            if item.get('folderId') is None or pd.isna(item.get('folderId'))
+            else item['folderId'],
+            'sql_endpoint_connection_string': item_data['properties'][
+                'sqlEndpointProperties'
+            ]['connectionString'],
+            'sql_endpoint_id': item_data['properties'][
+                'sqlEndpointProperties'
+            ]['id'],
         }
 
     return config
@@ -162,15 +166,13 @@ def list_valid_lakehouses(
     Returns:
         (Union[Dict[str, Any], None]): The list of valids lakehouses of the workspace
     """
-    lakehouses = list_lakehouses(workspace)
+    items = list_lakehouses(workspace)
 
-    if lakehouses is None:
+    if items is None:
         return None
 
-    return lakehouses[
-        ~lakehouses['displayName'].str.contains(
-            'staging', case=False, na=False
-        )
+    return items[
+        ~items['displayName'].str.contains('staging', case=False, na=False)
     ].to_dict(orient='records')
 
 
@@ -181,7 +183,7 @@ def generate_lakehouse_shortcuts_metadata(
     # Create shortcuts.metadata.json
     shortcuts_list = list_shortcuts(workspace, lakehouse, df=False)
 
-    if shortcuts_list is None:
+    if len(shortcuts_list) == 0:
         return None
 
     # Init a empty list for shortcuts
@@ -252,9 +254,9 @@ def export_all_lakehouses_from_workspace(
             folder_path = resolve_folder_from_id_to_path(
                 workspace_id, item['folderId']
             )
-        except Exception as e:
-            logger.error(
-                f"Error resolving folder path for item {item['id']}: {e}"
+        except:
+            logger.info(
+                f'{item["displayName"]}.Lakehouse is not inside a folder.'
             )
             folder_path = None
 

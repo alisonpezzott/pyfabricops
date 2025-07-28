@@ -154,3 +154,15 @@ else:
 # Save the configuration to a JSON file
 with open('config.json', 'w') as json_file:
     json.dump(config, json_file, indent=4)
+
+
+"""
+# Extract other artifacts
+excluded_types = ['Lakehouse', 'Warehouse', 'Notebook', 'DataPipeline', 'Dataflow', 'SemanticModel', 'Report', 'SQLEndpoint', 'KQLDatabase', 'KQLQueryset']
+other_artifacts = pf.list_items(workspace)
+other_artifacts = other_artifacts[~other_artifacts['type'].isin(excluded_types)] 
+if other_artifacts is None:
+    other_artifacts = DataFrame()
+else:
+    display(other_artifacts)
+"""
