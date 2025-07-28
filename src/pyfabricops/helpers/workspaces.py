@@ -65,16 +65,13 @@ def get_workspace_details(
 
     # Create a empty dict
     workspace_config = {}
-    workspace_config['workspace_config'] = {}
 
     # Populate the dict
-    workspace_config['workspace_config']['workspace_id'] = workspace_id
-    workspace_config['workspace_config']['workspace_name'] = workspace_name
-    workspace_config['workspace_config'][
-        'workspace_description'
-    ] = workspace_description
-    workspace_config['workspace_config']['capacity_id'] = capacity_id
-    workspace_config['workspace_config']['capacity_region'] = capacity_region
-    workspace_config['workspace_config']['workspace_roles'] = roles
+    workspace_config['workspace_id'] = workspace_id
+    workspace_config['workspace_name'] = workspace_name
+    workspace_config['workspace_description'] = workspace_description
+    workspace_config['capacity_id'] = capacity_id
+    workspace_config['capacity_region'] = capacity_region
+    workspace_config['workspace_roles'] = roles
 
     return workspace_config

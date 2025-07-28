@@ -55,7 +55,7 @@ def get_semantic_model_id(
         ```
     """
     models = list_semantic_models(
-        workspace_id=resolve_workspace(workspace), df=False
+        workspace=resolve_workspace(workspace), df=False
     )
     for model in models:
         if model.get('displayName') == semantic_model_name:
