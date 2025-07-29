@@ -62,17 +62,28 @@ from .core.workspaces import (
     update_workspace_role_assignment,
 )
 from .helpers.folders import (
+    deploy_folders,
     export_folders,
     generate_folders_paths,
     get_folders_config,
     get_folders_paths,
     resolve_folder_from_id_to_path,
+    create_folders_from_path_string,
 )
 from .helpers.lakehouses import (
     export_all_lakehouses,
     get_lakehouse_config,
     get_all_lakehouses_config,
     list_valid_lakehouses,
+)
+from .helpers.semantic_models import (
+    deploy_semantic_model,
+    export_semantic_model,
+    export_all_semantic_models,
+    get_semantic_model_config,
+    get_all_semantic_models_config,
+    list_valid_semantic_models,
+    extract_tmdl_parameters_from_semantic_model,
 )
 from .helpers.warehouses import (
     export_all_warehouses,
@@ -195,6 +206,9 @@ from .utils.utils import (
     read_json,
     unpack_item_definition,
     write_json,
+    list_paths_of_type,
+    extract_middle_path,
+    extract_display_name_from_platform,
 )
 
 __all__ = [
@@ -207,6 +221,7 @@ __all__ = [
     'create_dataflow_gen1',
     'create_dataflow_gen2',
     'create_folder',
+    'create_folders_from_path_string'
     'create_github_source_control_connection',
     'create_item',
     'create_lakehouse',
@@ -235,7 +250,15 @@ __all__ = [
     'delete_warehouse',
     'delete_workspace',
     'delete_workspace_role_assignment',
+    'deploy_folders',
+    'deploy_semantic_model', 
+    'export_semantic_model',
+    'export_all_semantic_models',
+    'extract_display_name_from_platform',
+    'extract_middle_path',
+    'extract_tmdl_parameters_from_semantic_model',
     'generate_folders_paths',
+    'get_all_semantic_models_config',
     'get_capacity_id',
     'get_connection',
     'get_connection_id',
@@ -275,6 +298,7 @@ __all__ = [
     'get_report_id',
     'get_root_path',
     'get_semantic_model',
+    'get_semantic_model_config',
     'get_semantic_model_definition',
     'get_semantic_model_id',
     'get_shortcut',
@@ -300,10 +324,12 @@ __all__ = [
     'list_items',
     'list_lakehouses',
     'list_notebooks',
+    'list_paths_of_type',
     'list_reports',
     'list_semantic_models',
     'list_shortcuts',
     'list_valid_lakehouses',
+    'list_valid_semantic_models',
     'list_warehouses',
     'list_workspace_role_assignments',
     'list_workspaces',

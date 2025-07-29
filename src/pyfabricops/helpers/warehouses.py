@@ -1,6 +1,5 @@
 import json
 import os
-import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
@@ -9,9 +8,7 @@ from pandas import DataFrame
 
 from ..core.workspaces import resolve_workspace
 from ..helpers.folders import resolve_folder_from_id_to_path
-from ..items.items import list_items
 from ..items.warehouses import get_warehouse, list_warehouses
-from ..items.shortcuts import list_shortcuts
 from ..utils.decorators import df
 from ..utils.logging import get_logger
 from ..utils.schemas import PLATFORM_SCHEMA, PLATFORM_VERSION

@@ -1,11 +1,13 @@
 import base64
 import fnmatch
+import glob
 import json
 import os
 import re
 import shutil
 import subprocess
 import uuid
+from typing import Any, Dict, List, Optional, Union
 from pathlib import Path
 
 import json5
@@ -330,109 +332,52 @@ def parse_tmdl_parameters(path: str) -> dict:
     if not os.path.exists(path):
         raise FileNotFoundError(f'File not found: {path}')
 
-    params = {}
-
     try:
         with open(path, 'r', encoding='utf-8') as f:
-            content = f.read()
+            expressions = f.read()
     except Exception as e:
         raise ValueError(f'Error reading file {path}: {str(e)}')
 
-    # Regex to capture TMDL parameters
-    # Supports different quote formats and spaces
-    pattern = re.compile(
-        r'expression\s+'  # "expression" followed by spaces
-        r'(?P<name>\w+)\s*=\s*'  # parameter name =
-        r'(?:"(?P<value_double>[^"]*)"|'  # value in double quotes OR
-        r"'(?P<value_single>[^']*)')\s+"  # value in single quotes
-        r'meta\s*\[(?P<meta>[^\]]+)\]',  # meta [...]
-        re.MULTILINE | re.IGNORECASE,
-    )
 
-    matches = pattern.finditer(content)
+    params = {}
 
-    for match in matches:
-        try:
-            name = match.group('name')
-            # Get the correct value depending on the quote type used
-            value = match.group('value_double') or match.group('value_single')
-            raw_meta = match.group('meta')
+    # Pattern 1: Import model - expression VariableName = "Value"
+    pattern1 = r'expression\s+(\w+)\s*=\s*"([^"]*)"'
+    matches1 = re.findall(pattern1, expressions)
 
-            # Robust parsing of metadata
-            meta_items = {}
+    for match in matches1:
+        variable_name = match[0]
+        variable_value = match[1]
+        # Skip if it's already a placeholder
+        if not (
+            variable_value.startswith('#{')
+            and variable_value.endswith('}#')
+        ):
+            params[variable_name] = variable_value
 
-            # Split by commas, but be careful with commas inside strings
-            meta_parts = []
-            current_part = ''
-            in_quotes = False
-            quote_char = None
+    # Pattern 2: Direct Lake - Sql.Database("server", "database")
+    pattern2 = r'Sql\.Database\s*\(\s*"([^"]+)"\s*,\s*"([^"]+)"\s*\)'
+    matches2 = re.findall(pattern2, expressions)
 
-            for char in raw_meta:
-                if char in ['"', "'"] and not in_quotes:
-                    in_quotes = True
-                    quote_char = char
-                    current_part += char
-                elif char == quote_char and in_quotes:
-                    in_quotes = False
-                    quote_char = None
-                    current_part += char
-                elif char == ',' and not in_quotes:
-                    meta_parts.append(current_part.strip())
-                    current_part = ''
-                else:
-                    current_part += char
+    for match in matches2:
+        server_value = match[0]
+        database_value = match[1]
 
-            # Add the last part
-            if current_part.strip():
-                meta_parts.append(current_part.strip())
-
-            # Process each metadata part
-            for part in meta_parts:
-                if '=' not in part:
-                    continue
-
-                try:
-                    key, val = part.split('=', 1)
-                    key = key.strip()
-                    val = val.strip()
-
-                    # Remove quotes if present
-                    if (val.startswith('"') and val.endswith('"')) or (
-                        val.startswith("'") and val.endswith("'")
-                    ):
-                        val = val[1:-1]
-
-                    # Convert booleans
-                    if val.lower() in ('true', 'false'):
-                        val = val.lower() == 'true'
-                    # Try to convert numbers
-                    elif val.isdigit():
-                        val = int(val)
-                    elif val.replace('.', '').isdigit():
-                        try:
-                            val = float(val)
-                        except ValueError:
-                            pass  # Keep as string
-
-                    meta_items[key] = val
-
-                except ValueError as e:
-                    logger.warning(
-                        f'Error parsing meta item "{part}" for parameter "{name}": {str(e)}'
-                    )
-                    continue
-
-            # params[name] = {'Value': value, **meta_items}
-            params[name] = value
-
-        except Exception as e:
-            logger.warning(f'Error parsing parameter from match: {str(e)}')
-            continue
+        # Skip if they're already placeholders
+        if not (
+            server_value.startswith('#{') and server_value.endswith('}#')
+        ):
+            params['ServerEndpoint'] = server_value
+        if not (
+            database_value.startswith('#{')
+            and database_value.endswith('}#')
+        ):
+            params['DatabaseId'] = database_value
 
     if not params:
         logger.warning(f'No parameters found in file: {path}')
 
-    return {'parameters': params}
+    return params
 
 
 def parse_definition_report(path: str) -> dict:
@@ -681,3 +626,40 @@ def dataframe_to_list(df: DataFrame) -> list[dict]:
         return []
 
     return df.to_dict(orient='records')
+
+
+def list_paths_of_type(path: Union[str, Path], type: str) -> List[Union[str, Path]]:
+    """
+    Returns a list of paths given a type of the items
+    """
+    paths = glob.glob(
+        f'{path}/**/*.{type}', recursive=True
+    )
+    return [str(Path(p).as_posix()) for p in paths]
+
+
+def extract_middle_path(path: str, start_path: Optional[str] = None) -> Union[str, None]:
+    '''
+    Extract the middle of a full path given a start.
+    '''
+    path_list = path.split('/')[:-1]
+    if len(path_list) == 0:
+        return None
+
+    middle_path = '/'.join(path_list)
+
+    if start_path is None:
+        return middle_path
+    else:
+        try:
+            middle_path = middle_path.split(start_path + '/')[1]
+            return middle_path
+        except:
+            return None
+
+
+def extract_display_name_from_platform(path: str) -> str:
+    with open(Path(path) / '.platform', 'r', encoding='utf-8') as f:
+        platform_dict = json.load(f) 
+
+    return platform_dict.get('metadata').get('displayName')

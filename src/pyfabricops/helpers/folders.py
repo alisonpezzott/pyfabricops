@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional, Union
 import pandas
 from pandas import DataFrame
 
-from ..core.folders import list_folders
+from ..core.folders import list_folders, resolve_folder
 from ..utils.logging import get_logger
 from ..core.workspaces import resolve_workspace 
 from ..core.folders import create_folder
@@ -266,3 +266,42 @@ def deploy_folders(
             create_folder(workspace, folder_name)
 
     logger.success(f'Created all folders in the workspace {workspace}.')
+
+
+def create_folders_from_path_string(workspace: str, path: str) -> str:
+    """
+    Create recursively folders and subfolders from a path string.
+
+    Args:
+        workspace (str): The name or ID of the workspace.
+        path (str): The name or ID of the folder.
+
+    Returns:
+        str: The ID of the final folder.
+    """
+    workspace_id = resolve_workspace(workspace)
+    folders_tree = path.split('/')
+
+    parent_folder_id = None
+
+    for folder in folders_tree:
+        
+        # Get folder_id if folder exists
+        folder_id = resolve_folder(workspace_id, folder)
+        if folder_id is not None:
+            logger.info(f'Folder `{folder}` already exists with ID `{folder_id}`.') 
+        
+        # If not, creates it.
+        else:
+            folder_id = create_folder(
+                workspace_id, 
+                folder, 
+                parent_folder=parent_folder_id, 
+                df=False,
+            ).get('id')
+            logger.success(f'Folder `{folder}` created with ID `{folder_id}` successfully.')   
+
+        parent_folder_id = folder_id
+
+    return folder_id
+

@@ -8,6 +8,7 @@ from ..core.workspaces import resolve_workspace
 from ..utils.decorators import df
 from ..utils.logging import get_logger
 from ..utils.utils import is_valid_uuid
+from pyfabricops.core import workspaces
 
 logger = get_logger(__name__)
 
@@ -37,14 +38,14 @@ def list_semantic_models(
 
 
 def get_semantic_model_id(
-    workspace: str, semantic_model_name: str
+    workspace: str, semantic_model: str
 ) -> Union[str, None]:
     """
     Retrieves the ID of a semantic model by its name from the specified workspace.
 
     Args:
         workspace (str): The workspace name or ID.
-        semantic_model_name (str): The name of the semantic model.
+        semantic_model (str): The name of the semantic model.
 
     Returns:
         (Optional[str]): The ID of the semantic model if found, otherwise None.
@@ -54,12 +55,14 @@ def get_semantic_model_id(
         get_semantic_model_id('123e4567-e89b-12d3-a456-426614174000', 'SalesDataModel')
         ```
     """
-    models = list_semantic_models(
-        workspace=resolve_workspace(workspace), df=False
-    )
-    for model in models:
-        if model.get('displayName') == semantic_model_name:
-            return model.get('id')
+    workspace_id = resolve_workspace(workspace)
+    if workspace_id is None:
+        return None
+    
+    semantic_models = list_semantic_models(workspace_id, df=False)
+    for semantic_model_ in semantic_models:
+        if semantic_model_['displayName'] == semantic_model:
+            return semantic_model_['id']
     return None
 
 
