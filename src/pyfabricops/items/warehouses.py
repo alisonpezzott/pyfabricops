@@ -120,44 +120,16 @@ def get_warehouse(
         ```
     """
     workspace_id = resolve_workspace(workspace)
+    if not workspace_id:
+        return None
+    
     warehouse_id = resolve_warehouse(workspace_id, warehouse)
+    if not warehouse_id:
+        return None
 
-    response = api_request(
+    return api_request(
         endpoint='/workspaces/' + workspace_id + '/warehouses/' + warehouse_id,
     )
-
-    if response.data:
-        warehouse_sql_endpoint_id = response.data['properties'][
-            'sqlEndpointProperties'
-        ]['id']
-
-    if warehouse_sql_endpoint_id:
-        return response.data
-
-    else:
-        MAX_RETRIES = 10
-        RETRY_INTERVAL = 10
-        logger.info(f'Checking warehouse SQL endpoint...')
-        for attempt in range(1, MAX_RETRIES + 1):
-            response = api_request(
-                endpoint='/workspaces/'
-                + workspace_id
-                + '/warehouses/'
-                + warehouse_id,
-            )
-            if not response.success:
-                logger.warning(
-                    f'Failed to retrieve warehouse {warehouse} in workspace {workspace}.'
-                )
-                return None
-            warehouse_sql_endpoint_id = response.data['properties'][
-                'sqlEndpointProperties'
-            ]['id']
-            if warehouse_sql_endpoint_id:
-                logger.success('warehouse SQL endpoint is now available.')
-                break
-            time.sleep(RETRY_INTERVAL)
-        return response.data
 
 
 @df

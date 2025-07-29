@@ -70,13 +70,15 @@ from .helpers.folders import (
 )
 from .helpers.lakehouses import (
     export_all_lakehouses_from_workspace,
-    generate_lakehouse_platform,
-    generate_lakehouse_shortcuts_metadata,
     get_lakehouse_config,
     get_lakehouses_config,
     list_valid_lakehouses,
-    save_lakehouse_metadata_json,
-    save_lakehouse_platform,
+)
+from .helpers.warehouses import (
+    export_all_warehouses,
+    get_warehouse_config,
+    get_all_warehouses_config,
+    list_valid_warehouses,
 )
 from .helpers.workspaces import (
     get_workspace_config,
@@ -351,11 +353,10 @@ __all__ = [
     'write_json',
     'export_all_lakehouses_from_workspace',
     'get_lakehouse_config',
-    'generate_lakehouse_platform',
-    'generate_lakehouse_shortcuts_metadata',
     'get_lakehouses_config',
-    'save_lakehouse_metadata_json',
-    'save_lakehouse_platform',
+    'export_all_warehouses',
+    'get_warehouse_config',
+    'get_all_warehouses_config',
     'export_folders',
     'resolve_folder_from_id_to_path',
 ]
