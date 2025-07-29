@@ -3,19 +3,36 @@ from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Union
 
 import pandas as pd
+from h11 import Data
 from pandas import DataFrame
-
 
 from ..api.api import _base_api
 from ..core.gateways import resolve_gateway
 from ..core.workspaces import resolve_workspace
-from ..helpers.folders import resolve_folder_from_id_to_path, create_folders_from_path_string
+from ..helpers.folders import (
+    create_folders_from_path_string,
+    resolve_folder_from_id_to_path,
+)
 from ..helpers.lakehouses import list_valid_lakehouses
 from ..helpers.warehouses import list_valid_warehouses
-from ..items.semantic_models import create_semantic_model, get_semantic_model, list_semantic_models, get_semantic_model_definition, resolve_semantic_model, update_semantic_model_definition
+from ..items.semantic_models import (
+    create_semantic_model,
+    get_semantic_model,
+    get_semantic_model_definition,
+    list_semantic_models,
+    resolve_semantic_model,
+    update_semantic_model_definition,
+)
 from ..utils.decorators import df
 from ..utils.logging import get_logger
-from ..utils.utils import pack_item_definition, unpack_item_definition, parse_tmdl_parameters, extract_display_name_from_platform, extract_middle_path
+from ..utils.utils import (
+    extract_display_name_from_platform,
+    extract_middle_path,
+    list_paths_of_type,
+    pack_item_definition,
+    parse_tmdl_parameters,
+    unpack_item_definition,
+)
 
 logger = get_logger(__name__)
 
@@ -53,9 +70,11 @@ def get_semantic_model_config(
         }
 
         return config
-    
 
-def get_all_semantic_models_config(workspace: str) -> Union[Dict[str, Any], None]:
+
+def get_all_semantic_models_config(
+    workspace: str,
+) -> Union[Dict[str, Any], None]:
     """
     Get semantic models config from a workspace.
 
@@ -107,36 +126,38 @@ def list_valid_semantic_models(
     items = list_semantic_models(workspace_id)
     if items is None:
         return None
-    
+
     # Creating a excluded list of Staging, Lake and Warehouses default semantic models
     exclude_list = ['staging']
 
     lakehouses_df = list_valid_lakehouses(workspace_id)
     if lakehouses_df is not None:
         lakehouses_list = lakehouses_df['displayName'].tolist()
-        exclude_list.extend(lakehouses_list)  
+        exclude_list.extend(lakehouses_list)
 
     warehouses_df = list_valid_warehouses(workspace_id)
     if warehouses_df is not None:
         warehouses_list = warehouses_df['displayName'].tolist()
-        exclude_list.extend(warehouses_list)  
+        exclude_list.extend(warehouses_list)
 
     # Create regex pattern to create multiple parts
     if exclude_list:
-        exclude_pattern = '|'.join(exclude_list)  
+        exclude_pattern = '|'.join(exclude_list)
         filtered_items = items[
-            ~items['displayName'].str.contains(exclude_pattern, case=False, na=False)
+            ~items['displayName'].str.contains(
+                exclude_pattern, case=False, na=False
+            )
         ]
     else:
         filtered_items = items
-    
+
     return filtered_items.to_dict(orient='records')
 
 
 def export_semantic_model(
-        workspace: str,
-        semantic_model: str,
-        path: Union[str, Path],
+    workspace: str,
+    semantic_model: str,
+    path: Union[str, Path],
 ) -> None:
     """
     Export a semantic model to path.
@@ -149,7 +170,7 @@ def export_semantic_model(
     workspace_id = resolve_workspace(workspace)
     if workspace_id is None:
         return None
-    
+
     item = get_semantic_model(workspace_id, semantic_model, df=False)
     try:
         folder_path = resolve_folder_from_id_to_path(
@@ -167,23 +188,23 @@ def export_semantic_model(
         item_path = (
             Path(path) / folder_path / (item['displayName'] + '.SemanticModel')
         )
-    os.makedirs(item_path, exist_ok=True) 
+    os.makedirs(item_path, exist_ok=True)
 
-    definition = get_semantic_model_definition(workspace_id, item['id']) 
+    definition = get_semantic_model_definition(workspace_id, item['id'])
     if definition is None:
         return None
-    
-    unpack_item_definition(definition, item_path) 
+
+    unpack_item_definition(definition, item_path)
 
     logger.success(
-        f'`{item['displayName']}.SemanticModel` was exported to {item_path} successfully.'
+        f'`{item["displayName"]}.SemanticModel` was exported to {item_path} successfully.'
     )
     return None
 
 
 def export_all_semantic_models(
-        workspace: str,
-        path: Union[str, Path],
+    workspace: str,
+    path: Union[str, Path],
 ) -> None:
     """
     Export a semantic model to path.
@@ -196,11 +217,11 @@ def export_all_semantic_models(
     workspace_id = resolve_workspace(workspace)
     if workspace_id is None:
         return None
-    
+
     items = list_valid_semantic_models(workspace_id, df=False)
     if items is None:
         return None
-    
+
     for item in items:
         try:
             folder_path = resolve_folder_from_id_to_path(
@@ -216,15 +237,17 @@ def export_all_semantic_models(
             item_path = Path(path) / (item['displayName'] + '.SemanticModel')
         else:
             item_path = (
-                Path(path) / folder_path / (item['displayName'] + '.SemanticModel')
+                Path(path)
+                / folder_path
+                / (item['displayName'] + '.SemanticModel')
             )
-        os.makedirs(item_path, exist_ok=True) 
+        os.makedirs(item_path, exist_ok=True)
 
-        definition = get_semantic_model_definition(workspace_id, item['id']) 
+        definition = get_semantic_model_definition(workspace_id, item['id'])
         if definition is None:
             return None
-        
-        unpack_item_definition(definition, item_path) 
+
+        unpack_item_definition(definition, item_path)
 
     logger.success(
         f'All semantic models were exported to {path} successfully.'
@@ -232,19 +255,21 @@ def export_all_semantic_models(
     return None
 
 
-def extract_tmdl_parameters_from_semantic_model(path: Union[str, Path]) -> Dict[str, str]:
+def extract_tmdl_parameters_from_semantic_model(
+    path: Union[str, Path]
+) -> Dict[str, str]:
     """
     Extract TMDL parameters from a specified semantic model in the local directory.
-    
+
     Args:
         path (Union[str, Path]): The semantic model path.
     """
     expressions_path = Path(path) / 'definition' / 'expressions.tmdl'
-    parameters = parse_tmdl_parameters(expressions_path)  
+    parameters = parse_tmdl_parameters(expressions_path)
 
     if parameters is None:
         return None
-    
+
     return parameters
 
 
@@ -414,27 +439,41 @@ def refresh_semantic_model(
         logger.success('Refresh accepted successfully.')
 
 
+@df
 def deploy_semantic_model(
-        workspace: str,
-        path: str,
-        start_path: Optional[str] = None,
-        description: Optional[str] = None,
-) -> str:
+    workspace: str,
+    path: str,
+    start_path: Optional[str] = None,
+    description: Optional[str] = None,
+    df: Optional[bool] = True,
+) -> Union[DataFrame, Dict[str, Any], None]:
     """
     Deploy a semantic model to workspace.
+
+    Args:
+        workspace (str): The name or ID of the workspace.
+        path (str): The path to the semantic model.
+        start_path (Optional[str]): The starting path for folder creation.
+        description (Optional[str]): Description for the semantic model.
+        df (Optional[bool]): If True, returns a DataFrame, otherwise returns a dictionary.
+
+    Returns:
+        (Union[DataFrame, Dict[str, Any], None]): The deployed semantic model or None if deployment fails.
     """
     workspace_id = resolve_workspace(workspace)
     if workspace_id is None:
         return None
-    
-    display_name = extract_display_name_from_platform(path)  
+
+    display_name = extract_display_name_from_platform(path)
     if display_name is None:
         return None
-    
-    semantic_model_id = resolve_semantic_model(workspace_id, display_name) 
+
+    semantic_model_id = resolve_semantic_model(workspace_id, display_name)
 
     folder_path_string = extract_middle_path(path, start_path=start_path)
-    folder_id = create_folders_from_path_string(workspace_id, folder_path_string) 
+    folder_id = create_folders_from_path_string(
+        workspace_id, folder_path_string
+    )
 
     item_definition = pack_item_definition(path)
 
@@ -443,6 +482,7 @@ def deploy_semantic_model(
             workspace_id,
             display_name=display_name,
             item_definition=item_definition,
+            description=description,
             folder=folder_id,
         )
 
@@ -452,3 +492,58 @@ def deploy_semantic_model(
             semantic_model_id,
             item_definition=item_definition,
         )
+
+
+def deploy_all_semantic_models(
+    workspace: str,
+    path: str,
+    start_path: Optional[str] = None,
+) -> None:
+    """
+    Deploy all semantic models to workspace.
+
+    Args:
+        workspace (str): The name or ID of the workspace.
+        path (str): The path to the semantic models.
+        start_path (Optional[str]): The starting path for folder creation.
+    """
+    workspace_id = resolve_workspace(workspace)
+    if workspace_id is None:
+        return None
+
+    semantic_models_paths = list_paths_of_type(path, 'SemanticModel')
+
+    for path_ in semantic_models_paths:
+
+        display_name = extract_display_name_from_platform(path_)
+        if display_name is None:
+            return None
+
+        semantic_model_id = resolve_semantic_model(workspace_id, display_name)
+
+        folder_path_string = extract_middle_path(path_, start_path=start_path)
+        folder_id = create_folders_from_path_string(
+            workspace_id, folder_path_string
+        )
+
+        item_definition = pack_item_definition(path_)
+
+        if semantic_model_id is None:
+            create_semantic_model(
+                workspace_id,
+                display_name=display_name,
+                item_definition=item_definition,
+                folder=folder_id,
+            )
+
+        else:
+            update_semantic_model_definition(
+                workspace_id,
+                semantic_model_id,
+                item_definition=item_definition,
+            )
+
+    logger.success(
+        f'All semantic models were deployed to workspace "{workspace}" successfully.'
+    )
+    return None
