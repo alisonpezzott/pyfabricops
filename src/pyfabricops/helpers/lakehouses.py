@@ -19,7 +19,7 @@ from ..utils.schemas import PLATFORM_SCHEMA, PLATFORM_VERSION
 logger = get_logger(__name__)
 
 
-def generate_lakehouse_platform(
+def _generate_lakehouse_platform(
     display_name: str,
     description: Optional[str] = '',
 ) -> Dict[str, Any]:
@@ -47,7 +47,7 @@ def generate_lakehouse_platform(
     }
 
 
-def save_lakehouse_platform(
+def _save_lakehouse_platform(
     platform: Dict[str, Any],
     path: str,
 ) -> None:
@@ -62,7 +62,7 @@ def save_lakehouse_platform(
         json.dump(platform, f, indent=2)
 
 
-def save_lakehouse_metadata_json(path: str) -> None:
+def _save_lakehouse_metadata_json(path: str) -> None:
     """
     Save metadata.json to lakehouse's path
 
@@ -114,7 +114,7 @@ def get_lakehouse_config(
         return config
 
 
-def get_lakehouses_config(workspace: str) -> Union[Dict[str, Any], None]:
+def get_all_lakehouses_config(workspace: str) -> Union[Dict[str, Any], None]:
     """
     Generate lakehouses config from a workspace.
 
@@ -238,7 +238,57 @@ def save_lakehouse_shortcuts_metadata(
         json.dump(shortcuts_metadata, f, indent=2)
 
 
-def export_all_lakehouses_from_workspace(
+def export_lakehouse(
+    workspace: str, 
+    lakehouse: str,
+    path: Union[str, Path], 
+) -> None:
+    workspace_id = resolve_workspace(workspace)
+    if workspace_id is None:
+        return None
+
+    item = get_lakehouse(workspace_id, lakehouse, df=False)
+    if item is None:
+        return None
+
+    try:
+        folder_path = resolve_folder_from_id_to_path(
+            workspace_id, item['folderId']
+        )
+    except:
+        logger.info(
+            f'{item["displayName"]}.Lakehouse is not inside a folder.'
+        )
+        folder_path = None
+
+    if folder_path is None:
+        item_path = Path(path) / (item['displayName'] + '.Lakehouse')
+    else:
+        item_path = (
+            Path(path) / folder_path / (item['displayName'] + '.Lakehouse')
+        )
+    os.makedirs(item_path, exist_ok=True)
+
+    platform = _generate_lakehouse_platform(
+        display_name=item['displayName'],
+        description=item['description'],
+    )
+
+    _save_lakehouse_platform(platform, item_path)
+
+    _save_lakehouse_metadata_json(item_path)
+
+    shortcuts = generate_lakehouse_shortcuts_metadata(
+        workspace_id, item['id']
+    )
+
+    save_lakehouse_shortcuts_metadata(shortcuts, item_path)
+
+    logger.success(f'Lakehouse `{lakehouse}` from workspace `{workspace}` was exported to `{path}` successfully.')
+    return None
+
+
+def export_all_lakehouses(
     workspace: str, path: Union[str, Path]
 ) -> None:
     workspace_id = resolve_workspace(workspace)
@@ -268,14 +318,14 @@ def export_all_lakehouses_from_workspace(
             )
         os.makedirs(item_path, exist_ok=True)
 
-        platform = generate_lakehouse_platform(
+        platform = _generate_lakehouse_platform(
             display_name=item['displayName'],
             description=item['description'],
         )
 
-        save_lakehouse_platform(platform, item_path)
+        _save_lakehouse_platform(platform, item_path)
 
-        save_lakehouse_metadata_json(item_path)
+        _save_lakehouse_metadata_json(item_path)
 
         shortcuts = generate_lakehouse_shortcuts_metadata(
             workspace_id, item['id']

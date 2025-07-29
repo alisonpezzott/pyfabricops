@@ -69,9 +69,9 @@ from .helpers.folders import (
     resolve_folder_from_id_to_path,
 )
 from .helpers.lakehouses import (
-    export_all_lakehouses_from_workspace,
+    export_all_lakehouses,
     get_lakehouse_config,
-    get_lakehouses_config,
+    get_all_lakehouses_config,
     list_valid_lakehouses,
 )
 from .helpers.warehouses import (
@@ -351,9 +351,9 @@ __all__ = [
     'update_workspace',
     'update_workspace_role_assignment',
     'write_json',
-    'export_all_lakehouses_from_workspace',
+    'export_all_lakehouses',
     'get_lakehouse_config',
-    'get_lakehouses_config',
+    'get_all_lakehouses_config',
     'export_all_warehouses',
     'get_warehouse_config',
     'get_all_warehouses_config',
