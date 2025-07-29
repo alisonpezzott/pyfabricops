@@ -423,7 +423,7 @@ def deploy_semantic_model(
     """
     Deploy a semantic model to workspace.
     """
-    workspace_id = resolve_workspace(workspace),
+    workspace_id = resolve_workspace(workspace)
     if workspace_id is None:
         return None
     
