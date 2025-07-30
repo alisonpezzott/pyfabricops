@@ -111,42 +111,57 @@ Visit: [https://github.com/alisonpezzott/pyfabricops-examples](https://github.co
 ```bash
 src/
 └── pyfabricops/
-    ├── cicd/
+    ├── api/
     │   ├── __init__.py
-    │   └── _support_files.py
-    ├── orchestration/
+    │   ├── api.py
+    │   ├── auth.py
+    │   └── scopes.py
+    ├── cd/
     │   ├── __init__.py
-    │   └── _workspaces.py
+    │   └── support_files.py
+    ├── core/
+    │   ├── __init__.py
+    │   ├── capacities.py
+    │   ├── connections.py
+    │   ├── folders.py
+    │   ├── gateways.py
+    │   ├── gateways_encryp_creds.py
+    │   ├── git.py
+    │   └── workspaces.py
+    ├── helpers/
+    │   ├── __init__.py
+    │   ├── dataflows_gen1.py
+    │   ├── dataflows_gen2.py
+    │   ├── data_pipelines.py
+    │   ├── folders.py
+    │   ├── items.py
+    │   ├── lakehouses.py
+    │   ├── notebooks.py
+    │   ├── reports.py
+    │   ├── semantic_models.py
+    │   ├── warehouses.py
+    │   └── workspaces.py
+    ├── items/
+    │   ├── __init__.py
+    │   ├── dataflows_gen1.py
+    │   ├── dataflows_gen2.py
+    │   ├── data_pipelines.py
+    │   ├── items.py
+    │   ├── lakehouses.py
+    │   ├── notebooks.py
+    │   ├── reports.py
+    │   ├── semantic_models.py
+    │   ├── shortcuts.py
+    │   └── warehouses.py
+    ├── utils/
+    │   ├── __init__.py
+    │   ├── decorators.py
+    │   ├── exceptions.py
+    │   ├── logging.py
+    │   ├── schemas.py
+    │   └── utils.py
     ├── __init__.py
-    ├── _auth.py
-    ├── _capacities.py
-    ├── _connections.py
-    ├── _core.py
-    ├── _data_pipelines.py
-    ├── _dataflows_gen1.py
-    ├── _dataflows_gen2.py
-    ├── _decorators.py
-    ├── _encrypt_gateway_credentials.py
-    ├── _exceptions.py
-    ├── _fabric_items.py
-    ├── _folders.py
-    ├── _gateways.py
-    ├── _git.py
-    ├── _items.py
-    ├── _lakehouses.py
-    ├── _logging.py
-    ├── _notebooks.py
-    ├── _reports_support.py
-    ├── _reports.py
-    ├── _scopes.py
-    ├── _semantic_models.py
-    ├── _shortcuts_payloads.py
-    ├── _shortcuts.py
-    ├── _utils.py
-    ├── _version.py
-    ├── _warehouses_support.py
-    ├── _warehouses.py
-    └── _workspaces.py
+    └── _version.py
 ```  
 
 ### Logging configuration  
