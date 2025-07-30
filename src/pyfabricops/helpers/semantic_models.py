@@ -1,4 +1,5 @@
 import os
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Union
 
@@ -546,4 +547,271 @@ def deploy_all_semantic_models(
     logger.success(
         f'All semantic models were deployed to workspace "{workspace}" successfully.'
     )
+    return None
+
+
+def replace_semantic_model_parameters_with_placeholders(path: Union[str, Path], parameters: Dict[str, str]) -> None:
+    """
+    Replace parameter values with placeholders in semantic model expressions.
+    Supports both Import and Direct Lake model syntaxes.
+
+    Args:
+        path (Union[str, Path]): The path to the semantic model.
+    """
+    # Read the current content of expressions.tmdl
+    expressions_path = Path(path) / 'definition' / 'expressions.tmdl'
+
+    if not expressions_path.exists():
+        logger.warning(f'expressions.tmdl not found: {expressions_path}')
+        return None
+
+    try:
+        with open(expressions_path, 'r', encoding='utf-8') as f:
+            expressions = f.read()
+    except Exception as e:
+        logger.error(f'Error reading expressions.tmdl: {e}')
+        return None
+
+    semantic_model_parameters = extract_tmdl_parameters_from_semantic_model(path)
+    if semantic_model_parameters is None:
+        logger.warning(f'No parameters found in semantic model: {path}')
+        return None
+
+    # Replace the values with placeholders
+    expressions_with_placeholders = expressions
+    replacements_made = 0
+
+    for parameter_name, actual_value in semantic_model_parameters.items():
+        logger.debug(
+            f'Processing parameter: {parameter_name} = "{actual_value}"'
+        )
+
+        # Pattern 1: Import model syntax - expression ParameterName = "Value"
+        pattern1 = rf'(expression\s+{re.escape(parameter_name)}\s*=\s*")({re.escape(actual_value)})(")'
+        replacement1 = (
+            lambda m: f'{m.group(1)}#{{{parameter_name}}}#{m.group(3)}'
+        )
+
+        # Pattern 2: Direct Lake - Sql.Database("server", "database") - First parameter (server)
+        pattern2 = (
+            rf'(Sql\.Database\s*\(\s*")({re.escape(actual_value)})("\s*,)'
+        )
+        replacement2 = (
+            lambda m: f'{m.group(1)}#{{{parameter_name}}}#{m.group(3)}'
+        )
+
+        # Pattern 3: Direct Lake - Sql.Database("server", "database") - Second parameter (database)
+        pattern3 = rf'(Sql\.Database\s*\([^"]*"[^"]*"\s*,\s*")({re.escape(actual_value)})(")'
+        replacement3 = (
+            lambda m: f'{m.group(1)}#{{{parameter_name}}}#{m.group(3)}'
+        )
+
+        # Pattern 4: Generic parameter syntax - ParameterName = "Value" (without 'expression' keyword)
+        pattern4 = rf'({re.escape(parameter_name)}\s*=\s*")({re.escape(actual_value)})(")'
+        replacement4 = (
+            lambda m: f'{m.group(1)}#{{{parameter_name}}}#{m.group(3)}'
+        )
+
+        # Pattern 5: Alternative syntax with single quotes
+        pattern5 = rf"({re.escape(parameter_name)}\s*=\s*')({re.escape(actual_value)})(')"
+        replacement5 = (
+            lambda m: f'{m.group(1)}#{{{parameter_name}}}#{m.group(3)}'
+        )
+
+        # Try each pattern
+        patterns = [
+            (pattern1, replacement1, 'Import model (expression)'),
+            (
+                pattern2,
+                replacement2,
+                'Direct Lake (first parameter - server)',
+            ),
+            (
+                pattern3,
+                replacement3,
+                'Direct Lake (second parameter - database)',
+            ),
+            (pattern4, replacement4, 'Generic parameter'),
+            (pattern5, replacement5, 'Single quotes'),
+        ]
+
+        pattern_found = False
+        for pattern, replacement, description in patterns:
+            if re.search(
+                pattern,
+                expressions_with_placeholders,
+                re.IGNORECASE | re.DOTALL,
+            ):
+                old_content = expressions_with_placeholders
+                expressions_with_placeholders = re.sub(
+                    pattern,
+                    replacement,
+                    expressions_with_placeholders,
+                    flags=re.IGNORECASE | re.DOTALL,
+                )
+                if old_content != expressions_with_placeholders:
+                    logger.info(
+                        f'Replaced {parameter_name} using {description} pattern'
+                    )
+                    replacements_made += 1
+                    pattern_found = True
+                    break
+
+        if not pattern_found:
+            logger.warning(
+                f'No matching pattern found for parameter: {parameter_name}'
+            )
+            logger.debug(f'Looking for value: "{actual_value}"')
+
+            # Log a snippet around potential matches for debugging
+            if actual_value in expressions_with_placeholders:
+                logger.debug(
+                    f'Value found in file but no pattern matched. Context:'
+                )
+                lines = expressions_with_placeholders.split('\n')
+                for i, line in enumerate(lines):
+                    if actual_value in line:
+                        start = max(0, i - 2)
+                        end = min(len(lines), i + 3)
+                        for j in range(start, end):
+                            prefix = '>>> ' if j == i else '    '
+                            logger.debug(f'{prefix}{j+1}: {lines[j]}')
+
+    # Write back the result to file
+    try:
+        with open(expressions_path, 'w', encoding='utf-8') as f:
+            f.write(expressions_with_placeholders)
+        logger.success(
+            f'Updated expressions.tmdl for: {path} ({replacements_made} replacements)'
+        )
+    except Exception as e:
+        logger.error(f'Error writing expressions.tmdl: {e}')
+    return None
+
+
+def replace_semantic_model_placeholders_with_parameters(path: Union[str, Path], parameters: Dict[str, str]) -> None:
+    """
+    Replace placeholders with actual parameter values in semantic model expressions.
+    Supports both Import and Direct Lake model syntaxes.
+
+    Args:
+        path (Union[str, Path]): The path to the semantic model.
+        parameters (Dict[str, str]): A dictionary mapping parameter names to their values.
+    """
+    # Read the current content of expressions.tmdl
+    expressions_path = Path(path) / 'definition' / 'expressions.tmdl'
+
+    if not os.path.exists(expressions_path):
+        logger.warning(f'expressions.tmdl not found: {expressions_path}')
+        return None
+
+    try:
+        with open(expressions_path, 'r', encoding='utf-8') as f:
+            expressions = f.read()
+    except Exception as e:
+        logger.error(f'Error reading expressions.tmdl: {e}')
+        return None
+        
+
+    # Replace placeholders with actual values
+    expressions_with_values = expressions
+    replacements_made = 0
+
+    for parameter_name, actual_value in parameters.items():
+        logger.debug(
+            f'Processing parameter: {parameter_name} = "{actual_value}"'
+        )
+
+        # Create placeholder pattern: #{ParameterName}#
+        placeholder = f'#{{{parameter_name}}}#'
+
+        # Pattern 1: Import model syntax - expression ParameterName = "#{ParameterName}#"
+        pattern1 = rf'(expression\s+{re.escape(parameter_name)}\s*=\s*")({re.escape(placeholder)})(")'
+        replacement1 = lambda m: f'{m.group(1)}{actual_value}{m.group(3)}'
+
+        # Pattern 2: Direct Lake - Sql.Database("#{ServerEndpoint}#", ...) - First parameter
+        pattern2 = (
+            rf'(Sql\.Database\s*\(\s*")({re.escape(placeholder)})("\s*,)'
+        )
+        replacement2 = lambda m: f'{m.group(1)}{actual_value}{m.group(3)}'
+
+        # Pattern 3: Direct Lake - Sql.Database(..., "#{DatabaseId}#") - Second parameter
+        pattern3 = rf'(Sql\.Database\s*\([^"]*"[^"]*"\s*,\s*")({re.escape(placeholder)})(")'
+        replacement3 = lambda m: f'{m.group(1)}{actual_value}{m.group(3)}'
+
+        # Pattern 4: Generic parameter syntax - ParameterName = "#{ParameterName}#"
+        pattern4 = rf'({re.escape(parameter_name)}\s*=\s*")({re.escape(placeholder)})(")'
+        replacement4 = lambda m: f'{m.group(1)}{actual_value}{m.group(3)}'
+
+        # Pattern 5: Alternative syntax with single quotes
+        pattern5 = rf"({re.escape(parameter_name)}\s*=\s*')({re.escape(placeholder)})(')"
+        replacement5 = lambda m: f'{m.group(1)}{actual_value}{m.group(3)}'
+
+        # Try each pattern
+        patterns = [
+            (pattern1, replacement1, 'Import model (expression)'),
+            (
+                pattern2,
+                replacement2,
+                'Direct Lake (first parameter - server)',
+            ),
+            (
+                pattern3,
+                replacement3,
+                'Direct Lake (second parameter - database)',
+            ),
+            (pattern4, replacement4, 'Generic parameter'),
+            (pattern5, replacement5, 'Single quotes'),
+        ]
+
+        pattern_found = False
+        for pattern, replacement, description in patterns:
+            if re.search(
+                pattern, expressions_with_values, re.IGNORECASE | re.DOTALL
+            ):
+                old_content = expressions_with_values
+                expressions_with_values = re.sub(
+                    pattern,
+                    replacement,
+                    expressions_with_values,
+                    flags=re.IGNORECASE | re.DOTALL,
+                )
+                if old_content != expressions_with_values:
+                    logger.info(
+                        f'Replaced placeholder {parameter_name} with value using {description} pattern'
+                    )
+                    replacements_made += 1
+                    pattern_found = True
+                    break
+
+        if not pattern_found:
+            logger.warning(
+                f'No matching pattern found for placeholder: {parameter_name}'
+            )
+            logger.debug(f'Looking for placeholder: "{placeholder}"')
+
+            # Log a snippet around potential matches for debugging
+            if placeholder in expressions_with_values:
+                logger.debug(
+                    f'Placeholder found in file but no pattern matched. Context:'
+                )
+                lines = expressions_with_values.split('\n')
+                for i, line in enumerate(lines):
+                    if placeholder in line:
+                        start = max(0, i - 2)
+                        end = min(len(lines), i + 3)
+                        for j in range(start, end):
+                            prefix = '>>> ' if j == i else '    '
+                            logger.debug(f'{prefix}{j+1}: {lines[j]}')
+
+    # Write back the result to file
+    try:
+        with open(expressions_path, 'w', encoding='utf-8') as f:
+            f.write(expressions_with_values)
+        logger.success(
+            f'Updated expressions.tmdl for: {path} ({replacements_made} replacements)'
+        )
+    except Exception as e:
+        logger.error(f'Error writing expressions.tmdl: {e}')
+    
     return None
