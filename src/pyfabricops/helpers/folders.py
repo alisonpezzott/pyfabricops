@@ -6,10 +6,9 @@ from typing import Any, Dict, List, Optional, Union
 import pandas
 from pandas import DataFrame
 
-from ..core.folders import list_folders, resolve_folder
+from ..core.folders import create_folder, list_folders, resolve_folder
+from ..core.workspaces import resolve_workspace
 from ..utils.logging import get_logger
-from ..core.workspaces import resolve_workspace 
-from ..core.folders import create_folder
 
 logger = get_logger(__name__)
 
@@ -36,7 +35,7 @@ def generate_folders_paths(
 
     # Recursive function with cache to build the full path
     @lru_cache(maxsize=None)
-    def build_full_path(folder_id: str) -> str:
+    def _build_full_path(folder_id: str) -> str:
         """
         Returns the full path for the folder `folder_id`,
         recursively concatenating the names of its parents.
@@ -50,10 +49,10 @@ def generate_folders_paths(
         if pandas.isna(parent) or parent == '':
             return name
         # Otherwise, joins the parent path with self name
-        return build_full_path(parent) + '/' + name
+        return _build_full_path(parent) + '/' + name
 
     # Apply the function by each dataframe row
-    df['folder_path'] = df['id'].apply(lambda x: build_full_path(x))
+    df['folder_path'] = df['id'].apply(lambda x: _build_full_path(x))
 
     df = df.rename(columns={'id': 'folder_id'})
     return df[['folder_id', 'folder_path']]
@@ -104,11 +103,15 @@ def export_folders(workspace: str, path: Union[str, Path]) -> None:
         folder_path_ = Path(path) / folder['folder_path']
         os.makedirs(folder_path_, exist_ok=True)
         # Create a dummy README.md in each created folder
-        with open(Path(folder_path_) / 'README.md', 'w', encoding='utf-8') as f:
+        with open(
+            Path(folder_path_) / 'README.md', 'w', encoding='utf-8'
+        ) as f:
             f.write(
-                f'# {folder['folder_path']}\n\nThis folder corresponds to the Fabric workspace folder: **{folder['folder_path']}**\n\nFolder ID: `{folder['folder_id']}`\n'
+                f'# {folder["folder_path"]}\n\nThis folder corresponds to the Fabric workspace folder: **{folder["folder_path"]}**\n'
             )
-    logger.success(f'All folders from workspace {workspace} were exported to {path} successfully.')
+    logger.success(
+        f'All folders from workspace {workspace} were exported to {path} successfully.'
+    )
 
 
 def resolve_folder_from_id_to_path(
@@ -134,7 +137,7 @@ def resolve_folder_from_id_to_path(
 
 def deploy_folders(
     workspace: str,
-    path: Union[str, Path], 
+    path: Union[str, Path],
 ):
     """
     Creates folders in Fabric workspace based on local folder structure
@@ -261,7 +264,7 @@ def deploy_folders(
                 workspace, folder_name, parent_folder=parent_folder_id
             )
         elif parent_name:
-            create_folder(workspace, folder_name, parente_folder = parent_name)
+            create_folder(workspace, folder_name, parente_folder=parent_name)
         else:
             create_folder(workspace, folder_name)
 
@@ -285,23 +288,26 @@ def create_folders_from_path_string(workspace: str, path: str) -> str:
     parent_folder_id = None
 
     for folder in folders_tree:
-        
+
         # Get folder_id if folder exists
         folder_id = resolve_folder(workspace_id, folder)
         if folder_id is not None:
-            logger.info(f'Folder `{folder}` already exists with ID `{folder_id}`.') 
-        
+            logger.info(
+                f'Folder `{folder}` already exists with ID `{folder_id}`.'
+            )
+
         # If not, creates it.
         else:
             folder_id = create_folder(
-                workspace_id, 
-                folder, 
-                parent_folder=parent_folder_id, 
+                workspace_id,
+                folder,
+                parent_folder=parent_folder_id,
                 df=False,
             ).get('id')
-            logger.success(f'Folder `{folder}` created with ID `{folder_id}` successfully.')   
+            logger.success(
+                f'Folder `{folder}` created with ID `{folder_id}` successfully.'
+            )
 
         parent_folder_id = folder_id
 
     return folder_id
-

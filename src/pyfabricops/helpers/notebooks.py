@@ -155,7 +155,6 @@ def export_all_notebooks(
 
     Args:
         workspace (str): The name or ID of the workspace.
-        notebook (str): The name or ID of the notebook.
         path (Union[str, Path]): The path to export to.
     """
     workspace_id = resolve_workspace(workspace)

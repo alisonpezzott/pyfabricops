@@ -239,9 +239,9 @@ def save_lakehouse_shortcuts_metadata(
 
 
 def export_lakehouse(
-    workspace: str, 
+    workspace: str,
     lakehouse: str,
-    path: Union[str, Path], 
+    path: Union[str, Path],
 ) -> None:
     workspace_id = resolve_workspace(workspace)
     if workspace_id is None:
@@ -256,9 +256,7 @@ def export_lakehouse(
             workspace_id, item['folderId']
         )
     except:
-        logger.info(
-            f'{item["displayName"]}.Lakehouse is not inside a folder.'
-        )
+        logger.info(f'{item["displayName"]}.Lakehouse is not inside a folder.')
         folder_path = None
 
     if folder_path is None:
@@ -278,19 +276,17 @@ def export_lakehouse(
 
     _save_lakehouse_metadata_json(item_path)
 
-    shortcuts = generate_lakehouse_shortcuts_metadata(
-        workspace_id, item['id']
-    )
+    shortcuts = generate_lakehouse_shortcuts_metadata(workspace_id, item['id'])
 
     save_lakehouse_shortcuts_metadata(shortcuts, item_path)
 
-    logger.success(f'Lakehouse `{lakehouse}` from workspace `{workspace}` was exported to `{path}` successfully.')
+    logger.success(
+        f'Lakehouse `{lakehouse}` from workspace `{workspace}` was exported to `{path}` successfully.'
+    )
     return None
 
 
-def export_all_lakehouses(
-    workspace: str, path: Union[str, Path]
-) -> None:
+def export_all_lakehouses(workspace: str, path: Union[str, Path]) -> None:
     workspace_id = resolve_workspace(workspace)
     if workspace_id is None:
         return None

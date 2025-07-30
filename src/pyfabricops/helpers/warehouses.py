@@ -18,7 +18,7 @@ logger = get_logger(__name__)
 
 def _save_warehouse_sqlproj(
     display_name: str,
-    path: Union[Path, str],      
+    path: Union[Path, str],
 ) -> None:
     """
     Create a dummy warehouse `.sqlproj` file
@@ -42,23 +42,27 @@ def _save_warehouse_sqlproj(
     with open(Path(path) / f'{display_name}.sqlproj', 'w') as f:
         f.write(sql_project)
 
-    logger.success(f'{display_name}.sqlproject has been created in {path} successfully.')  
+    logger.success(
+        f'{display_name}.sqlproject has been created in {path} successfully.'
+    )
 
 
 def _save_warehouse_defaultsemanticmodel_txt(
-    path: Union[Path, str],      
+    path: Union[Path, str],
 ) -> None:
     """
     Create a `DefaultSemanticModel.txt` in `Warehouse` path.
     """
     with open(Path(path) / 'DefaultSemanticModel.txt', 'w') as f:
-        f.write('Has default semantic model') 
+        f.write('Has default semantic model')
 
-    logger.success(f'DefaultSemanticModel.txt was created in {path} successfully.')
+    logger.success(
+        f'DefaultSemanticModel.txt was created in {path} successfully.'
+    )
 
 
 def _save_warehouse_xmla_json(
-        path: Union[Path, str],
+    path: Union[Path, str],
 ) -> None:
     """
     Create a dummy `xmla.json` on `Warehouse` path.
@@ -93,7 +97,7 @@ def _save_warehouse_xmla_json(
         },
     }
     with open(Path(path) / 'xmla.json', 'w') as f:
-        json.dump(WAREHOUSE_XMLA_JSON, f, indent=2)  
+        json.dump(WAREHOUSE_XMLA_JSON, f, indent=2)
 
     logger.success(f'xmla.json was created in {path} successfully.')
 
@@ -235,8 +239,8 @@ def list_valid_warehouses(
 
 
 def export_warehouse(
-    workspace: str, 
-    warehouse: str, 
+    workspace: str,
+    warehouse: str,
     path: Union[str, Path],
 ) -> None:
     """
@@ -257,9 +261,7 @@ def export_warehouse(
             workspace_id, item['folderId']
         )
     except:
-        logger.info(
-            f'{item["displayName"]}.Warehouse is not inside a folder.'
-        )
+        logger.info(f'{item["displayName"]}.Warehouse is not inside a folder.')
         folder_path = None
 
     if folder_path is None:
@@ -281,15 +283,13 @@ def export_warehouse(
 
     _save_warehouse_sqlproj(item['displayName'], item_path)
 
-    _save_warehouse_xmla_json(item_path) 
+    _save_warehouse_xmla_json(item_path)
 
     logger.success(f'All warehouses exported to {path} successfully.')
     return None
 
 
-def export_all_warehouses(
-    workspace: str, path: Union[str, Path]
-) -> None:
+def export_all_warehouses(workspace: str, path: Union[str, Path]) -> None:
     """
     Exports all warehouses from the workspace to path.
 
@@ -335,7 +335,7 @@ def export_all_warehouses(
 
         _save_warehouse_sqlproj(item['displayName'], item_path)
 
-        _save_warehouse_xmla_json(item_path) 
+        _save_warehouse_xmla_json(item_path)
 
     logger.success(f'All warehouses exported to {path} successfully.')
     return None

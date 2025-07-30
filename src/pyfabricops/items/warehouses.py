@@ -122,7 +122,7 @@ def get_warehouse(
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:
         return None
-    
+
     warehouse_id = resolve_warehouse(workspace_id, warehouse)
     if not warehouse_id:
         return None

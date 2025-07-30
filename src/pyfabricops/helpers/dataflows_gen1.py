@@ -1,16 +1,22 @@
-import os
 import json
+import os
 import uuid
-
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
 from ..api.api import _base_api
-from ..items.dataflows_gen1 import get_dataflow_gen1, list_dataflows_gen1, get_dataflow_gen1_definition
-from ..utils.logging import get_logger
-from ..utils.utils import load_and_sanitize, list_paths_of_type, write_single_line_json
 from ..core.workspaces import resolve_workspace
-
+from ..items.dataflows_gen1 import (
+    get_dataflow_gen1,
+    get_dataflow_gen1_definition,
+    list_dataflows_gen1,
+)
+from ..utils.logging import get_logger
+from ..utils.utils import (
+    list_paths_of_type,
+    load_and_sanitize,
+    write_single_line_json,
+)
 
 logger = get_logger(__name__)
 
@@ -155,9 +161,7 @@ def export_all_dataflows_gen1(
     else:
         for dataflow in dataflows:
             export_dataflow_gen1(
-                workspace=workspace,
-                dataflow=dataflow['objectId'],
-                path=path
+                workspace=workspace, dataflow=dataflow['objectId'], path=path
             )
         return None
 

@@ -7,8 +7,8 @@ import re
 import shutil
 import subprocess
 import uuid
-from typing import Any, Dict, List, Optional, Union
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
 
 import json5
 import pandas
@@ -338,7 +338,6 @@ def parse_tmdl_parameters(path: str) -> dict:
     except Exception as e:
         raise ValueError(f'Error reading file {path}: {str(e)}')
 
-
     params = {}
 
     # Pattern 1: Import model - expression VariableName = "Value"
@@ -350,8 +349,7 @@ def parse_tmdl_parameters(path: str) -> dict:
         variable_value = match[1]
         # Skip if it's already a placeholder
         if not (
-            variable_value.startswith('#{')
-            and variable_value.endswith('}#')
+            variable_value.startswith('#{') and variable_value.endswith('}#')
         ):
             params[variable_name] = variable_value
 
@@ -364,13 +362,10 @@ def parse_tmdl_parameters(path: str) -> dict:
         database_value = match[1]
 
         # Skip if they're already placeholders
-        if not (
-            server_value.startswith('#{') and server_value.endswith('}#')
-        ):
+        if not (server_value.startswith('#{') and server_value.endswith('}#')):
             params['ServerEndpoint'] = server_value
         if not (
-            database_value.startswith('#{')
-            and database_value.endswith('}#')
+            database_value.startswith('#{') and database_value.endswith('}#')
         ):
             params['DatabaseId'] = database_value
 
@@ -628,20 +623,22 @@ def dataframe_to_list(df: DataFrame) -> list[dict]:
     return df.to_dict(orient='records')
 
 
-def list_paths_of_type(path: Union[str, Path], type: str) -> List[Union[str, Path]]:
+def list_paths_of_type(
+    path: Union[str, Path], type: str
+) -> List[Union[str, Path]]:
     """
     Returns a list of paths given a type of the items
     """
-    paths = glob.glob(
-        f'{path}/**/*.{type}', recursive=True
-    )
+    paths = glob.glob(f'{path}/**/*.{type}', recursive=True)
     return [str(Path(p).as_posix()) for p in paths]
 
 
-def extract_middle_path(path: str, start_path: Optional[str] = None) -> Union[str, None]:
-    '''
+def extract_middle_path(
+    path: str, start_path: Optional[str] = None
+) -> Union[str, None]:
+    """
     Extract the middle of a full path given a start.
-    '''
+    """
     path_list = path.split('/')[:-1]
     if len(path_list) == 0:
         return None
@@ -660,6 +657,6 @@ def extract_middle_path(path: str, start_path: Optional[str] = None) -> Union[st
 
 def extract_display_name_from_platform(path: str) -> str:
     with open(Path(path) / '.platform', 'r', encoding='utf-8') as f:
-        platform_dict = json.load(f) 
+        platform_dict = json.load(f)
 
     return platform_dict.get('metadata').get('displayName')

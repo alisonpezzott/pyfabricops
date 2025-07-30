@@ -2,13 +2,14 @@ from typing import Any, Dict, List, Optional, Union
 
 from pandas import DataFrame
 
+from pyfabricops.core import workspaces
+
 from ..api.api import api_request
 from ..core.folders import resolve_folder
 from ..core.workspaces import resolve_workspace
 from ..utils.decorators import df
 from ..utils.logging import get_logger
 from ..utils.utils import is_valid_uuid
-from pyfabricops.core import workspaces
 
 logger = get_logger(__name__)
 
@@ -58,7 +59,7 @@ def get_semantic_model_id(
     workspace_id = resolve_workspace(workspace)
     if workspace_id is None:
         return None
-    
+
     semantic_models = list_semantic_models(workspace_id, df=False)
     for semantic_model_ in semantic_models:
         if semantic_model_['displayName'] == semantic_model:

@@ -123,7 +123,9 @@ def export_data_pipeline(
             workspace_id, item['folderId']
         )
     except:
-        logger.info(f'{item["displayName"]}.DataPipeline is not inside a folder.')
+        logger.info(
+            f'{item["displayName"]}.DataPipeline is not inside a folder.'
+        )
         folder_path = None
 
     if folder_path is None:
@@ -181,7 +183,9 @@ def export_all_data_pipelines(
             item_path = Path(path) / (item['displayName'] + '.DataPipeline')
         else:
             item_path = (
-                Path(path) / folder_path / (item['displayName'] + '.DataPipeline')
+                Path(path)
+                / folder_path
+                / (item['displayName'] + '.DataPipeline')
             )
         os.makedirs(item_path, exist_ok=True)
 
