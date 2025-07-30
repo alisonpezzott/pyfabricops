@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Union
 
 import pandas as pd
-from h11 import Data
 from pandas import DataFrame
 
 from ..api.api import _base_api
@@ -550,7 +549,9 @@ def deploy_all_semantic_models(
     return None
 
 
-def replace_semantic_model_parameters_with_placeholders(path: Union[str, Path], parameters: Dict[str, str]) -> None:
+def replace_semantic_model_parameters_with_placeholders(
+    path: Union[str, Path]
+) -> None:
     """
     Replace parameter values with placeholders in semantic model expressions.
     Supports both Import and Direct Lake model syntaxes.
@@ -572,7 +573,9 @@ def replace_semantic_model_parameters_with_placeholders(path: Union[str, Path], 
         logger.error(f'Error reading expressions.tmdl: {e}')
         return None
 
-    semantic_model_parameters = extract_tmdl_parameters_from_semantic_model(path)
+    semantic_model_parameters = extract_tmdl_parameters_from_semantic_model(
+        path
+    )
     if semantic_model_parameters is None:
         logger.warning(f'No parameters found in semantic model: {path}')
         return None
@@ -689,7 +692,9 @@ def replace_semantic_model_parameters_with_placeholders(path: Union[str, Path], 
     return None
 
 
-def replace_semantic_model_placeholders_with_parameters(path: Union[str, Path], parameters: Dict[str, str]) -> None:
+def replace_semantic_model_placeholders_with_parameters(
+    path: Union[str, Path], parameters: Dict[str, str]
+) -> None:
     """
     Replace placeholders with actual parameter values in semantic model expressions.
     Supports both Import and Direct Lake model syntaxes.
@@ -711,7 +716,6 @@ def replace_semantic_model_placeholders_with_parameters(path: Union[str, Path], 
     except Exception as e:
         logger.error(f'Error reading expressions.tmdl: {e}')
         return None
-        
 
     # Replace placeholders with actual values
     expressions_with_values = expressions
@@ -813,5 +817,5 @@ def replace_semantic_model_placeholders_with_parameters(path: Union[str, Path], 
         )
     except Exception as e:
         logger.error(f'Error writing expressions.tmdl: {e}')
-    
+
     return None

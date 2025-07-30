@@ -62,33 +62,35 @@ from .core.workspaces import (
     update_workspace_role_assignment,
 )
 from .helpers.folders import (
+    create_folders_from_path_string,
     deploy_folders,
     export_folders,
     generate_folders_paths,
     get_folders_config,
     get_folders_paths,
     resolve_folder_from_id_to_path,
-    create_folders_from_path_string,
 )
 from .helpers.lakehouses import (
     export_all_lakehouses,
-    get_lakehouse_config,
     get_all_lakehouses_config,
+    get_lakehouse_config,
     list_valid_lakehouses,
 )
 from .helpers.semantic_models import (
     deploy_semantic_model,
-    export_semantic_model,
     export_all_semantic_models,
-    get_semantic_model_config,
-    get_all_semantic_models_config,
-    list_valid_semantic_models,
+    export_semantic_model,
     extract_tmdl_parameters_from_semantic_model,
+    get_all_semantic_models_config,
+    get_semantic_model_config,
+    list_valid_semantic_models,
+    replace_semantic_model_parameters_with_placeholders,
+    replace_semantic_model_placeholders_with_parameters,
 )
 from .helpers.warehouses import (
     export_all_warehouses,
-    get_warehouse_config,
     get_all_warehouses_config,
+    get_warehouse_config,
     list_valid_warehouses,
 )
 from .helpers.workspaces import (
@@ -201,14 +203,14 @@ from .items.warehouses import (
 from .utils.logging import setup_logging
 from .utils.utils import (
     dataframe_to_list,
+    extract_display_name_from_platform,
+    extract_middle_path,
     get_current_branch,
     get_workspace_suffix,
+    list_paths_of_type,
     read_json,
     unpack_item_definition,
     write_json,
-    list_paths_of_type,
-    extract_middle_path,
-    extract_display_name_from_platform,
 )
 
 __all__ = [
@@ -251,7 +253,7 @@ __all__ = [
     'delete_workspace',
     'delete_workspace_role_assignment',
     'deploy_folders',
-    'deploy_semantic_model', 
+    'deploy_semantic_model',
     'export_semantic_model',
     'export_all_semantic_models',
     'extract_display_name_from_platform',
@@ -335,6 +337,8 @@ __all__ = [
     'list_workspaces',
     'move_folder',
     'read_json',
+    'replace_semantic_model_parameters_with_placeholders',
+    'replace_semantic_model_placeholders_with_parameters',
     'resolve_capacity',
     'resolve_connection',
     'resolve_data_pipeline',
