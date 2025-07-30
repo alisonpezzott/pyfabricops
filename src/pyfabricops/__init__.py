@@ -76,6 +76,14 @@ from .helpers.lakehouses import (
     get_lakehouse_config,
     list_valid_lakehouses,
 )
+from .helpers.notebooks import (
+    deploy_all_notebooks,
+    deploy_notebook,
+    export_all_notebooks,
+    export_notebook,
+    get_all_notebooks_config,
+    get_notebook_config,
+)
 from .helpers.reports import (
     convert_report_definition_to_by_connection,
     convert_report_definition_to_by_path,
@@ -86,7 +94,6 @@ from .helpers.reports import (
     extract_report_definition_pbir,
     get_all_reports_config,
     get_report_config,
-    list_valid_reports,
 )
 from .helpers.semantic_models import (
     deploy_semantic_model,
@@ -264,14 +271,19 @@ __all__ = [
     'delete_warehouse',
     'delete_workspace',
     'delete_workspace_role_assignment',
+    'deploy_all_notebooks',
     'deploy_folders',
+    'deploy_notebooks',
     'deploy_semantic_model',
+    'export_all_notebooks',
+    'export_notebooks',
     'export_semantic_model',
     'export_all_semantic_models',
     'extract_display_name_from_platform',
     'extract_middle_path',
     'extract_tmdl_parameters_from_semantic_model',
     'generate_folders_paths',
+    'get_all_notebooks_config',
     'get_all_semantic_models_config',
     'get_capacity_id',
     'get_connection',
@@ -305,6 +317,7 @@ __all__ = [
     'get_logger',
     'get_my_git_credentials',
     'get_notebook',
+    'get_notebook_config',
     'get_notebook_definition',
     'get_notebook_id',
     'get_report',
@@ -411,5 +424,4 @@ __all__ = [
     'extract_report_definition_pbir',
     'get_all_reports_config',
     'get_report_config',
-    'list_valid_reports',
 ]
