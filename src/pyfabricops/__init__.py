@@ -76,6 +76,18 @@ from .helpers.lakehouses import (
     get_lakehouse_config,
     list_valid_lakehouses,
 )
+from .helpers.reports import (
+    convert_report_definition_to_by_connection,
+    convert_report_definition_to_by_path,
+    deploy_all_reports,
+    deploy_report,
+    export_all_reports,
+    export_report,
+    extract_report_definition_pbir,
+    get_all_reports_config,
+    get_report_config,
+    list_valid_reports,
+)
 from .helpers.semantic_models import (
     deploy_semantic_model,
     export_all_semantic_models,
@@ -332,6 +344,7 @@ __all__ = [
     'list_shortcuts',
     'list_valid_lakehouses',
     'list_valid_semantic_models',
+    'list_valid_warehouses',
     'list_warehouses',
     'list_workspace_role_assignments',
     'list_workspaces',
@@ -389,4 +402,14 @@ __all__ = [
     'get_all_warehouses_config',
     'export_folders',
     'resolve_folder_from_id_to_path',
+    'convert_report_definition_to_by_connection',
+    'convert_report_definition_to_by_path',
+    'deploy_all_reports',
+    'deploy_report',
+    'export_all_reports',
+    'export_report',
+    'extract_report_definition_pbir',
+    'get_all_reports_config',
+    'get_report_config',
+    'list_valid_reports',
 ]
