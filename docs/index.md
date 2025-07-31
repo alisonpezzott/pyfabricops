@@ -195,7 +195,7 @@ pf.disable_logging()
 pf.reset_logging()
 ```  
 
-For complete logging configuration options, refer to the [logging_system.md](./logging_system.md)   
+For complete logging configuration options, refer to the [logging_system.md](../logging_system.md)   
 
 
 ## ❤️Contributing
@@ -244,7 +244,7 @@ pip install --index-url https://test.pypi.org/simple/ pyfabricops
 If you encounter any issues, please report them at [https://github.com/alisonpezzott/pyfabricops/issues](https://github.com/alisonpezzott/pyfabricops/issues)  
 
 ## ⚖️ License
-This project is licensed under the MIT License – see the [LICENSE](LICENSE) file for details.  
+This project is licensed under the MIT License – see the [LICENSE](../LICENSE) file for details.  
 
 ## 🌟 Acknowledgements
 Created and maintained by Alison Pezzott
