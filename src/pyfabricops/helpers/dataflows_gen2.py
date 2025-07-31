@@ -1,6 +1,7 @@
 import os
+import re
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
 from pandas import DataFrame
@@ -303,3 +304,197 @@ def deploy_all_dataflows_gen2(
         f'All dataflows_gen2 were deployed to workspace "{workspace}" successfully.'
     )
     return None
+
+
+def extract_dataflow_gen2_variables(path: str) -> List[Dict[str, Any]]:
+    """
+    Extract variables from a Dataflow Gen2 mashup.pq file, identifying each destination separately.
+
+    Args:
+        path (str): Path to the Dataflow gen2
+
+    Returns:
+        (List[Dict[str, Any]]): List of dictionaries containing the extracted variables for each destination
+    """
+    path = Path(path) / 'mashup.pq'
+
+    with open(path, 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    variables = []
+
+    # Pattern to find DataDestination sections
+    # Look for shared QueryName_DataDestination = let
+    destination_pattern = (
+        r'shared\s+(\w+)_DataDestination\s*=\s*let(.*?)in\s*\w+;'
+    )
+    destination_matches = re.findall(destination_pattern, content, re.DOTALL)
+
+    for query_name, destination_content in destination_matches:
+        param_dict = {
+            'destination_name': f'{query_name}_DataDestination',
+            'query_name': query_name,
+        }
+
+        # Extract workspaceId
+        workspace_pattern = r'workspaceId\s*=\s*"([a-f0-9-]+)"'
+        workspace_match = re.search(workspace_pattern, destination_content)
+        if workspace_match:
+            param_dict['workspaceId'] = workspace_match.group(1)
+
+        # Extract lakehouseId
+        lakehouse_pattern = r'lakehouseId\s*=\s*"([a-f0-9-]+)"'
+        lakehouse_match = re.search(lakehouse_pattern, destination_content)
+        if lakehouse_match:
+            param_dict['lakehouseId'] = lakehouse_match.group(1)
+            param_dict['destination_type'] = 'Lakehouse'
+
+        # Extract warehouseId
+        warehouse_pattern = r'warehouseId\s*=\s*"([a-f0-9-]+)"'
+        warehouse_match = re.search(warehouse_pattern, destination_content)
+        if warehouse_match:
+            param_dict['warehouseId'] = warehouse_match.group(1)
+            param_dict['destination_type'] = 'Warehouse'
+
+        # Extract semanticModelId (if present)
+        semantic_pattern = r'semanticModelId\s*=\s*"([a-f0-9-]+)"'
+        semantic_match = re.search(semantic_pattern, destination_content)
+        if semantic_match:
+            param_dict['semanticModelId'] = semantic_match.group(1)
+            param_dict['destination_type'] = 'SemanticModel'
+
+        # Only add if we found at least one ID parameter
+        if any(key.endswith('Id') for key in param_dict.keys()):
+            variables.append(param_dict)
+
+    return variables
+
+
+def replace_dataflow_gen2_variables_with_placeholders(
+    path: str, variables: List[Dict[str, Any]]
+) -> None:
+    """
+    Replace variables with placeholders in a Dataflow Gen2 mashup.pq file.
+    Each destination gets unique placeholders based on its query name.
+
+    Args:
+        path (str): Path to the Dataflow gen2
+        variables (list): List of variable dictionaries to replace
+        dataflow_name (str): Name of the dataflow for placeholder naming
+
+    Returns:
+        str: Modified content with placeholders
+    """
+    dataflow_name = path.split('/')[-1].split('.Dataflow')[0]
+
+    path = Path(path) / 'mashup.pq'
+
+    with open(path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    # Replace each destination's variables with unique placeholders
+    for var_dict in variables:
+        query_name = var_dict['query_name']
+
+        # Replace workspaceId
+        if 'workspaceId' in var_dict:
+            workspace_id = var_dict['workspaceId']
+            placeholder = f'#{{{dataflow_name}_{query_name}_workspaceId}}#'
+            content = content.replace(
+                f'workspaceId = "{workspace_id}"',
+                f'workspaceId = "{placeholder}"',
+            )
+
+        # Replace lakehouseId
+        if 'lakehouseId' in var_dict:
+            lakehouse_id = var_dict['lakehouseId']
+            placeholder = f'#{{{dataflow_name}_{query_name}_lakehouseId}}#'
+            content = content.replace(
+                f'lakehouseId = "{lakehouse_id}"',
+                f'lakehouseId = "{placeholder}"',
+            )
+
+        # Replace warehouseId
+        if 'warehouseId' in var_dict:
+            warehouse_id = var_dict['warehouseId']
+            placeholder = f'#{{{dataflow_name}_{query_name}_warehouseId}}#'
+            content = content.replace(
+                f'warehouseId = "{warehouse_id}"',
+                f'warehouseId = "{placeholder}"',
+            )
+
+        # Replace semanticModelId
+        if 'semanticModelId' in var_dict:
+            semantic_id = var_dict['semanticModelId']
+            placeholder = f'#{{{dataflow_name}_{query_name}_semanticModelId}}#'
+            content = content.replace(
+                f'semanticModelId = "{semantic_id}"',
+                f'semanticModelId = "{placeholder}"',
+            )
+
+    # Save the modified content back to the file
+    with open(path, 'w', encoding='utf-8') as file:
+        file.write(content)
+
+
+def replace_dataflow_gen2_placeholders_with_parameters(
+    path: str, variables: List[Dict[str, Any]]
+) -> None:
+    """
+    Replace placeholders with actual parameters in a Dataflow Gen2 mashup.pq file.
+
+    Args:
+        path (str): Path to the dataflow gen2
+        variables (list): List of variable dictionaries with actual values
+
+    Returns:
+        str: Modified content with actual parameter values
+    """
+    dataflow_name = path.split('/')[-1].split('.Dataflow')[0]
+
+    path = Path(path) / 'mashup.pq'
+
+    with open(path, 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    # Replace placeholders with actual values for each destination
+    for var_dict in variables:
+        query_name = var_dict['query_name']
+
+        # Replace workspaceId placeholder
+        if 'workspaceId' in var_dict:
+            workspace_id = var_dict['workspaceId']
+            placeholder = f'#{{{dataflow_name}_{query_name}_workspaceId}}#'
+            content = content.replace(
+                f'workspaceId = "{placeholder}"',
+                f'workspaceId = "{workspace_id}"',
+            )
+
+        # Replace lakehouseId placeholder
+        if 'lakehouseId' in var_dict:
+            lakehouse_id = var_dict['lakehouseId']
+            placeholder = f'#{{{dataflow_name}_{query_name}_lakehouseId}}#'
+            content = content.replace(
+                f'lakehouseId = "{placeholder}"',
+                f'lakehouseId = "{lakehouse_id}"',
+            )
+
+        # Replace warehouseId placeholder
+        if 'warehouseId' in var_dict:
+            warehouse_id = var_dict['warehouseId']
+            placeholder = f'#{{{dataflow_name}_{query_name}_warehouseId}}#'
+            content = content.replace(
+                f'warehouseId = "{placeholder}"',
+                f'warehouseId = "{warehouse_id}"',
+            )
+
+        # Replace semanticModelId placeholder
+        if 'semanticModelId' in var_dict:
+            semantic_id = var_dict['semanticModelId']
+            placeholder = f'#{{{dataflow_name}_{query_name}_semanticModelId}}#'
+            content = content.replace(
+                f'semanticModelId = "{placeholder}"',
+                f'semanticModelId = "{semantic_id}"',
+            )
+
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write(content)

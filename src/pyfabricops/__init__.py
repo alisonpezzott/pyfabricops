@@ -87,8 +87,11 @@ from .helpers.dataflows_gen2 import (
     deploy_dataflow_gen2,
     export_all_dataflows_gen2,
     export_dataflow_gen2,
+    extract_dataflow_gen2_variables,
     get_all_dataflows_gen2_config,
     get_dataflow_gen2_config,
+    replace_dataflow_gen2_placeholders_with_parameters,
+    replace_dataflow_gen2_variables_with_placeholders
 )
 from .helpers.folders import (
     create_folders_from_path_string,
@@ -397,6 +400,7 @@ __all__ = [
     'export_semantic_model',
     'export_warehouse',
     'extract_data_pipeline_variables',
+    'extract_dataflow_gen2_variables',
     'extract_display_name_from_platform',
     'extract_middle_path',
     'extract_report_definition_pbir',
@@ -506,6 +510,8 @@ __all__ = [
     'refresh_semantic_model',
     'replace_data_pipeline_placeholders_with_variables',
     'replace_data_pipeline_variables_with_placeholders',
+    'replace_dataflow_gen2_placeholders_with_parameters',
+    'replace_dataflow_gen2_variables_with_placeholders',
     'replace_semantic_model_parameters_with_placeholders',
     'replace_semantic_model_placeholders_with_parameters',
     'reset_logging',

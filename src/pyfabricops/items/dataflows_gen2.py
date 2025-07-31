@@ -50,7 +50,7 @@ def get_dataflow_gen2_id(
         (Union[str, None]): The ID of the dataflow if found, otherwise None.
     """
     dataflows = list_dataflows_gen2(
-        workspace_id=resolve_workspace(workspace),
+        workspace=resolve_workspace(workspace),
         df=False,
     )
 
@@ -231,6 +231,7 @@ def get_dataflow_gen2_definition(
         + '/dataflows/'
         + dataflow_id
         + '/getDefinition',
+        method='post',
         support_lro=True,
     )
 
