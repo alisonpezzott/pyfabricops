@@ -8,36 +8,50 @@ edit_uri: tree/main/docs
 nav:
   - Home: index.md
   - Functions:
-    - Core: 
-      - Authentication: functions/auth.md
-      - Capacities: functions/capacities.md
-      - Connections: functions/connections.md
-      - Core: functions/core.md
-      - Folders: functions/folders.md
-      - Gateways: functions/gateways.md
-      - Workspaces: functions/workspaces.md
+    - API: 
+      - API: functions/api/api.md
+      - Auth: functions/api/auth.md
+      - Scopes: functions/api/scopes.md
+    - CD (Continuous Deployment):
+      - Support files: functions/cd/support_files.md
+    - Core:
+      - Capacities: functions/core/capacities.md
+      - Connections: functions/core/connections.md
+      - Folders: functions/core/folders.md
+      - Gateways: functions/core/gateways.md
+      - Git: functions/core/git.md
+      - Workspaces: functions/core/workspaces.md
+    - Helpers:
+      - Data Pipelines: functions/helpers/data_pipelines.md
+      - Dataflows Gen1: functions/helpers/dataflows_gen1.md
+      - Dataflows Gen2: functions/helpers/dataflows_gen2.md
+      - Folders: functions/helpers/folders.md
+      - Items: functions/helpers/items.md
+      - Lakehouses: functions/helpers/lakehouses.md
+      - Notebooks: functions/helpers/notebooks.md
+      - Reports: functions/helpers/reports.md
+      - Semantic Models: functions/helpers/semantic_models.md
+      - Warehouses: functions/helpers/warehouses.md
+      - Workspaces: functions/helpers/workspaces.md
     - Items:
-      - Data Pipelines: functions/data_pipelines.md
-      - Dataflows Gen1: functions/dataflows_gen1.md
-      - Dataflows Gen2: functions/dataflows_gen2.md
-      - Items: functions/items.md
-      - Lakehouses: functions/lakehouses.md
-      - Notebooks: functions/notebooks.md
-      - Reports: functions/reports.md
-      - Semantic Models: functions/semantic_models.md
-      - Shortcuts: functions/shortcuts.md
-      - Warehouses: functions/warehouses.md
-    - CI/CD:
-      - Git: functions/git.md
-      - Support Files: functions/CI_CD/support_files.md   
-    - Orchestration:
-      - Workspaces: functions/orchestration/workspaces.md
-    - Raises and Logging:
-      - Exceptions: functions/raises_and_logging/exceptions.md
-      - Logging: functions/raises_and_logging/logging_system.md
-    - Auxiliary:
-      - Decorators: functions/auxiliary/decorators.md
-      - Utils: functions/auxiliary/utils.md
+      - Data Pipelines: functions/items/data_pipelines.md
+      - Dataflows Gen1: functions/items/dataflows_gen1.md
+      - Dataflows Gen2: functions/items/dataflows_gen2.md
+      - Folders: functions/items/folders.md
+      - Items: functions/items/items.md
+      - Lakehouses: functions/items/lakehouses.md
+      - Notebooks: functions/items/notebooks.md
+      - Reports: functions/items/reports.md
+      - Semantic Models: functions/items/semantic_models.md
+      - Warehouses: functions/items/warehouses.md
+      - Workspaces: functions/items/workspaces.md
+    - Utils:
+      - Decorators: functions/utils/decorators.md
+      - Exceptions: functions/utils/exceptions.md
+      - Logging: functions/utils/logging.md
+      - Logging System: functions/utils/logging_system.md
+      - Schemas: functions/utils/schemas.md
+      - Utils: functions/utils/utils.md
 
 theme:
   name: material
