@@ -68,8 +68,11 @@ from .helpers.data_pipelines import (
     deploy_data_pipeline,
     export_all_data_pipelines,
     export_data_pipeline,
+    extract_data_pipeline_variables,
     get_all_data_pipelines_config,
     get_data_pipeline_config,
+    replace_data_pipeline_placeholders_with_variables,
+    replace_data_pipeline_variables_with_placeholders,
 )
 from .helpers.dataflows_gen1 import (
     deploy_all_dataflows_gen1,
@@ -393,6 +396,7 @@ __all__ = [
     'export_report',
     'export_semantic_model',
     'export_warehouse',
+    'extract_data_pipeline_variables',
     'extract_display_name_from_platform',
     'extract_middle_path',
     'extract_report_definition_pbir',
@@ -500,6 +504,8 @@ __all__ = [
     'read_json',
     'refresh_dataflow_gen1',
     'refresh_semantic_model',
+    'replace_data_pipeline_placeholders_with_variables',
+    'replace_data_pipeline_variables_with_placeholders',
     'replace_semantic_model_parameters_with_placeholders',
     'replace_semantic_model_placeholders_with_parameters',
     'reset_logging',
