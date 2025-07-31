@@ -43,7 +43,6 @@ nav:
       - Reports: functions/items/reports.md
       - Semantic Models: functions/items/semantic_models.md
       - Warehouses: functions/items/warehouses.md
-      - Workspaces: functions/items/workspaces.md
     - Utils:
       - Decorators: functions/utils/decorators.md
       - Exceptions: functions/utils/exceptions.md
