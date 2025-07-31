@@ -1,3 +1,7 @@
+from ..utils.utils import get_logger
+
+logger = get_logger(__name__)
+
 ENV = {
     'path': '.env',
     'content': """FAB_CLIENT_ID=your_client_id_here
@@ -137,4 +141,4 @@ def create_support_files():
             os.makedirs(os.path.dirname(path) or '.', exist_ok=True)
             with open(path, 'w', encoding='utf-8') as f:
                 f.write(file_dict['content'])
-            print(f'✓ {path}')
+            logger.success(f'Created {path}')
