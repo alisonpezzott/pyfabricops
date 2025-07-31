@@ -160,7 +160,6 @@ def export_all_reports(
 
     Args:
         workspace (str): The name or ID of the workspace.
-        report (str): The name or ID of the report.
         path (Union[str, Path]): The path to export to.
     """
     workspace_id = resolve_workspace(workspace)

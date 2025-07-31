@@ -102,7 +102,7 @@ def get_gateway_public_key(gateway: str) -> dict | None:
     Extracts the public key of a gateway by its ID.
 
     Args:
-        gateway_id (str): The ID of the gateway to retrieve the public key from.
+        gateway (str): The ID of the gateway to retrieve the public key from.
 
     Returns:
         dict: The public key details if found, otherwise None.

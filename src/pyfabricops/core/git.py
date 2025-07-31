@@ -500,7 +500,7 @@ def update_my_git_connection(
     ] = 'UpdateGitCredentialsToAutomaticRequest',
     connection_id: str = None,
     credential_type: Literal['spn', 'user'] = 'spn',
-):
+) -> dict:
     """
     Updates the Git connection for a Fabric workspace.
 

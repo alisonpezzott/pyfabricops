@@ -172,7 +172,6 @@ def deploy_item(
         start_path (str, optional): The starting path for the item.
         description (str, optional): A description for the item.
         df (bool, optional): Whether to return a DataFrame. Defaults to True.
-        ```
     """
     workspace_id = resolve_workspace(workspace)
     if not workspace_id:

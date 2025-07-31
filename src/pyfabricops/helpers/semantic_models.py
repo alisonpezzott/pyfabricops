@@ -211,7 +211,6 @@ def export_all_semantic_models(
 
     Args:
         workspace (str): The name or ID of the workspace.
-        semantic_model (str): The name or ID of the semantic_model.
         path (Union[str, Path]): The path to export to.
     """
     workspace_id = resolve_workspace(workspace)

@@ -156,7 +156,6 @@ def export_all_dataflows_gen2(
 
     Args:
         workspace (str): The name or ID of the workspace.
-        dataflow_gen2 (str): The name or ID of the dataflow_gen2.
         path (Union[str, Path]): The path to export to.
     """
     workspace_id = resolve_workspace(workspace)
@@ -380,7 +379,6 @@ def replace_dataflow_gen2_variables_with_placeholders(
     Args:
         path (str): Path to the Dataflow gen2
         variables (list): List of variable dictionaries to replace
-        dataflow_name (str): Name of the dataflow for placeholder naming
 
     Returns:
         str: Modified content with placeholders

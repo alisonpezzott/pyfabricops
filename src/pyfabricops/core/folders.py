@@ -21,7 +21,7 @@ def list_folders(
     List folders in a workspace
 
     Args:
-        workspace_id (str): The workspace to list folders from.
+        workspace (str): The workspace to list folders from.
         df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
@@ -242,9 +242,9 @@ def move_folder(
     Move a existing folder into other or root folder.
 
     Args:
-        workspace_id (str): The workspace where the folder will be updated.
-        folder_id (str): The folder to be moved.
-        target_folder_id (str): The name of the parent folder will receive the moved folder.
+        workspace (str): The workspace where the folder will be updated.
+        folder (str): The folder to be moved.
+        target_folder (str): The name of the parent folder will receive the moved folder.
         df (bool, optional): Keyword-only.
             If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.

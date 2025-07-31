@@ -234,7 +234,6 @@ def update_connection_role_assignment(
     Args:
         connection (str): The name or ID of the connection to update the role assignment for.
         user_uuid (str): The UUID of the user or group to update the role assignment for.
-        user_type (str): The type of the principal. Options: User, Group, ServicePrincipal, ServicePrincipalProfile.
         role (str): The role to assign to the user or group. Options: Owner, User, UserWithReshare.
         df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
@@ -447,7 +446,7 @@ def create_sql_on_premises_connection(
 
     Args:
         display_name (str): The display name for the connection. If None, defaults to connection_name.
-        gateway (str): The ID or displayName of the gateway to use for the connection.
+        gateway_id (str): The ID or displayName of the gateway to use for the connection.
         server (str): The server name for the SQL connection.
         database (str): The database name for the SQL connection.
         username (str): The username for the SQL connection.

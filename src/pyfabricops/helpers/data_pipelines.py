@@ -158,7 +158,6 @@ def export_all_data_pipelines(
 
     Args:
         workspace (str): The name or ID of the workspace.
-        data_pipeline (str): The name or ID of the data_pipeline.
         path (Union[str, Path]): The path to export to.
     """
     workspace_id = resolve_workspace(workspace)
