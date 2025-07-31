@@ -37,7 +37,6 @@ nav:
       - Data Pipelines: functions/items/data_pipelines.md
       - Dataflows Gen1: functions/items/dataflows_gen1.md
       - Dataflows Gen2: functions/items/dataflows_gen2.md
-      - Folders: functions/items/folders.md
       - Items: functions/items/items.md
       - Lakehouses: functions/items/lakehouses.md
       - Notebooks: functions/items/notebooks.md
