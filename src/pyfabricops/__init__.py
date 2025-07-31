@@ -91,7 +91,7 @@ from .helpers.dataflows_gen2 import (
     get_all_dataflows_gen2_config,
     get_dataflow_gen2_config,
     replace_dataflow_gen2_placeholders_with_parameters,
-    replace_dataflow_gen2_variables_with_placeholders
+    replace_dataflow_gen2_variables_with_placeholders,
 )
 from .helpers.folders import (
     create_folders_from_path_string,
@@ -122,8 +122,11 @@ from .helpers.notebooks import (
     deploy_notebook,
     export_all_notebooks,
     export_notebook,
+    extract_notebook_parameters,
     get_all_notebooks_config,
     get_notebook_config,
+    replace_notebook_parameters_with_placeholders,
+    replace_notebook_placeholders_with_parameters,
 )
 from .helpers.reports import (
     convert_report_definition_to_by_connection,
@@ -403,6 +406,7 @@ __all__ = [
     'extract_dataflow_gen2_variables',
     'extract_display_name_from_platform',
     'extract_middle_path',
+    'extract_notebook_parameters',
     'extract_report_definition_pbir',
     'extract_tmdl_parameters_from_semantic_model',
     'find_and_replace',
@@ -512,6 +516,8 @@ __all__ = [
     'replace_data_pipeline_variables_with_placeholders',
     'replace_dataflow_gen2_placeholders_with_parameters',
     'replace_dataflow_gen2_variables_with_placeholders',
+    'replace_notebook_parameters_with_placeholders',
+    'replace_notebook_placeholders_with_parameters',
     'replace_semantic_model_parameters_with_placeholders',
     'replace_semantic_model_placeholders_with_parameters',
     'reset_logging',
