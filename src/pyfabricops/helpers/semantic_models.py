@@ -620,6 +620,10 @@ def replace_semantic_model_parameters_with_placeholders(
             lambda m: f'{m.group(1)}#{{{parameter_name}}}#{m.group(3)}'
         )
 
+        # Pattern 6: Parameters starting with # (like #date, #datetime, etc.)
+        pattern6 = rf'(expression\s+{re.escape(parameter_name)}\s*=\s*)({re.escape(actual_value)})'
+        replacement6 = lambda m: f'{m.group(1)}#{{{parameter_name}}}#'
+
         # Try each pattern
         patterns = [
             (pattern1, replacement1, 'Import model (expression)'),
@@ -635,6 +639,11 @@ def replace_semantic_model_parameters_with_placeholders(
             ),
             (pattern4, replacement4, 'Generic parameter'),
             (pattern5, replacement5, 'Single quotes'),
+            (
+                pattern6,
+                replacement6,
+                'Hash functions (#date, #datetime, etc.)',
+            ),
         ]
 
         pattern_found = False
@@ -747,8 +756,12 @@ def replace_semantic_model_placeholders_with_parameters(
         replacement4 = lambda m: f'{m.group(1)}{actual_value}{m.group(3)}'
 
         # Pattern 5: Alternative syntax with single quotes
-        pattern5 = rf"({re.escape(parameter_name)}\s*=\s*')({re.escape(placeholder)})(')"
+        pattern5 = rf"({re.escape(parameter_name)}\s*=\s*')({re.escape(actual_value)})(')"
         replacement5 = lambda m: f'{m.group(1)}{actual_value}{m.group(3)}'
+
+        # Pattern 6: Parameters starting with # (like #date, #datetime, etc.) - for placeholders
+        pattern6 = rf'(expression\s+{re.escape(parameter_name)}\s*=\s*)({re.escape(placeholder)})'
+        replacement6 = lambda m: f'{m.group(1)}{actual_value}'
 
         # Try each pattern
         patterns = [
@@ -765,6 +778,11 @@ def replace_semantic_model_placeholders_with_parameters(
             ),
             (pattern4, replacement4, 'Generic parameter'),
             (pattern5, replacement5, 'Single quotes'),
+            (
+                pattern6,
+                replacement6,
+                'Hash functions (#date, #datetime, etc.)',
+            ),
         ]
 
         pattern_found = False

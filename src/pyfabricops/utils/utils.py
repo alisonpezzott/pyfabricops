@@ -353,11 +353,24 @@ def parse_tmdl_parameters(path: str) -> dict:
         ):
             params[variable_name] = variable_value
 
-    # Pattern 2: Direct Lake - Sql.Database("server", "database")
-    pattern2 = r'Sql\.Database\s*\(\s*"([^"]+)"\s*,\s*"([^"]+)"\s*\)'
+    # Pattern 2: Parameters starting with # (like #date, #datetime, #time, etc.)
+    pattern2 = r'expression\s+(\w+)\s*=\s*(#\w+\([^)]*\))'
     matches2 = re.findall(pattern2, expressions)
 
     for match in matches2:
+        variable_name = match[0]
+        variable_value = match[1]
+        # Skip if it's already a placeholder
+        if not (
+            variable_value.startswith('#{') and variable_value.endswith('}#')
+        ):
+            params[variable_name] = variable_value
+
+    # Pattern 3: Direct Lake - Sql.Database("server", "database")
+    pattern3 = r'Sql\.Database\s*\(\s*"([^"]+)"\s*,\s*"([^"]+)"\s*\)'
+    matches3 = re.findall(pattern3, expressions)
+
+    for match in matches3:
         server_value = match[0]
         database_value = match[1]
 
