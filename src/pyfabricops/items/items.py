@@ -59,7 +59,7 @@ def get_item_id(workspace: str, item: str) -> str | None:
         ```
     """
     items = list_items(
-        workspace_id=resolve_workspace(workspace),
+        workspace=resolve_workspace(workspace),
         df=False,
     )
 

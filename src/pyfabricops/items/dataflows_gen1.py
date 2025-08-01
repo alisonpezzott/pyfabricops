@@ -50,7 +50,7 @@ def get_dataflow_gen1_id(
         str | None: The ID of the dataflow if found, otherwise None.
     """
     dataflows = list_dataflows_gen1(
-        workspace_id=resolve_workspace(workspace),
+        workspace=resolve_workspace(workspace),
         df=False,
     )
     for _dataflow in dataflows:

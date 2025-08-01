@@ -297,6 +297,7 @@ def deploy_report(
             item_definition=item_definition,
             description=description,
             folder=folder_id,
+            df=False,
         )
 
     else:
@@ -304,6 +305,7 @@ def deploy_report(
             workspace_id,
             item_id,
             item_definition=item_definition,
+            df=False,
         )
 
 
@@ -347,6 +349,7 @@ def deploy_all_reports(
                 display_name=display_name,
                 item_definition=item_definition,
                 folder=folder_id,
+                df=False,
             )
 
         else:
@@ -354,6 +357,7 @@ def deploy_all_reports(
                 workspace_id,
                 item_id,
                 item_definition=item_definition,
+                df=False,
             )
 
     logger.success(

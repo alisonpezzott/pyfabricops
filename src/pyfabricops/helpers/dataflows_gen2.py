@@ -240,6 +240,7 @@ def deploy_dataflow_gen2(
             item_definition=item_definition,
             description=description,
             folder=folder_id,
+            df=False,
         )
 
     else:
@@ -247,6 +248,7 @@ def deploy_dataflow_gen2(
             workspace_id,
             item_id,
             item_definition=item_definition,
+            df=False,
         )
 
 

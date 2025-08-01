@@ -483,6 +483,7 @@ def deploy_semantic_model(
             item_definition=item_definition,
             description=description,
             folder=folder_id,
+            df=False,
         )
 
     else:
@@ -490,6 +491,7 @@ def deploy_semantic_model(
             workspace_id,
             semantic_model_id,
             item_definition=item_definition,
+            df=False,
         )
 
 
@@ -533,6 +535,7 @@ def deploy_all_semantic_models(
                 display_name=display_name,
                 item_definition=item_definition,
                 folder=folder_id,
+                df=False,
             )
 
         else:
@@ -540,6 +543,7 @@ def deploy_all_semantic_models(
                 workspace_id,
                 semantic_model_id,
                 item_definition=item_definition,
+                df=False,
             )
 
     logger.success(

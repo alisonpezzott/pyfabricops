@@ -52,7 +52,7 @@ def get_data_pipeline_id(
         str | None: The ID of the data pipeline if found, otherwise None.
     """
     data_pipelines = list_data_pipelines(
-        workspace_id=resolve_workspace(workspace),
+        workspace=resolve_workspace(workspace),
         df=False,
     )
     for _data_pipeline in data_pipelines:

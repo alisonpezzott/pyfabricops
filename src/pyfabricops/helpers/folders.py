@@ -283,6 +283,10 @@ def create_folders_from_path_string(workspace: str, path: str) -> str:
         str: The ID of the final folder.
     """
     workspace_id = resolve_workspace(workspace)
+
+    if path is None or '/' not in path:
+        return None
+
     folders_tree = path.split('/')
 
     parent_folder_id = None

@@ -197,6 +197,7 @@ def deploy_item(
             item_definition=item_definition,
             description=description,
             folder=folder_id,
+            df=False,
         )
 
     else:
@@ -204,6 +205,7 @@ def deploy_item(
             workspace_id,
             item_id,
             item_definition=item_definition,
+            df=False,
         )
 
 
@@ -251,6 +253,7 @@ def deploy_all_items(
                     display_name=display_name,
                     item_definition=item_definition,
                     folder=folder_id,
+                    df=False,
                 )
 
             else:
@@ -258,6 +261,7 @@ def deploy_all_items(
                     workspace_id,
                     item_id,
                     item_definition=item_definition,
+                    df=False,
                 )
 
     logger.success(

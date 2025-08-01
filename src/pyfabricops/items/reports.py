@@ -50,7 +50,7 @@ def get_report_id(workspace: str, report_name: str) -> Union[str, None]:
         get_report_id('123e4567-e89b-12d3-a456-426614174000', 'SalesDataModel')
         ```
     """
-    reports = list_reports(workspace_id=resolve_workspace(workspace), df=False)
+    reports = list_reports(workspace=resolve_workspace(workspace), df=False)
     for report in reports:
         if report.get('displayName') == report_name:
             return report.get('id')

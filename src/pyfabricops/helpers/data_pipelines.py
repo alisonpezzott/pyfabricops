@@ -244,6 +244,7 @@ def deploy_data_pipeline(
             item_definition=item_definition,
             description=description,
             folder=folder_id,
+            df=False,
         )
 
     else:
@@ -251,6 +252,7 @@ def deploy_data_pipeline(
             workspace_id,
             item_id,
             item_definition=item_definition,
+            df=False,
         )
 
 
@@ -294,6 +296,7 @@ def deploy_all_data_pipelines(
                 display_name=display_name,
                 item_definition=item_definition,
                 folder=folder_id,
+                df=False,
             )
 
         else:
@@ -301,6 +304,7 @@ def deploy_all_data_pipelines(
                 workspace_id,
                 item_id,
                 item_definition=item_definition,
+                df=False,
             )
 
     logger.success(
