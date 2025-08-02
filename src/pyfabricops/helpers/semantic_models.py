@@ -307,7 +307,7 @@ def bind_semantic_model_to_gateway(
         return None
 
     semantic_model_id = resolve_semantic_model(
-        workspace_id, semantic_model, silent=True
+        workspace_id, semantic_model
     )
     if not semantic_model_id:
         logger.error(
@@ -315,7 +315,7 @@ def bind_semantic_model_to_gateway(
         )
         return None
 
-    gateway_id = resolve_gateway(gateway, silent=True)
+    gateway_id = resolve_gateway(gateway)
     if not gateway_id:
         logger.error(f'Gateway "{gateway}" not found.')
         return None
@@ -325,7 +325,7 @@ def bind_semantic_model_to_gateway(
         payload['datasourceObjectIds'] = datasource_ids
 
     response = _base_api(
-        endpoint=f'/groups/{workspace}/datasets/{semantic_model}/Default.BindToGateway',
+        endpoint=f'/groups/{workspace}/datasets/{semantic_model_id}/Default.BindToGateway',
         method='post',
         payload=payload,
         audience='powerbi',
@@ -401,7 +401,7 @@ def refresh_semantic_model(
         return None
 
     semantic_model_id = resolve_semantic_model(
-        workspace_id, semantic_model, silent=True
+        workspace_id, semantic_model
     )
     if not semantic_model_id:
         logger.error(
