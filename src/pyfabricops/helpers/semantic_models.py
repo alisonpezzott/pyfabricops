@@ -306,9 +306,7 @@ def bind_semantic_model_to_gateway(
         logger.error(f'Workspace "{workspace}" not found.')
         return None
 
-    semantic_model_id = resolve_semantic_model(
-        workspace_id, semantic_model
-    )
+    semantic_model_id = resolve_semantic_model(workspace_id, semantic_model)
     if not semantic_model_id:
         logger.error(
             f'Semantic model "{semantic_model}" not found in workspace "{workspace}".'
@@ -400,9 +398,7 @@ def refresh_semantic_model(
         logger.error(f'Workspace "{workspace}" not found.')
         return None
 
-    semantic_model_id = resolve_semantic_model(
-        workspace_id, semantic_model
-    )
+    semantic_model_id = resolve_semantic_model(workspace_id, semantic_model)
     if not semantic_model_id:
         logger.error(
             f'Semantic model "{semantic_model}" not found in workspace "{workspace}".'
