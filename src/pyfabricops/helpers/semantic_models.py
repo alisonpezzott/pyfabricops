@@ -348,7 +348,7 @@ def refresh_semantic_model(
     notify_option: Literal[
         'MailOnCompletion', 'MailOnFailure', 'NoNotification'
     ] = 'NoNotification',
-    apply_refresh_policy: bool = False,
+    apply_refresh_policy: Union[bool, None] = None,
     commit_mode: Literal['PartialBatch', 'Transactional'] = 'Transactional',
     effective_date: str = None,
     max_parallelism: int = 1,
@@ -385,11 +385,26 @@ def refresh_semantic_model(
 
     Examples:
         ```python
-        bind_semantic_model_to_gateway(
+        refresh_semantic_model(
             workspace="AdventureWorks",
             semantic_model="SalesAnalysis",
-            gateway="my_gateway",
-            datasource_ids=["id1", "id2", "id3"]
+            apply_refresh_policy=False,
+            commit_mode="Transactional",
+            effective_date="2023-01-01",
+            max_parallelism=5,
+            objects=[
+                {
+                    "table": "FactSales",
+                    "partition": "2024"
+                },
+                {
+                    "table": "FactReturns",
+                    "partition": "2024"
+                }
+            ],
+            retry_count=3,
+            timeout="00:30:00",
+            type="Full"
         )
         ```
     """
@@ -406,7 +421,7 @@ def refresh_semantic_model(
         return None
 
     payload = {'notifyOption': notify_option}
-    if apply_refresh_policy:
+    if apply_refresh_policy is not None:
         payload['applyRefreshPolicy'] = apply_refresh_policy
     if commit_mode:
         payload['commitMode'] = commit_mode
