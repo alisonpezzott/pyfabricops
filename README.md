@@ -80,6 +80,38 @@ pf.set_auth_provider("oauth")
 ```
 This will open a browser window for user authentication.
 
+### 🔧 Microsoft Fabric Compatibility
+
+PyFabricOps is fully compatible with Microsoft Fabric notebooks. The library provides multiple authentication options:
+
+```python
+import pyfabricops as pf
+
+# Check available authentication providers
+providers = pf.get_available_auth_providers()
+print(f"Available providers: {providers}")
+
+# Method 1: Automatic (recommended for Fabric notebooks)
+if providers['auto']:
+    pf.set_auth_provider('auto')  # Uses current authenticated context
+
+# Method 2: Environment variables
+elif providers['env']:
+    pf.set_auth_provider('env')
+
+# Method 3: Interactive OAuth
+elif providers['oauth']:
+    pf.set_auth_provider('oauth')
+```
+
+**Authentication Providers:**
+- **`auto`**: Automatically detects and uses current authentication context (ideal for Microsoft Fabric, Azure notebooks, etc.)
+- **`env`**: Uses environment variables (good for development/CI/CD)
+- **`oauth`**: Interactive browser authentication (fallback option)
+- **`vault`**: Azure KeyVault (may not be available in Fabric)
+
+For more details, see [FABRIC_COMPATIBILITY.md](FABRIC_COMPATIBILITY.md).
+
 ```
 
 > Create a repository and clone it locally.
