@@ -1,5 +1,48 @@
 # Changelog
 
+## Version 0.2.1 - Cryptography Compatibility Fix
+
+### 🐛 Bug Fix
+
+**Problem**: Microsoft Fabric compatibility issue with cryptography library
+```
+ImportError: cannot import name '_get_backend' from 'cryptography.hazmat.backends'
+```
+
+**Cause**: Microsoft Fabric environment has a newer version of `cryptography` library that removed the `_get_backend` function, but PyFabricOps was importing cryptography-dependent functions on module load.
+
+**Solution**: Implemented lazy loading for gateway credential encryption functions
+
+### 🔧 Technical Changes
+
+#### `src/pyfabricops/core/connections.py`
+- Removed direct import of `_get_encrypt_gateway_credentials` from `gateways_encryp_creds`
+- Added `_get_encrypt_gateway_credentials_function()` for lazy loading
+- Modified connection creation functions to use lazy loading when encryption is needed
+- Added proper error handling when cryptography features are not available
+
+### ✅ Impact
+
+- ✅ **Microsoft Fabric**: Library now imports successfully without cryptography errors
+- ✅ **Connection Creation**: Works normally, encryption is loaded only when needed
+- ✅ **Backward Compatibility**: Existing code continues to work without changes
+- ✅ **Graceful Degradation**: Clear error messages when encryption is not available
+
+### 🚀 Usage
+
+```python
+# Now works in Microsoft Fabric!
+import pyfabricops as pf
+pf.set_auth_provider('auto')
+
+# Connection operations work normally
+connections = pf.list_connections()
+```
+
+**Note**: This fix specifically resolves the cryptography import issue that prevented PyFabricOps from loading in Microsoft Fabric environments.
+
+
+
 ## Version 0.2.0 - Microsoft Fabric Compatibility
 
 ### 🚀 New Features

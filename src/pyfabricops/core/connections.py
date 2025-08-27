@@ -3,12 +3,26 @@ from typing import Any, Dict, List, Literal, Optional, Union
 from pandas import DataFrame
 
 from ..api.api import api_request
-from ..core.gateways_encryp_creds import _get_encrypt_gateway_credentials
+# REMOVED: from ..core.gateways_encryp_creds import _get_encrypt_gateway_credentials
 from ..utils.decorators import df
+from ..utils.exceptions import OptionNotAvailableError
 from ..utils.logging import get_logger
 from ..utils.utils import is_valid_uuid
 
 logger = get_logger(__name__)
+
+
+def _get_encrypt_gateway_credentials_function():
+    """Lazy loading of cryptography function to avoid version conflicts"""
+    try:
+        from ..core.gateways_encryp_creds import _get_encrypt_gateway_credentials
+        return _get_encrypt_gateway_credentials
+    except ImportError as e:
+        logger.warning(f"Gateway credential encryption not available: {e}")
+        raise OptionNotAvailableError(
+            "Gateway credential encryption is not available in this environment. "
+            "This may be due to incompatibilities with the cryptography library."
+        )
 
 
 @df
@@ -481,6 +495,7 @@ def create_sql_on_premises_connection(
         )
         ```
     """
+    _get_encrypt_gateway_credentials = _get_encrypt_gateway_credentials_function()
     encrypted_credentials = _get_encrypt_gateway_credentials(
         gateway_id=gateway_id, username=username, password=password
     )
