@@ -7,7 +7,8 @@ from typing import Dict, Literal, Optional, Union
 
 import requests
 from azure.identity import ClientSecretCredential, InteractiveBrowserCredential
-from azure.keyvault.secrets import SecretClient
+
+# REMOVIDA: from azure.keyvault.secrets import SecretClient
 from dotenv import load_dotenv
 
 from ..utils.exceptions import (
@@ -21,7 +22,21 @@ from .scopes import FABRIC_SCOPE, POWERBI_SCOPE, TOKEN_TEMPLATE
 logger = get_logger(__name__)
 
 # Define what should be publicly exported from this module
-__all__ = ['set_auth_provider']
+__all__ = ['set_auth_provider', 'get_available_auth_providers']
+
+
+def _get_keyvault_client():
+    """Lazy loading do SecretClient para evitar conflitos de versão"""
+    try:
+        from azure.keyvault.secrets import SecretClient
+
+        return SecretClient
+    except ImportError as e:
+        logger.warning(f'Azure KeyVault não disponível: {e}')
+        raise OptionNotAvailableError(
+            'Azure KeyVault não está disponível neste ambiente. '
+            "Use 'env' ou 'oauth' como auth provider."
+        )
 
 
 class TokenCache:
@@ -135,6 +150,7 @@ class VaultCredentialProvider(CredentialProvider):
             client_secret=env_creds['azure_client_secret'],
         )
 
+        SecretClient = _get_keyvault_client()
         client = SecretClient(vault_url=vault_url, credential=credential)
         secrets = {}
 
@@ -157,6 +173,61 @@ class VaultCredentialProvider(CredentialProvider):
                 logger.warning(f'Failed to retrieve secret {secret_name}: {e}')
 
         return secrets
+
+
+class AutoCredentialProvider:
+    """
+    Automatic credential provider using DefaultAzureCredential.
+    Ideal for Microsoft Fabric notebooks and other authenticated contexts.
+    """
+
+    def __init__(self, cache: TokenCache):
+        self.cache = cache
+
+    def get_token(
+        self, audience: Literal['fabric', 'powerbi'] = 'fabric'
+    ) -> Dict:
+        """Get token using DefaultAzureCredential (automatic detection)"""
+        try:
+            from azure.identity import DefaultAzureCredential
+        except ImportError:
+            raise OptionNotAvailableError(
+                'azure-identity não está disponível. '
+                "Use 'env' ou 'oauth' como auth provider."
+            )
+
+        scope = FABRIC_SCOPE if audience == 'fabric' else POWERBI_SCOPE
+        token_key = f'{audience.upper()}_AUTO'
+
+        # Check if cached token is still valid
+        if self.cache.is_token_valid(token_key):
+            return self.cache.get_token(token_key)
+
+        logger.info('Detectando credenciais automáticas...')
+
+        try:
+            credential = DefaultAzureCredential()
+            new_token = credential.get_token(scope)
+
+            if not new_token:
+                raise ResourceNotFoundError(
+                    'Token não encontrado via DefaultAzureCredential.'
+                )
+
+            logger.success('Token obtido automaticamente com sucesso.')
+
+            # Calculate expires_in based on expires_on
+            expires_in = int(new_token.expires_on - time.time())
+            self.cache.store_token(token_key, new_token.token, expires_in)
+
+            return self.cache.get_token(token_key)
+
+        except Exception as e:
+            logger.warning(f'DefaultAzureCredential falhou: {e}')
+            raise OptionNotAvailableError(
+                f'Autenticação automática não está disponível neste ambiente. '
+                f"Erro: {e}. Use 'env' ou 'oauth' como auth provider."
+            )
 
 
 class OAuthProvider:
@@ -195,7 +266,7 @@ class TokenManager:
     """Main token and authentication manager"""
 
     def __init__(
-        self, auth_provider: Literal['env', 'vault', 'oauth'] = 'env'
+        self, auth_provider: Literal['env', 'vault', 'oauth', 'auto'] = 'env'
     ):
         self.cache = TokenCache()
         self.auth_provider = auth_provider
@@ -204,15 +275,38 @@ class TokenManager:
             'vault': VaultCredentialProvider(),
         }
         self.oauth_provider = OAuthProvider(self.cache)
+        self.auto_provider = AutoCredentialProvider(self.cache)
 
     def set_auth_provider(
-        self, source: Literal['env', 'vault', 'oauth'] = 'env'
+        self, source: Literal['env', 'vault', 'oauth', 'auto'] = 'env'
     ):
         """Define the authentication provider"""
-        if source not in ['env', 'vault', 'oauth']:
+        if source not in ['env', 'vault', 'oauth', 'auto']:
             raise OptionNotAvailableError(
-                f'Source not available. Available: env, vault, oauth. Got: {source}'
+                f'Source not available. Available: env, vault, oauth, auto. Got: {source}'
             )
+
+        # Verifica se o provedor vault está realmente disponível
+        if source == 'vault':
+            try:
+                _get_keyvault_client()
+            except (ImportError, OptionNotAvailableError):
+                raise OptionNotAvailableError(
+                    'Azure KeyVault não está disponível neste ambiente. '
+                    "Use 'env', 'oauth' ou 'auto' como auth provider."
+                )
+
+        # Verifica se o provedor auto está disponível
+        if source == 'auto':
+            try:
+                # Testa se pode importar DefaultAzureCredential
+                from azure.identity import DefaultAzureCredential
+            except ImportError:
+                raise OptionNotAvailableError(
+                    'Autenticação automática não está disponível. '
+                    "azure-identity não encontrado. Use 'env' ou 'oauth' como auth provider."
+                )
+
         self.auth_provider = source
 
     def _build_token_payload(
@@ -281,6 +375,10 @@ class TokenManager:
         if self.auth_provider == 'oauth':
             return self.oauth_provider.get_token(audience)
 
+        # Auto uses DefaultAzureCredential
+        if self.auth_provider == 'auto':
+            return self.auto_provider.get_token(audience)
+
         # For env and vault, use cache + API
         token_key = f'{audience.upper()}_{credential_type.upper()}'
 
@@ -311,13 +409,13 @@ _token_manager = TokenManager()
 
 
 def set_auth_provider(
-    source: Literal['env', 'vault', 'oauth'] = 'env'
+    source: Literal['env', 'vault', 'oauth', 'auto'] = 'env'
 ) -> None:
     """
     Set the authentication provider for token retrieval.
 
     Args:
-        source (str): The provider of credentials. Can be "env", "vault", or "oauth".
+        source (str): The provider of credentials. Can be "env", "vault", "oauth", or "auto".
 
     Returns:
         None
@@ -340,9 +438,87 @@ def set_auth_provider(
         ```python
         set_auth_provider("oauth")
         ```
+
+        ### Automatic (Microsoft Fabric, Azure environments)
+        ```python
+        set_auth_provider("auto")
+        ```
     """
     global _token_manager
     _token_manager.set_auth_provider(source)
+
+
+def get_available_auth_providers():
+    """
+    Get a list of available authentication providers.
+
+    Returns:
+        dict: A dictionary with provider names as keys and availability status as values.
+
+    Examples:
+        ```python
+        providers = get_available_auth_providers()
+        print(providers)
+        # {'env': True, 'oauth': True, 'vault': False, 'auto': True}
+        ```
+    """
+    providers = {
+        'env': True,  # Always available
+        'oauth': True,  # Always available (requires azure-identity)
+        'vault': False,  # Default to False, test if KeyVault is available
+        'auto': False,  # Default to False, test if DefaultAzureCredential is available
+    }
+
+    try:
+        _get_keyvault_client()
+        providers['vault'] = True
+    except (ImportError, OptionNotAvailableError):
+        providers['vault'] = False
+
+    try:
+        import os
+
+        from azure.identity import DefaultAzureCredential
+
+        # Verifica indicadores de ambientes autenticados automaticamente
+        auto_auth_indicators = [
+            # Azure Managed Identity
+            'MSI_ENDPOINT' in os.environ,
+            'MSI_SECRET' in os.environ,
+            'AZURE_CLIENT_ID' in os.environ,
+            # Azure Service Principal
+            all(
+                var in os.environ
+                for var in [
+                    'AZURE_CLIENT_ID',
+                    'AZURE_CLIENT_SECRET',
+                    'AZURE_TENANT_ID',
+                ]
+            ),
+            # Azure CLI logado
+            os.path.exists(os.path.expanduser('~/.azure/accessTokens.json')),
+            # Visual Studio Code
+            'VSCODE_INJECTION' in os.environ,
+            # Notebooks/Jupyter indicadores
+            any(
+                'jupyter' in str(v).lower()
+                for v in os.environ.values()
+                if isinstance(v, str)
+            ),
+        ]
+
+        # Se algum indicador sugere ambiente autenticado, marca como disponível
+        if any(auto_auth_indicators):
+            providers['auto'] = True
+        else:
+            # Como fallback, marca como disponível mas pode falhar na execução
+            # Isso permite que o usuário tente e receba uma mensagem de erro clara
+            providers['auto'] = True
+
+    except (ImportError, Exception):
+        providers['auto'] = False
+
+    return providers
 
 
 def _get_token(
