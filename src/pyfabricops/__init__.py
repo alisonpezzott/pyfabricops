@@ -1,6 +1,6 @@
 from ._version import __version__
 from .api.api import ApiResult, api_request
-from .api.auth import get_available_auth_providers, set_auth_provider
+from .api.auth import set_auth_provider
 from .cd.support_files import create_support_files
 from .core.capacities import get_capacity_id, list_capacities, resolve_capacity
 from .core.connections import (
@@ -476,8 +476,8 @@ __all__ = [
     'get_workspace_config',
     'get_workspace_id',
     'get_workspace_role_assignment',
-    'get_available_auth_providers',
     'get_workspace_suffix',
+    'git_disconnect',
     'git_init',
     'git_status',
     'github_connect',
