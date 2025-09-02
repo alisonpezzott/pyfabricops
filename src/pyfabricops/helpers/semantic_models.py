@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Literal, Optional, Union
 import pandas as pd
 from pandas import DataFrame
 
-from ..api.api import _base_api
+from ..api.api import _base_api, api_request
 from ..core.gateways import resolve_gateway
 from ..core.workspaces import resolve_workspace
 from ..helpers.folders import (
@@ -447,6 +447,147 @@ def refresh_semantic_model(
 
     if response.status_code == 202:
         logger.success('Refresh accepted successfully.')
+    else:
+        logger.error(f'Refresh failed: {response.error}')
+
+
+@df
+def get_semantic_model_refreshes(
+    workspace: str,
+    semantic_model: str,
+    *,
+    top: int = None,
+    df: Optional[bool] = True,
+) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    """
+    Get the list of refresh operations for a semantic model.
+
+    Args:
+        workspace (str): The workspace name or ID.
+        semantic_model (str): The semantic model name or ID.
+        top (int, optional): The maximum number of refresh operations to return.
+        df (bool, optional): Whether to return the results as a DataFrame.
+
+    Returns:
+        Union[DataFrame, List[Dict[str, Any]], None]: The list of refresh operations or None if not found.
+    """
+    workspace_id = resolve_workspace(workspace)
+    if not workspace_id:
+        logger.error(f'Workspace "{workspace}" not found.')
+        return None
+
+    semantic_model_id = resolve_semantic_model(workspace_id, semantic_model)
+    if not semantic_model_id:
+        logger.error(
+            f'Semantic model "{semantic_model}" not found in workspace "{workspace}".'
+        )
+        return None
+
+    params = {}
+    if not top is None and top >= 1:
+        params = {'$top': top}
+
+    response = api_request(
+        endpoint=f'/groups/{workspace_id}/datasets/{semantic_model_id}/refreshes',
+        audience='powerbi',
+        support_pagination=True,
+        params=params,
+    )
+    return response
+
+
+@df
+def get_semantic_model_refresh_details(
+    workspace: str,
+    semantic_model: str,
+    refresh_id: str,
+    *,
+    df: Optional[bool] = True,
+) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    """
+    Get the details of a specific refresh operation for a semantic model.
+
+    Args:
+        workspace (str): The workspace name or ID.
+        semantic_model (str): The semantic model name or ID.
+        refresh_id (str): The ID of the refresh operation.
+        df (bool, optional): Whether to return the results as a DataFrame.
+
+    Returns:
+        Union[DataFrame, List[Dict[str, Any]], None]: The details of the refresh operation or None if not found.
+    """
+    workspace_id = resolve_workspace(workspace)
+    if not workspace_id:
+        logger.error(f'Workspace "{workspace}" not found.')
+        return None
+
+    semantic_model_id = resolve_semantic_model(workspace_id, semantic_model)
+    if not semantic_model_id:
+        logger.error(
+            f'Semantic model "{semantic_model}" not found in workspace "{workspace}".'
+        )
+        return None
+
+    response = api_request(
+        endpoint=f'/groups/{workspace_id}/datasets/{semantic_model_id}/refreshes/{refresh_id}',
+        audience='powerbi',
+    )
+    return response
+
+def execute_queries(
+    workspace: str,
+    semantic_model: str,
+    query: str,
+    *,
+    include_nulls: bool = True,
+    impersonated_user_name: Optional[str] = None,
+    df: Optional[bool] = True,
+) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    """
+    Execute DAX queries against a semantic model.
+
+    Args:
+        workspace (str): The workspace name or ID.
+        semantic_model (str): The semantic model name or ID.
+        query (str): The DAX query to execute.
+        df (bool, optional): Whether to return the results as a DataFrame.
+
+    Returns:
+        Union[DataFrame, List[Dict[str, Any]], None]: The details of the refresh operation or None if not found.
+    """
+    workspace_id = resolve_workspace(workspace)
+    if not workspace_id:
+        logger.error(f'Workspace "{workspace}" not found.')
+        return None
+
+    semantic_model_id = resolve_semantic_model(workspace_id, semantic_model)
+    if not semantic_model_id:
+        logger.error(
+            f'Semantic model "{semantic_model}" not found in workspace "{workspace}".'
+        )
+        return None
+    
+    payload = {
+        'queries': [
+            {
+                'query': query
+            }
+        ],
+        'serializerSettings': {
+            'includeNulls': include_nulls
+        }
+    }
+
+    if impersonated_user_name:
+        payload['impersonatedUserName'] = impersonated_user_name
+
+    response = api_request(
+        endpoint=f'/groups/{workspace_id}/datasets/{semantic_model_id}/executeQueries',
+        method='POST',
+        audience='powerbi',
+        payload=payload,
+    )
+    return response
 
 
 @df
