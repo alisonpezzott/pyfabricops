@@ -4,5 +4,7 @@ azure-keyvault-secrets==4.9.0
 cryptography==3.4.6
 json5==0.9.28
 pandas==2.3.0
+pyadomd>=0.1.1
 python-dotenv==1.1.1
+pythonnet>=3.0.0
 requests==2.32.4
