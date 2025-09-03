@@ -534,6 +534,7 @@ def get_semantic_model_refresh_details(
     )
     return response
 
+
 def execute_queries(
     workspace: str,
     semantic_model: str,
@@ -566,16 +567,10 @@ def execute_queries(
             f'Semantic model "{semantic_model}" not found in workspace "{workspace}".'
         )
         return None
-    
+
     payload = {
-        'queries': [
-            {
-                'query': query
-            }
-        ],
-        'serializerSettings': {
-            'includeNulls': include_nulls
-        }
+        'queries': [{'query': query}],
+        'serializerSettings': {'includeNulls': include_nulls},
     }
 
     if impersonated_user_name:
