@@ -233,7 +233,7 @@ def extract_report_definition_pbir(path: Union[str, Path]) -> Dict[str, str]:
         )
     by_conn = data['datasetReference']['byConnection']
     conn_str = by_conn['connectionString']
-    model_id = by_conn['pbiModelDatabaseName']
+    # model_id = by_conn['pbiModelDatabaseName']
 
     # 1) workspace_name: part after the last slash and before the semicolon
     workspace_name = conn_str.split('/')[-1].split(';')[0]
@@ -243,7 +243,8 @@ def extract_report_definition_pbir(path: Union[str, Path]) -> Dict[str, str]:
     semantic_model_name = m.group(1) if m else None
 
     # 3) semantic_model_id: takes directly from the pbiModelDatabaseName field
-    semantic_model_id = model_id
+    m_id = re.search(r'semanticmodelid=([^;]+)', conn_str, re.IGNORECASE)
+    semantic_model_id = m_id.group(1) if m_id else None
 
     return {
         'workspace_name': workspace_name,
@@ -472,16 +473,11 @@ def convert_report_definition_to_by_path(
 
 
 REPORT_DEFINITION = """{
-  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definitionProperties/1.0.0/schema.json",
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definitionProperties/2.0.0/schema.json",
   "version": "4.0",
   "datasetReference": {
     "byConnection": {
-      "connectionString": "Data Source=powerbi://api.powerbi.com/v1.0/myorg/#{workspace_name}#;initial catalog=#{semantic_model_name}#;integrated security=ClaimsToken",
-      "pbiServiceModelId": null,
-      "pbiModelVirtualServerName": "sobe_wowvirtualserver",
-      "pbiModelDatabaseName": "#{semantic_model_id}#",
-      "name": "EntityDataSource",
-      "connectionType": "pbiServiceXmlaStyleLive"
+      "connectionString": "Data Source=powerbi://api.powerbi.com/v1.0/myorg/#{workspace_name}#;initial catalog=#{semantic_model_name}#;integrated security=ClaimsToken;semanticmodelid=#{semantic_model_id}#"
     }
   }
 }"""
