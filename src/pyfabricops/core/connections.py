@@ -1,9 +1,12 @@
+import re
 from typing import Any, Dict, List, Literal, Optional, Union
 
 from pandas import DataFrame
 
 from ..api.api import api_request
 from ..core.gateways_encryp_creds import _get_encrypt_gateway_credentials
+from ..core.workspaces import resolve_workspace
+from ..items.semantic_models import resolve_semantic_model
 from ..utils.decorators import df
 from ..utils.logging import get_logger
 from ..utils.utils import is_valid_uuid
@@ -517,3 +520,80 @@ def create_sql_on_premises_connection(
         method='post',
         payload=payload,
     )
+
+
+def bind_semantic_model_connection(
+    workspace: str,
+    semantic_model: str,
+    connection_type: str,
+    connection_path: str,
+    connectivity_type: Literal[
+        'ShareableCloud',
+        'PersonalCloud',
+        'OnPremisesGateway',
+        'OnPremisesGatewayPersonal',
+        'VirtualNetworkGateway',
+        'Automatic',
+        'None',
+    ] = 'ShareableCloud',
+    connection: str = None,
+) -> None:
+    """
+    Binds the semantic model to a connection.
+
+    Returns:
+        None
+
+    Examples:
+        ```python
+        bind_semantic_model_connection(
+            workspace='Sandbox Fabric',
+            semantic_model='Contoso Sales',
+            connection_type='SQL',
+            connection_path='pezzot-mvp.database.windows.net;contoso',
+            connectivity_type='ShareableCloud',
+            connection='pezzott-mvp_contoso',
+        )
+
+        # Unbind connection
+        bind_semantic_model_connection(
+            workspace='Sandbox Fabric',
+            semantic_model='Contoso Sales',
+            connection_type='SQL',
+            connection_path='pezzot-mvp.database.windows.net;contoso',
+            connectivity_type='None',
+        )
+        ```
+    """
+    workspace_id = resolve_workspace(workspace)
+    semantic_model_id = resolve_semantic_model(workspace_id, semantic_model)
+    payload = {
+        'connectionBinding': {
+            'connectivityType': connectivity_type,
+            'connectionDetails': {
+                'type': connection_type,
+                'path': connection_path,
+            },
+        }
+    }
+    if connection is not None:
+        connection_id = resolve_connection(connection)
+        payload['connectionBinding']['id'] = connection_id
+
+    response = api_request(
+        endpoint=f'/workspaces/{workspace_id}/semanticModels/{semantic_model_id}/bindConnection',
+        method='post',
+        payload=payload,
+    )
+
+    if response == None:
+        if connectivity_type == 'None':
+            logger.success(
+                f"Semantic model '{semantic_model}' in workspace '{workspace}' successfully unbinded from current connection."
+            )
+        else:
+            logger.success(
+                f"Semantic model '{semantic_model}' in workspace '{workspace}' successfully binded to connection {connection}."
+            )
+
+    return response
