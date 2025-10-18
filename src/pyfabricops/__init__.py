@@ -5,6 +5,7 @@ from .cd.support_files import create_support_files
 from .core.capacities import get_capacity_id, list_capacities, resolve_capacity
 from .core.connections import (
     add_connection_role_assignment,
+    bind_semantic_model_connection,
     create_github_source_control_connection,
     create_sql_cloud_connection,
     create_sql_on_premises_connection,
@@ -339,6 +340,7 @@ __all__ = [
     'ado_connect',
     'api_request',
     'assign_to_capacity',
+    'bind_semantic_model_connection',
     'bind_semantic_model_to_gateway',
     'commit_to_git',
     'convert_report_definition_to_by_connection',
