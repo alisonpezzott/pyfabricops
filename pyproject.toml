@@ -1,6 +1,6 @@
 [project]
 name = "pyfabricops"
-version = "0.2.6"
+version = "0.2.7"
 description = "A Python wrapper library for Microsoft Fabric (and Power BI) operations, providing a simple interface to the official Fabric REST APIs. Falls back to Power BI REST APIs where needed. Designed to run in Python notebooks, pure Python scripts or integrated into YAML-based workflows for CI/CD."
 authors = [
     {name = "alisonpezzott",email = "alisonpezzott@gmail.com"}
@@ -32,7 +32,7 @@ dependencies = [
     "azure-storage-blob==12.25.1",
     "azure-identity==1.16.0",
     "azure-keyvault-secrets==4.9.0",
-    "cryptography==3.4.6",
+    "cryptography>=3.4.8,<47.0.0",
     "json5==0.9.28",
     "pandas==2.3.0",
     "pyadomd>=0.1.1",
