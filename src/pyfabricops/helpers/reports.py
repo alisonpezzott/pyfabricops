@@ -416,7 +416,8 @@ def convert_report_definition_to_by_path(
         )
         return None
 
-    semantic_model_name = match.group(1)
+    semantic_model_name = match.group(1).strip('"')
+
     logger.info(f'Found semantic model: {semantic_model_name}')
 
     # Find the semantic model directory relative to the report

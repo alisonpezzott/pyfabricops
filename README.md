@@ -132,9 +132,9 @@ src/
     │   ├── dmv.py
     ├── helpers/
     │   ├── __init__.py
-    │   ├── dataflows_gen1.py
+    │   ├── data_pipelines.py│   
+    ├── dataflows_gen1.py
     │   ├── dataflows_gen2.py
-    │   ├── data_pipelines.py
     │   ├── folders.py
     │   ├── items.py
     │   ├── lakehouses.py
@@ -145,15 +145,16 @@ src/
     │   └── workspaces.py
     ├── items/
     │   ├── __init__.py
+    │   ├── data_pipelines.py
     │   ├── dataflows_gen1.py
     │   ├── dataflows_gen2.py
-    │   ├── data_pipelines.py
     │   ├── items.py
     │   ├── lakehouses.py
     │   ├── notebooks.py
     │   ├── reports.py
     │   ├── semantic_models.py
     │   ├── shortcuts.py
+    │   ├── variable_libraries.py
     │   └── warehouses.py
     ├── utils/
     │   ├── __init__.py

@@ -70,6 +70,10 @@ def get_folders_paths(workspace: str) -> DataFrame:
     """
     folders_df = list_folders(workspace)
 
+    if folders_df is None or folders_df.empty:
+        logger.debug(f'No folders found in workspace {workspace}.')
+        return None
+
     if 'parentFolderId' not in folders_df.columns:
         folders_df['parentFolderId'] = ''
 
