@@ -110,11 +110,15 @@ def export_all_items(
         return None
 
     items = list_items(workspace_id, df=False)
+    
     if items is None:
         return None
 
+    items = [item for item in items if item['type'] != 'SQLEndpoint']
+
     for item in items:
-        item_ = get_item(workspace_id, item, df=False)
+        item_id = item['id']
+        item_ = get_item(workspace_id, item_id, df=False)
         if not item_:
             return None
 
