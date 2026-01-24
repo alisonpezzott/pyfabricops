@@ -47,14 +47,14 @@ def get_item_id(workspace: str, item: str) -> str | None:
 
     Args:
         workspace (str): The workspace name or ID.
-        item (str): The name of the item.
+        item (str): The name with type of the item.
 
     Returns:
         str|None: The ID of the item, or None if not found.
 
     Examples:
         ```python
-        get_item_id('MyProjectWorkspace', 'SalesDataModel')
+        get_item_id('MyProjectWorkspace', 'SalesDataModel.SemanticModel')
         get_item_id('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000')
         ```
     """
@@ -64,7 +64,7 @@ def get_item_id(workspace: str, item: str) -> str | None:
     )
 
     for _item in items:
-        if _item['displayName'] == item:
+        if _item['displayName'] + '.' + _item['type'] == item:
             return _item['id']
     logger.warning(f"Item '{item}' not found in workspace '{workspace}'.")
     return None

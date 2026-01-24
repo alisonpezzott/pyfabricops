@@ -59,35 +59,37 @@ def export_item(
         return None
 
     item_id = item_['id']
-    item_type = item_['type']
-    folder_id = None
-    if 'folderId' in item_:
-        folder_id = item_['folderId']
-
     definition = get_item_definition(workspace_id, item_id)
     if not definition:
         return None
 
-    try:
-        folder_path = resolve_folder_from_id_to_path(workspace_id, folder_id)
-    except:
-        logger.info(
-            f'{item["displayName"]}.{item_type} is not inside a folder.'
-        )
-        folder_path = None
+    item_type = item_['type']
+    item_name = item_['displayName']
+    
+    folder_id = None
+    folder_path = None
+
+    if 'folderId' in item_:
+        folder_id = item_['folderId']
+        try:
+            folder_path = resolve_folder_from_id_to_path(workspace_id, folder_id)
+        except:
+            logger.info(
+                f'{item_name}.{item_type} is not inside a folder.'
+            )
+            folder_path = None
 
     if folder_path is None:
-        item_path = Path(path) / (item['displayName'] + f'.{item_type}')
+        item_path = Path(path) / f'{item_name}.{item_type}'
     else:
-        item_path = (
-            Path(path) / folder_path / (item['displayName'] + f'.{item_type}')
-        )
+        item_path = Path(path) / folder_path / f'{item_name}.{item_type}'
+    
     os.makedirs(item_path, exist_ok=True)
 
     unpack_item_definition(definition, item_path)
 
     logger.success(
-        f'`{item["displayName"]}.{item_type}` was exported to {item_path} successfully.'
+        f'{item_name}.{item_type} was exported to {item_path} successfully.'
     )
     return None
 
@@ -117,39 +119,43 @@ def export_all_items(
             return None
 
         item_id = item_['id']
+        item_name = item_['displayName']
         item_type = item_['type']
-        folder_id = None
-        if 'folderId' in item_:
-            folder_id = item_['folderId']
 
         definition = get_item_definition(workspace_id, item_id)
         if not definition:
             return None
 
-        try:
-            folder_path = resolve_folder_from_id_to_path(
-                workspace_id, folder_id
-            )
-        except:
-            logger.info(
-                f'{item["displayName"]}.{item_type} is not inside a folder.'
-            )
-            folder_path = None
+        folder_id = None
+        folder_path = None
+        
+        if 'folderId' in item_:
+            folder_id = item_['folderId']
+
+            try:
+                folder_path = resolve_folder_from_id_to_path(
+                    workspace_id, folder_id
+                )
+            except:
+                logger.info(
+                    f'{item["displayName"]}.{item_type} is not inside a folder.'
+                )
+                folder_path = None
 
         if folder_path is None:
-            item_path = Path(path) / (item['displayName'] + f'.{item_type}')
+            item_path = Path(path) / f'{item_name}.{item_type}'
         else:
             item_path = (
                 Path(path)
                 / folder_path
-                / (item['displayName'] + f'.{item_type}')
+                / f'{item_name}.{item_type}'
             )
         os.makedirs(item_path, exist_ok=True)
 
         unpack_item_definition(definition, item_path)
 
         logger.success(
-            f'`{item["displayName"]}.{item_type}` was exported to {item_path} successfully.'
+            f'{item_name}.{item_type} was exported to {item_path} successfully.'
         )
     return None
 
