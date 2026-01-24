@@ -265,8 +265,8 @@ def extract_tmdl_parameters_from_semantic_model(
     """
     expressions_path = Path(path) / 'definition' / 'expressions.tmdl'
     if not expressions_path.exists():
-       return None
-     
+        return None
+
     parameters = parse_tmdl_parameters(expressions_path)
 
     if parameters is None:

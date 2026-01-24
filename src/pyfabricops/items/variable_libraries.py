@@ -29,12 +29,16 @@ def list_variable_libraries(
         (Union[DataFrame, List[Dict[str, Any]], None]): A list of variable libraries or a DataFrame if df is True.
     """
     return api_request(
-        endpoint='/workspaces/' + resolve_workspace(workspace) + '/VariableLibraries',
+        endpoint='/workspaces/'
+        + resolve_workspace(workspace)
+        + '/VariableLibraries',
         support_pagination=True,
     )
 
 
-def get_variable_library_id(workspace: str, variable_library_name: str) -> Union[str, None]:
+def get_variable_library_id(
+    workspace: str, variable_library_name: str
+) -> Union[str, None]:
     """
     Retrieves the ID of a variable library by its name from the specified workspace.
 
@@ -50,7 +54,9 @@ def get_variable_library_id(workspace: str, variable_library_name: str) -> Union
         get_variable_library_id('123e4567-e89b-12d3-a456-426614174000', 'Variables')
         ```
     """
-    libraries = list_variable_libraries(workspace=resolve_workspace(workspace), df=False)
+    libraries = list_variable_libraries(
+        workspace=resolve_workspace(workspace), df=False
+    )
     for library in libraries:
         if library.get('displayName') == variable_library_name:
             return library.get('id')
@@ -91,7 +97,10 @@ def get_variable_library(
     workspace_id = resolve_workspace(workspace)
     variable_library_id = resolve_variable_library(workspace, variable_library)
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/VariableLibrary/' + variable_library_id,
+        endpoint='/workspaces/'
+        + workspace_id
+        + '/VariableLibrary/'
+        + variable_library_id,
     )
 
 
@@ -196,7 +205,10 @@ def update_variable_library(
         payload['description'] = description
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/VariableLibraries/' + variable_library_id,
+        endpoint='/workspaces/'
+        + workspace_id
+        + '/VariableLibraries/'
+        + variable_library_id,
         method='patch',
         payload=payload,
     )
@@ -222,7 +234,10 @@ def delete_variable_library(workspace: str, variable_library: str) -> None:
     variable_library_id = resolve_variable_library(workspace, variable_library)
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/VariableLibraries/' + variable_library_id,
+        endpoint='/workspaces/'
+        + workspace_id
+        + '/VariableLibraries/'
+        + variable_library_id,
         method='delete',
     )
 
