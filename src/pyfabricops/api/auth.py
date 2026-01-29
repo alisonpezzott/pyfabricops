@@ -21,7 +21,7 @@ from .scopes import FABRIC_SCOPE, POWERBI_SCOPE, TOKEN_TEMPLATE
 logger = get_logger(__name__)
 
 # Define what should be publicly exported from this module
-__all__ = ['set_auth_provider']
+__all__ = ['set_auth_provider', 'clear_token_cache']
 
 
 class TokenCache:
@@ -87,6 +87,14 @@ class TokenCache:
             'expires_at': time.time() + expires_in,
         }
         self.save_tokens(tokens)
+
+    def clear_cache(self):
+        """Clear the token cache by deleting the cache file"""
+        if os.path.exists(self.cache_file):
+            os.remove(self.cache_file)
+            logger.info(f'Token cache cleared: {self.cache_file}')
+        else:
+            logger.warning(f'Cache file not found: {self.cache_file}')
 
 
 class CredentialProvider(ABC):
@@ -343,6 +351,28 @@ def set_auth_provider(
     """
     global _token_manager
     _token_manager.set_auth_provider(source)
+
+
+def clear_token_cache() -> None:
+    """
+    Clear the token cache by deleting the cache file.
+
+    This will force all subsequent token requests to retrieve new tokens
+    from the authentication provider.
+
+    Returns:
+        None
+
+    Examples:
+        ```python
+        from pyfabricops.api.auth import clear_token_cache
+
+        # Clear all cached tokens
+        clear_token_cache()
+        ```
+    """
+    global _token_manager
+    _token_manager.cache.clear_cache()
 
 
 def _get_token(

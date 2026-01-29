@@ -126,10 +126,12 @@ src/
     │   ├── capacities.py
     │   ├── connections.py
     │   ├── deployment_pipelines.py
+    │   ├── domains.py
     │   ├── folders.py
     │   ├── gateways.py
     │   ├── gateways_encryp_creds.py
     │   ├── git.py
+    │   ├── tags.py
     │   └── workspaces.py
     ├── dmv/
     │   ├── __init__.py
