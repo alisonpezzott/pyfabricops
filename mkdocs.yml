@@ -17,9 +17,12 @@ nav:
     - Core:
       - Capacities: functions/core/capacities.md
       - Connections: functions/core/connections.md
+      - Deployment Pipelines: functions/core/deployment_pipelines.md
+      - Domains: functions/core/domains.md
       - Folders: functions/core/folders.md
       - Gateways: functions/core/gateways.md
       - Git: functions/core/git.md
+      - Tags: functions/core/tags.md
       - Workspaces: functions/core/workspaces.md
     - DMV:
       - DMV: functions/dmv/dmv.md
@@ -44,6 +47,7 @@ nav:
       - Notebooks: functions/items/notebooks.md
       - Reports: functions/items/reports.md
       - Semantic Models: functions/items/semantic_models.md
+      - Variable Libraries: functions/items/variable_libraries.md
       - Warehouses: functions/items/warehouses.md
     - Utils:
       - Decorators: functions/utils/decorators.md
