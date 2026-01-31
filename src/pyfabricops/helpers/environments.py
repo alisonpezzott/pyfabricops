@@ -1,20 +1,15 @@
 import os
-import re
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Dict, Optional, Union
 
 import pandas as pd
 from pandas import DataFrame
 
-from ..api.api import _base_api, api_request
-from ..core.gateways import resolve_gateway
 from ..core.workspaces import resolve_workspace
 from ..helpers.folders import (
     create_folders_from_path_string,
     resolve_folder_from_id_to_path,
 )
-from ..helpers.lakehouses import list_lakehouses
-from ..helpers.warehouses import list_warehouses
 from ..items.environments import (
     create_environment,
     get_environment,
@@ -30,7 +25,6 @@ from ..utils.utils import (
     extract_middle_path,
     list_paths_of_type,
     pack_item_definition,
-    parse_tmdl_parameters,
     unpack_item_definition,
 )
 
