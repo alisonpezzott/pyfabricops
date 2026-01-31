@@ -30,6 +30,7 @@ nav:
       - Data Pipelines: functions/helpers/data_pipelines.md
       - Dataflows Gen1: functions/helpers/dataflows_gen1.md
       - Dataflows Gen2: functions/helpers/dataflows_gen2.md
+      - Environments: functions/helpers/environments.md
       - Folders: functions/helpers/folders.md
       - Items: functions/helpers/items.md
       - Lakehouses: functions/helpers/lakehouses.md
@@ -42,10 +43,12 @@ nav:
       - Data Pipelines: functions/items/data_pipelines.md
       - Dataflows Gen1: functions/items/dataflows_gen1.md
       - Dataflows Gen2: functions/items/dataflows_gen2.md
+      - Environments: functions/items/environments.md
       - Items: functions/items/items.md
       - Lakehouses: functions/items/lakehouses.md
       - Notebooks: functions/items/notebooks.md
       - Reports: functions/items/reports.md
+      - Spark: functions/items/spark.md
       - Semantic Models: functions/items/semantic_models.md
       - Variable Libraries: functions/items/variable_libraries.md
       - Warehouses: functions/items/warehouses.md
