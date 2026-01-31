@@ -279,8 +279,15 @@ def _lro_handler(api_result: NamedTuple) -> ApiResult:
 
     # Handle immediate completion states
     if status in ['Succeeded']:
-        return _get_lro_result(f'{location_header}/result')
-
+        # return _get_lro_result(f'{location_header}/result')
+        return ApiResult(
+            success=True,
+            status_code=200,
+            data=None,
+            headers=None,
+            error=None,
+            request_kwargs=None,
+        )
     elif status in ['Failed', 'Undefined']:
         return ApiResult(
             success=False,
