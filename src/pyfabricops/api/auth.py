@@ -6,8 +6,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Literal, Optional, Union
 
 import requests
-from azure.identity import ClientSecretCredential, InteractiveBrowserCredential
-from azure.keyvault.secrets import SecretClient
+from azure.identity import InteractiveBrowserCredential
 from dotenv import load_dotenv
 
 from ..utils.exceptions import (
@@ -117,54 +116,8 @@ class EnvCredentialProvider(CredentialProvider):
             'fab_tenant_id': os.getenv('FAB_TENANT_ID'),
             'fab_username': os.getenv('FAB_USERNAME'),
             'fab_password': os.getenv('FAB_PASSWORD'),
-            'azure_tenant_id': os.getenv('AZURE_TENANT_ID'),
-            'azure_client_id': os.getenv('AZURE_CLIENT_ID'),
-            'azure_client_secret': os.getenv('AZURE_CLIENT_SECRET'),
-            'azure_key_vault_name': os.getenv('AZURE_KEY_VAULT_NAME'),
             'github_token': os.getenv('GH_TOKEN'),
         }
-
-
-class VaultCredentialProvider(CredentialProvider):
-    """Azure Key Vault credential provider"""
-
-    def __init__(self):
-        self.env_provider = EnvCredentialProvider()
-
-    def get_credentials(self) -> Dict[str, str]:
-        env_creds = self.env_provider.get_credentials()
-        vault_url = (
-            f"https://{env_creds['azure_key_vault_name']}.vault.azure.net"
-        )
-
-        credential = ClientSecretCredential(
-            tenant_id=env_creds['azure_tenant_id'],
-            client_id=env_creds['azure_client_id'],
-            client_secret=env_creds['azure_client_secret'],
-        )
-
-        client = SecretClient(vault_url=vault_url, credential=credential)
-        secrets = {}
-
-        secret_names = [
-            'fab-client-id',
-            'fab-client-secret',
-            'fab-tenant-id',
-            'fab-username',
-            'fab-password',
-            'github-token',
-            'database-username',
-            'database-password',
-        ]
-
-        for secret_name in secret_names:
-            try:
-                secret = client.get_secret(secret_name)
-                secrets[secret_name.replace('-', '_')] = secret.value
-            except Exception as e:
-                logger.warning(f'Failed to retrieve secret {secret_name}: {e}')
-
-        return secrets
 
 
 class OAuthProvider:
@@ -202,24 +155,19 @@ class OAuthProvider:
 class TokenManager:
     """Main token and authentication manager"""
 
-    def __init__(
-        self, auth_provider: Literal['env', 'vault', 'oauth'] = 'env'
-    ):
+    def __init__(self, auth_provider: Literal['env', 'oauth'] = 'env'):
         self.cache = TokenCache()
         self.auth_provider = auth_provider
         self._credential_providers = {
             'env': EnvCredentialProvider(),
-            'vault': VaultCredentialProvider(),
         }
         self.oauth_provider = OAuthProvider(self.cache)
 
-    def set_auth_provider(
-        self, source: Literal['env', 'vault', 'oauth'] = 'env'
-    ):
+    def set_auth_provider(self, source: Literal['env', 'oauth'] = 'env'):
         """Define the authentication provider"""
-        if source not in ['env', 'vault', 'oauth']:
+        if source not in ['env', 'oauth']:
             raise OptionNotAvailableError(
-                f'Source not available. Available: env, vault, oauth. Got: {source}'
+                f'Source not available. Available: env, oauth. Got: {source}'
             )
         self.auth_provider = source
 
@@ -289,7 +237,7 @@ class TokenManager:
         if self.auth_provider == 'oauth':
             return self.oauth_provider.get_token(audience)
 
-        # For env and vault, use cache + API
+        # For env, use cache + API
         token_key = f'{audience.upper()}_{credential_type.upper()}'
 
         # Check if cached token is still valid
@@ -318,14 +266,12 @@ class TokenManager:
 _token_manager = TokenManager()
 
 
-def set_auth_provider(
-    source: Literal['env', 'vault', 'oauth'] = 'env'
-) -> None:
+def set_auth_provider(source: Literal['env', 'oauth'] = 'env') -> None:
     """
     Set the authentication provider for token retrieval.
 
     Args:
-        source (str): The provider of credentials. Can be "env", "vault", or "oauth".
+        source (str): The provider of credentials. Can be "env" or "oauth".
 
     Returns:
         None
@@ -337,11 +283,6 @@ def set_auth_provider(
         ### Environment variables (.env, GitHub Secrets, Ado Secrets...)
         ```python
         set_auth_provider("env")
-        ```
-
-        ### Azure Key Vault
-        ```python
-        set_auth_provider("vault")
         ```
 
         ### OAuth (Interactive)
@@ -377,7 +318,7 @@ def clear_token_cache() -> None:
 
 def _get_token(
     audience: Literal['fabric', 'powerbi'] = 'fabric',
-    auth_provider: Literal['env', 'vault', 'oauth'] = 'env',
+    auth_provider: Literal['env', 'oauth'] = 'env',
     credential_type: Literal['spn', 'user'] = 'spn',
 ) -> Union[dict, None]:
     """Get a token"""

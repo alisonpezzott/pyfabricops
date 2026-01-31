@@ -1,6 +1,5 @@
 azure-storage-blob==12.25.1
 azure-identity==1.16.0
-azure-keyvault-secrets==4.9.0
 cryptography>=3.4.8,<47.0.0
 json5==0.9.28
 pandas==2.3.0

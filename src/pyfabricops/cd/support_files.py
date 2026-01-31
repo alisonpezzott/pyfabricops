@@ -9,10 +9,6 @@ FAB_CLIENT_SECRET=your_client_secret_here
 FAB_TENANT_ID=your_tenant_id_here
 FAB_USERNAME=your_username_here
 FAB_PASSWORD=your_password_here
-AZURE_CLIENT_ID=your_azure_client_id_here
-AZURE_CLIENT_SECRET=your_azure_client_secret_here
-AZURE_TENANT_ID=your_azure_tenant_id_here
-AZURE_KEY_VAULT_NAME=your_key_vault_name_here
 DATABASE_USERNAME=your_database_username_here
 DATABASE_PASSWORD=your_database_password_here
 GH_TOKEN=your_github_token_here""",
@@ -25,6 +21,7 @@ BRANCHES = {
     "main": "-PRD",
     "master": "-PRD",
     "dev": "-DEV",
+    "develop": "-DEV",
     "staging": "-STG"
 }""",
 }
