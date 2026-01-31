@@ -1,14 +1,14 @@
 [project]
 name = "pyfabricops"
-version = "0.3.2"
-description = "A Python wrapper library for Microsoft Fabric (and Power BI) operations, providing a simple interface to the official Fabric REST APIs. Falls back to Power BI REST APIs where needed. Designed to run in Python notebooks, pure Python scripts or integrated into YAML-based workflows for CI/CD."
+version = "0.3.3"
+description = "A Python wrapper library for Microsoft Fabric and Power BI that provides a simple, consistent interface to the official Fabric REST APIs, with automatic fallback to Power BI REST APIs when required. Designed to run in Fabric notebooks, pure Python scripts, or as part of YAML-based CI/CD workflows."
 authors = [
     {name = "alisonpezzott",email = "alisonpezzott@gmail.com"}
 ]
 license = "MIT"
 license-files = ["LICENSE"]
 readme = "README.md"
-requires-python = ">=3.10, <= 3.12.10"
+requires-python = ">=3.10, <= 3.13"
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
