@@ -11,7 +11,7 @@ Access to the repositoy on [GitHub](https://github.com/alisonpezzott/pyfabricops
 
 ## 🚀 Features  
 
-- Authenticate using environment variables (GitHub Secrets, ADO Secrets, AzKeyVault, .env ...)
+- Authenticate using environment variables (GitHub Secrets, ADO Secrets, .env ...)
 - Manage workspaces, capacities, semantic models, lakehouses, reports and connections
 - Execute Git operations and automate Fabric deployment flows (Power BI inclusive)
 - Capture and Manage Git branches automatically for CI/CD scenarios
@@ -60,19 +60,6 @@ FAB_USERNAME=your_username_here   # Necessary for some functions with no SPN sup
 FAB_PASSWORD=your_password_here   # Necessary for some functions with no SPN support
 ```
 
-#### Azure Key Vault
-
-```python
-pf.set_auth_provider("vault")
-```
-Ensure you have the required Azure Key Vault secrets set:
-```
-AZURE_CLIENT_ID=your_azure_client_id_here
-AZURE_CLIENT_SECRET=your_azure_client_secret_here
-AZURE_TENANT_ID=your_azure_tenant_id_here
-AZURE_KEY_VAULT_NAME=your_key_vault_name_here
-```
-
 #### OAuth (Interactive)
 
 ```python
@@ -81,7 +68,7 @@ pf.set_auth_provider("oauth")
 This will open a browser window for user authentication.  
 
 > Create a repository and clone it locally.
-> Prepare your environment with the required variables according to your authentication method (GitHub Secrets, ADO Secrets, AzKeyVault, .env ...)
+> Prepare your environment with the required variables according to your authentication method (GitHub Secrets, ADO Secrets, .env ...)
 
 
 ### Branches configuration
