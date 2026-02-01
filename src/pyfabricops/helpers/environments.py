@@ -323,7 +323,7 @@ def _create_environment_external_library_yaml(
         env_yaml += f"""
       - {library}=={version}"""
 
-    target_path = './tmp/env/Libraries/PublicLibraries/environment.yaml'
+    target_path = '../tmp/env/Libraries/PublicLibraries/environment.yaml'
 
     os.makedirs(os.path.dirname(target_path), exist_ok=True)
     with open(target_path, 'w', encoding='utf-8') as f:
