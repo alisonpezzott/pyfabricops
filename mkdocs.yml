@@ -11,6 +11,7 @@ nav:
     - API: 
       - API: functions/api/api.md
       - Auth: functions/api/auth.md
+      - Authentication Guide: authentication_guide.md
       - Scopes: functions/api/scopes.md
     - CD (Continuous Deployment):
       - Support files: functions/cd/support_files.md

@@ -289,7 +289,7 @@ def update_environment_definition(
 
     payload = {'definition': environment_definition}
 
-    params = {'updateMetadata': True}
+    parms = {'updateMetadata': True}
 
     return api_request(
         endpoint='/workspaces/'
@@ -298,7 +298,8 @@ def update_environment_definition(
         + environment_id
         + '/updateDefinition',
         payload=payload,
-        params=params,
+        params=parms,
+        method='post',
         support_lro=True,
     )
 
@@ -539,4 +540,71 @@ def update_environment_spark_compute(
         params={'beta': False},
         method='patch',
         payload=payload,
+    )
+
+
+def export_environment_external_libraries(
+    workspace: str,
+    environment: str,
+) -> Union[Dict[str, Any], None]:
+    """
+    Export environment external libraries.
+
+    Args:
+        workspace (str): The workspace name or ID.
+        environment (str): The name or ID of the environment.
+
+    Returns:
+        (Union[Dict[str, Any], None]): The environment external libraries if found, otherwise None.
+
+    Examples:
+        ```python
+        export_environment_external_libraries('MyProjectWorkspace', 'MyEnvironment')
+        export_environment_external_libraries('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000')
+        ```
+    """
+    workspace_id = resolve_workspace(workspace)
+
+    environment_id = resolve_environment(workspace_id, environment)
+
+    return api_request(
+        endpoint='/workspaces/'
+        + workspace_id
+        + '/environments/'
+        + environment_id
+        + '/libraries/exportExternalLibraries',
+        return_raw=True,
+    ).text
+
+
+def import_environment_external_libraries(
+    workspace: str,
+    environment: str,
+) -> Union[Dict[str, Any], None]:
+    """
+    Import external libraries from environment.yaml in the environment.
+
+    Args:
+        workspace (str): The workspace name or ID.
+        environment (str): The name or ID of the environment.
+
+    Returns:
+        (Union[Dict[str, Any], None]): The environment external libraries if found, otherwise None.
+
+    Examples:
+        ```python
+        import_environment_external_libraries('MyProjectWorkspace', 'MyEnvironment')
+        import_environment_external_libraries('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000')
+        ```
+    """
+    workspace_id = resolve_workspace(workspace)
+    environment_id = resolve_environment(workspace_id, environment)
+
+    return api_request(
+        endpoint='/workspaces/'
+        + workspace_id
+        + '/environments/'
+        + environment_id
+        + '/staging/libraries/importExternalLibraries',
+        method='post',
     )

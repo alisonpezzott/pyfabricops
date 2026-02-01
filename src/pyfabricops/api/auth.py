@@ -30,9 +30,11 @@ class TokenCache:
         'FABRIC_SPN': {'access_token': '', 'expires_at': 0},
         'FABRIC_USER': {'access_token': '', 'expires_at': 0},
         'FABRIC_INTERACTIVE': {'access_token': '', 'expires_at': 0},
+        'FABRIC_NOTEBOOK': {'access_token': '', 'expires_at': 0},
         'POWERBI_SPN': {'access_token': '', 'expires_at': 0},
         'POWERBI_USER': {'access_token': '', 'expires_at': 0},
         'POWERBI_INTERACTIVE': {'access_token': '', 'expires_at': 0},
+        'POWERBI_NOTEBOOK': {'access_token': '', 'expires_at': 0},
     }
 
     def __init__(self, cache_file: Optional[str] = None):
@@ -152,22 +154,82 @@ class OAuthProvider:
         return self.cache.get_token(token_key)
 
 
+class FabricNotebookProvider:
+    """Fabric Notebook authentication provider using notebookutils.credentials"""
+
+    def __init__(self, cache: TokenCache):
+        self.cache = cache
+        self._notebookutils = None
+
+    def _get_notebookutils(self):
+        """Lazy load notebookutils module"""
+        if self._notebookutils is None:
+            try:
+                from notebookutils import credentials
+
+                self._notebookutils = credentials
+            except ImportError:
+                raise AuthenticationError(
+                    'notebookutils is not available. '
+                    'This authentication method only works inside Microsoft Fabric notebooks. '
+                    'If you are running outside Fabric, use set_auth_provider("env") or set_auth_provider("oauth") instead.'
+                )
+        return self._notebookutils
+
+    def get_token(
+        self, audience: Literal['fabric', 'powerbi'] = 'fabric'
+    ) -> Dict:
+        """Get token from Fabric notebook context"""
+        token_key = f'{audience.upper()}_NOTEBOOK'
+
+        # Check if cached token is still valid
+        if self.cache.is_token_valid(token_key):
+            return self.cache.get_token(token_key)
+
+        logger.info('Getting token from Fabric notebook context...')
+        credentials = self._get_notebookutils()
+
+        # Get token using notebookutils
+        # For Power BI API, use 'pbi' resource
+        # For Fabric API, use 'storage' or the appropriate resource
+        resource = 'pbi' if audience == 'powerbi' else 'pbi'
+        access_token = credentials.getToken(resource)
+
+        if not access_token:
+            raise ResourceNotFoundError(
+                f'Access token not found for resource: {resource}'
+            )
+
+        logger.success('Token retrieved successfully from Fabric notebook.')
+
+        # Store in cache with default expiration (1 hour)
+        expires_in = 3600
+        self.cache.store_token(token_key, access_token, expires_in)
+
+        return self.cache.get_token(token_key)
+
+
 class TokenManager:
     """Main token and authentication manager"""
 
-    def __init__(self, auth_provider: Literal['env', 'oauth'] = 'env'):
+    def __init__(
+        self, auth_provider: Literal['env', 'oauth', 'fabric'] = 'env'
+    ):
         self.cache = TokenCache()
         self.auth_provider = auth_provider
         self._credential_providers = {
             'env': EnvCredentialProvider(),
         }
         self.oauth_provider = OAuthProvider(self.cache)
+        self.fabric_provider = FabricNotebookProvider(self.cache)
 
-    def set_auth_provider(self, source: Literal['env', 'oauth'] = 'env'):
+    def set_auth_provider(
+        self, source: Literal['env', 'oauth', 'fabric'] = 'env'
+    ):
         """Define the authentication provider"""
-        if source not in ['env', 'oauth']:
+        if source not in ['env', 'oauth', 'fabric']:
             raise OptionNotAvailableError(
-                f'Source not available. Available: env, oauth. Got: {source}'
+                f'Source not available. Available: env, oauth, fabric. Got: {source}'
             )
         self.auth_provider = source
 
@@ -237,6 +299,10 @@ class TokenManager:
         if self.auth_provider == 'oauth':
             return self.oauth_provider.get_token(audience)
 
+        # Fabric notebook uses notebookutils
+        if self.auth_provider == 'fabric':
+            return self.fabric_provider.get_token(audience)
+
         # For env, use cache + API
         token_key = f'{audience.upper()}_{credential_type.upper()}'
 
@@ -266,12 +332,14 @@ class TokenManager:
 _token_manager = TokenManager()
 
 
-def set_auth_provider(source: Literal['env', 'oauth'] = 'env') -> None:
+def set_auth_provider(
+    source: Literal['env', 'oauth', 'fabric'] = 'env'
+) -> None:
     """
     Set the authentication provider for token retrieval.
 
     Args:
-        source (str): The provider of credentials. Can be "env" or "oauth".
+        source (str): The provider of credentials. Can be "env", "oauth", or "fabric".
 
     Returns:
         None
@@ -289,6 +357,14 @@ def set_auth_provider(source: Literal['env', 'oauth'] = 'env') -> None:
         ```python
         set_auth_provider("oauth")
         ```
+
+        ### Fabric Notebook (uses notebookutils.credentials)
+        ```python
+        set_auth_provider("fabric")
+        ```
+        This method is designed for use inside Microsoft Fabric notebooks where
+        the user is already authenticated. It uses notebookutils.credentials.getToken()
+        to retrieve the access token.
     """
     global _token_manager
     _token_manager.set_auth_provider(source)
@@ -318,7 +394,7 @@ def clear_token_cache() -> None:
 
 def _get_token(
     audience: Literal['fabric', 'powerbi'] = 'fabric',
-    auth_provider: Literal['env', 'oauth'] = 'env',
+    auth_provider: Literal['env', 'oauth', 'fabric'] = 'env',
     credential_type: Literal['spn', 'user'] = 'spn',
 ) -> Union[dict, None]:
     """Get a token"""
