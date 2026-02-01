@@ -21,6 +21,7 @@ from ..items.environments import (
 from ..utils.decorators import df
 from ..utils.logging import get_logger
 from ..utils.utils import (
+    delete_path,
     extract_display_name_from_platform,
     extract_middle_path,
     list_paths_of_type,
@@ -369,6 +370,8 @@ def add_environment_external_library_from_pypi(
         workspace,
         environment,
     )
+
+    delete_path('../tmp')
 
     unpack_item_definition(
         definition,

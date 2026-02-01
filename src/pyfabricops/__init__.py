@@ -396,6 +396,7 @@ from .utils.logging import (
 from .utils.utils import (
     copy_to_staging,
     dataframe_to_list,
+    delete_path,
     extract_display_name_from_platform,
     extract_middle_path,
     find_and_replace,
@@ -483,6 +484,7 @@ __all__ = [
     'delete_item',
     'delete_lakehouse',
     'delete_notebook',
+    'delete_path',
     'delete_report',
     'delete_semantic_model',
     'delete_shortcut',
