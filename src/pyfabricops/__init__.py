@@ -150,6 +150,7 @@ from .helpers.dataflows_gen2 import (
     replace_dataflow_gen2_variables_with_placeholders,
 )
 from .helpers.environments import (
+    add_environment_external_library_from_pypi,
     deploy_all_environments,
     deploy_environment,
     export_all_environments,
@@ -268,10 +269,12 @@ from .items.dataflows_gen2 import (
 from .items.environments import (
     create_environment,
     delete_environment,
+    export_environment_external_libraries,
     get_environment,
     get_environment_definition,
     get_environment_id,
     get_environment_spark_compute,
+    import_environment_external_libraries,
     list_environments,
     publish_environment,
     resolve_environment,
@@ -281,7 +284,7 @@ from .items.environments import (
 )
 from .items.items import (
     create_item,
-    delete_item,
+    delete_item,    
     get_item,
     get_item_definition,
     get_item_id,
@@ -427,6 +430,7 @@ __all__ = [
     'SUCCESS_LEVEL',
     'add_connection_role_assignment',
     'add_deployment_pipeline_role_assignment',
+    'add_environment_external_library_from_pypi',
     'add_workspace_role_assignment',
     'ado_connect',
     'api_request',
@@ -531,6 +535,7 @@ __all__ = [
     'export_dataflow_gen1',
     'export_dataflow_gen2',
     'export_environment',
+    'export_environment_external_libraries',
     'export_folders',
     'export_item',
     'export_lakehouse',
@@ -637,6 +642,7 @@ __all__ = [
     'git_init',
     'git_status',
     'github_connect',
+    'import_environment_external_libraries',
     'import_pyadomd',
     'is_valid_uuid',
     'json_to_df',

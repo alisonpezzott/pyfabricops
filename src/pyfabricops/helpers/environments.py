@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
 from pandas import DataFrame
@@ -308,5 +308,80 @@ def deploy_all_environments(
 
     logger.success(
         f'All environments were deployed to workspace "{workspace}" successfully.'
+    )
+    return None
+
+
+def _create_environment_external_library_yaml(
+        libraries: List[tuple[str, str]],
+):
+ 
+    env_yaml = """dependencies:
+  - pip:"""
+
+    for library, version in libraries:
+        env_yaml += f"""
+      - {library}=={version}"""
+    
+    target_path ='./tmp/Env/Libraries/PublicLibraries/environment.yaml'
+
+    os.makedirs(os.path.dirname(target_path), exist_ok=True)
+    with open(target_path, 'w', encoding='utf-8') as f:
+        f.write(env_yaml)
+    logger.success(
+        f'Environment external libraries were created successfully.'
+    )
+    return None
+
+
+def add_environment_external_library_from_pypi(
+    workspace: str,
+    environment: str,
+    libraries: List[tuple[str, str]],
+):
+    """
+    Add external libraries to an environment from PyPI.
+
+    Args:
+        workspace (str): The name or ID of the workspace.
+        environment (str): The name or ID of the environment.
+        libraries (List[tuple[str, str]]): A list of tuples containing library names and their versions.
+
+    Returns:
+        None
+
+    Example::
+        add_environment_external_library_from_pypi(
+            workspace='FabricOpsFlow-DEV',
+            environment='Default',
+            libraries=[
+                ('pyFabricOps', '0.3.3'),
+                ('pandas', '1.5.3'),
+                ('numpy', '1.24.2')
+            ]
+        )
+    """
+    target_path ='./tmp/Env'
+
+    definition = get_environment_definition(
+        workspace,
+        environment,
+    )
+
+    unpack_item_definition(
+        definition,
+        path=target_path,
+    )
+
+    _create_environment_external_library_yaml(libraries)
+
+    update_environment_definition(
+        workspace=workspace,
+        environment=environment,
+        environment_definition=pack_item_definition(target_path)
+    )
+
+    logger.success(
+        f'External libraries were added to environment "{environment}" successfully. Perform a publish to apply the changes.'
     )
     return None
