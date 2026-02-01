@@ -67,6 +67,17 @@ pf.set_auth_provider("oauth")
 ```
 This will open a browser window for user authentication.  
 
+#### Fabric Notebook (Authenticated User)
+
+```python
+pf.set_auth_provider("fabric")
+```
+This method is designed for use inside Microsoft Fabric notebooks where the user is already authenticated.  
+It uses `notebookutils.credentials.getToken()` to retrieve the access token automatically.  
+No browser authentication required - perfect for notebooks running in Fabric!
+
+See more details in the [authentication guide](authentication_guide.md)  
+
 > Create a repository and clone it locally.
 > Prepare your environment with the required variables according to your authentication method (GitHub Secrets, ADO Secrets, .env ...)
 
@@ -80,6 +91,7 @@ Create a branches.json file in the root of your repository to define your branch
     "main": "-PRD",
     "master": "-PRD",
     "dev": "-DEV",
+    "develop": "-DEV",
     "staging": "-STG"
 }
 ```
