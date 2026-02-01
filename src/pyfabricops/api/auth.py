@@ -166,6 +166,7 @@ class FabricNotebookProvider:
         if self._notebookutils is None:
             try:
                 from notebookutils import credentials
+
                 self._notebookutils = credentials
             except ImportError:
                 raise AuthenticationError(
@@ -187,7 +188,7 @@ class FabricNotebookProvider:
 
         logger.info('Getting token from Fabric notebook context...')
         credentials = self._get_notebookutils()
-        
+
         # Get token using notebookutils
         # For Power BI API, use 'pbi' resource
         # For Fabric API, use 'storage' or the appropriate resource
@@ -211,7 +212,9 @@ class FabricNotebookProvider:
 class TokenManager:
     """Main token and authentication manager"""
 
-    def __init__(self, auth_provider: Literal['env', 'oauth', 'fabric'] = 'env'):
+    def __init__(
+        self, auth_provider: Literal['env', 'oauth', 'fabric'] = 'env'
+    ):
         self.cache = TokenCache()
         self.auth_provider = auth_provider
         self._credential_providers = {
@@ -220,7 +223,9 @@ class TokenManager:
         self.oauth_provider = OAuthProvider(self.cache)
         self.fabric_provider = FabricNotebookProvider(self.cache)
 
-    def set_auth_provider(self, source: Literal['env', 'oauth', 'fabric'] = 'env'):
+    def set_auth_provider(
+        self, source: Literal['env', 'oauth', 'fabric'] = 'env'
+    ):
         """Define the authentication provider"""
         if source not in ['env', 'oauth', 'fabric']:
             raise OptionNotAvailableError(
@@ -327,7 +332,9 @@ class TokenManager:
 _token_manager = TokenManager()
 
 
-def set_auth_provider(source: Literal['env', 'oauth', 'fabric'] = 'env') -> None:
+def set_auth_provider(
+    source: Literal['env', 'oauth', 'fabric'] = 'env'
+) -> None:
     """
     Set the authentication provider for token retrieval.
 

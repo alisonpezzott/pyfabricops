@@ -313,17 +313,17 @@ def deploy_all_environments(
 
 
 def _create_environment_external_library_yaml(
-        libraries: List[tuple[str, str]],
+    libraries: List[tuple[str, str]],
 ):
- 
+
     env_yaml = """dependencies:
   - pip:"""
 
     for library, version in libraries:
         env_yaml += f"""
       - {library}=={version}"""
-    
-    target_path ='./tmp/Env/Libraries/PublicLibraries/environment.yaml'
+
+    target_path = './tmp/Env/Libraries/PublicLibraries/environment.yaml'
 
     os.makedirs(os.path.dirname(target_path), exist_ok=True)
     with open(target_path, 'w', encoding='utf-8') as f:
@@ -361,7 +361,7 @@ def add_environment_external_library_from_pypi(
             ]
         )
     """
-    target_path ='./tmp/Env'
+    target_path = './tmp/Env'
 
     definition = get_environment_definition(
         workspace,
@@ -378,7 +378,7 @@ def add_environment_external_library_from_pypi(
     update_environment_definition(
         workspace=workspace,
         environment=environment,
-        environment_definition=pack_item_definition(target_path)
+        environment_definition=pack_item_definition(target_path),
     )
 
     logger.success(

@@ -573,7 +573,7 @@ def export_environment_external_libraries(
         + '/environments/'
         + environment_id
         + '/libraries/exportExternalLibraries',
-        return_raw=True
+        return_raw=True,
     ).text
 
 

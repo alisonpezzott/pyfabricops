@@ -284,7 +284,7 @@ from .items.environments import (
 )
 from .items.items import (
     create_item,
-    delete_item,    
+    delete_item,
     get_item,
     get_item_definition,
     get_item_id,
