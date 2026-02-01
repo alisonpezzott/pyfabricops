@@ -673,3 +673,24 @@ def extract_display_name_from_platform(path: str) -> str:
         platform_dict = json.load(f)
 
     return platform_dict.get('metadata').get('displayName')
+
+
+def delete_path(path: str) -> None:
+    """
+    Deletes a file or directory at the specified path.
+
+    Args:
+        path (str): The path to the file or directory to be deleted.
+
+    Returns:
+        None
+
+    Examples:
+        ```python
+        delete_path('/path/to/file_or_directory')
+        ```
+    """
+    if os.path.isfile(path):
+        os.remove(path)
+    elif os.path.isdir(path):
+        shutil.rmtree(path)
