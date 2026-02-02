@@ -99,7 +99,7 @@ def get_variable_library(
     return api_request(
         endpoint='/workspaces/'
         + workspace_id
-        + '/VariableLibrary/'
+        + '/VariableLibraries/'
         + variable_library_id,
     )
 
@@ -153,7 +153,7 @@ def create_variable_library(
             payload['folderId'] = folder_id
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/VariableLibrary',
+        endpoint='/workspaces/' + workspace_id + '/VariableLibraries',
         method='post',
         payload=payload,
         support_lro=True,
