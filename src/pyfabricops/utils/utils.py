@@ -306,7 +306,7 @@ def unpack_item_definition(item_definition: dict, path: str) -> None:
         with open(out_path, 'wb') as out_file:
             out_file.write(content_bytes)
 
-    logger.success(f'Item definition unpacked to {path}')
+    logger.debug(f'Item definition unpacked to {path}')
 
 
 def parse_tmdl_parameters(path: str) -> dict:
