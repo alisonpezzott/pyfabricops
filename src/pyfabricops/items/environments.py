@@ -392,7 +392,7 @@ def publish_environment(
 
     params = {'beta': False}
 
-    response = api_request(
+    return api_request(
         endpoint='/workspaces/'
         + workspace_id
         + '/environments/'
@@ -401,12 +401,6 @@ def publish_environment(
         method='post',
         params=params,
     )
-
-    if response.success:
-        logger.info(
-            f"Environment '{environment}' published in workspace {workspace}. It's running, please check after 10 minutes aproximately'."
-        )
-        return None
 
 
 @df
