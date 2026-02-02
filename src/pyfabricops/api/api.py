@@ -465,7 +465,7 @@ def api_request(
 
     # Handle long-running operations (LRO) if supported
     if support_lro and response.status_code == 202:
-        logger.info('Long-running operation detected, handling LRO...')
+        logger.debug('Long-running operation detected, handling LRO...')
 
         # Call the LRO handler
         lro_response = _lro_handler(response)

@@ -329,9 +329,7 @@ def _create_environment_external_library_yaml(
     os.makedirs(os.path.dirname(target_path), exist_ok=True)
     with open(target_path, 'w', encoding='utf-8') as f:
         f.write(env_yaml)
-    logger.success(
-        f'Environment external libraries were created successfully.'
-    )
+    logger.debug(f'Environment external libraries were created successfully.')
     return None
 
 
@@ -387,6 +385,6 @@ def add_environment_external_library_from_pypi(
     )
 
     logger.success(
-        f'External libraries were added to environment "{environment}" successfully. Perform a publish to apply the changes.'
+        f'External libraries were added to environment {environment} successfully.'
     )
     return None
