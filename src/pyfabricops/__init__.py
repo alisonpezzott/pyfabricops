@@ -6,6 +6,7 @@ from .core.capacities import get_capacity_id, list_capacities, resolve_capacity
 from .core.connections import (
     add_connection_role_assignment,
     bind_semantic_model_connection,
+    create_adlsgen2_connection_with_service_principal_credentials,
     create_github_source_control_connection,
     create_sql_cloud_connection,
     create_sql_on_premises_connection,
@@ -458,6 +459,7 @@ __all__ = [
     'convert_report_definition_to_by_connection',
     'convert_report_definition_to_by_path',
     'copy_to_staging',
+    'create_adlsgen2_connection_with_service_principal_credentials',
     'create_data_pipeline',
     'create_dataflow_gen1',
     'create_dataflow_gen2',
