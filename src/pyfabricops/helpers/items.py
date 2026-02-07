@@ -1,4 +1,3 @@
-import json
 import os
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
@@ -186,17 +185,17 @@ def deploy_item(
     display_name = extract_display_name_from_platform(path)
     if display_name is None:
         return None
-
-    item_id = resolve_item(workspace_id, display_name)
-
-    folder_path_string = extract_middle_path(path, start_path=start_path)
-    folder_id = create_folders_from_path_string(
-        workspace_id, folder_path_string
-    )
+    item_type = path.split('.')[-1]
+    item_with_type = f'{display_name}.{item_type}'
+    item_id = resolve_item(workspace_id, item_with_type)
 
     item_definition = pack_item_definition(path)
 
     if item_id is None:
+        folder_path_string = extract_middle_path(path, start_path=start_path)
+        folder_id = create_folders_from_path_string(
+            workspace_id, folder_path_string
+        )
         return create_item(
             workspace_id,
             display_name=display_name,
@@ -232,7 +231,17 @@ def deploy_all_items(
     if workspace_id is None:
         return None
 
-    types = ['Notebook', 'DataPipeline', 'Dataflow', 'SemanticModel', 'Report']
+    types = [
+        'Notebook',
+        'DataPipeline',
+        'Dataflow',
+        'SemanticModel',
+        'Report',
+        'VariableLibrary',
+        'Lakehouse',
+        'Warehouse',
+        'Environment',
+    ]
     for type in types:
         item_paths = list_paths_of_type(path, type)
 
@@ -241,19 +250,19 @@ def deploy_all_items(
             display_name = extract_display_name_from_platform(path_)
             if display_name is None:
                 return None
-
-            item_id = resolve_item(workspace_id, display_name)
-
-            folder_path_string = extract_middle_path(
-                path_, start_path=start_path
-            )
-            folder_id = create_folders_from_path_string(
-                workspace_id, folder_path_string
-            )
+            item_type = path_.split('.')[-1]
+            item_with_type = f'{display_name}.{item_type}'
+            item_id = resolve_item(workspace_id, item_with_type)
 
             item_definition = pack_item_definition(path_)
 
             if item_id is None:
+                folder_path_string = extract_middle_path(
+                    path_, start_path=start_path
+                )
+                folder_id = create_folders_from_path_string(
+                    workspace_id, folder_path_string
+                )
                 create_item(
                     workspace_id,
                     display_name=display_name,
