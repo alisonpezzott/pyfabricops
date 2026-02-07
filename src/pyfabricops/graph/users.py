@@ -33,7 +33,7 @@ def get_user_email(id):
         raise ResourceNotFoundError(f'User {id} not found')
 
 
-def get_group_id(group_name):
+def get_security_group_id(group_name):
     """Get group ID by display name or mail"""
     response = api_request(
         endpoint=f"/groups?$filter=displayName eq '{group_name}'",
@@ -47,7 +47,7 @@ def get_group_id(group_name):
         raise ResourceNotFoundError(f'Group {group_name} not found')
 
 
-def get_group_name(group_id):
+def get_security_group_name(group_id):
     """Get group display name by ID"""
     response = api_request(
         endpoint=f"/groups?$filter=id eq '{group_id}'",
