@@ -218,7 +218,7 @@ For complete logging configuration options, refer to the [logging_system.md](fun
 2. Create a new branch (feat/my-feature)
 3. Run `poetry install` to set up the development environment
 4. Run `poetry run task test` to run tests
-5. Submit a pull request 🚀  
+5. Submit a pull request to branch `develop` 🚀  
 
 ## 🚀 Publishing
 
