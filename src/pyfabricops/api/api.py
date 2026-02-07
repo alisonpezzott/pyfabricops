@@ -1,4 +1,5 @@
 import time
+from email.mime import base
 from typing import Any, Dict, List, Literal, NamedTuple, Optional, Union
 from urllib.parse import urlencode
 
@@ -11,7 +12,7 @@ from ..utils.exceptions import (
 )
 from ..utils.logging import get_logger
 from .auth import _get_token
-from .scopes import FABRIC_API, POWERBI_API
+from .scopes import FABRIC_API, GRAPH_API, POWERBI_API
 
 logger = get_logger(__name__)
 
@@ -34,7 +35,7 @@ def _base_api(
     payload: Optional[dict] = None,
     data: Optional[dict] = None,
     params: Optional[dict] = None,
-    audience: Literal['fabric', 'powerbi'] = 'fabric',
+    audience: Literal['fabric', 'powerbi', 'graph'] = 'fabric',
     credential_type: Literal['spn', 'user'] = 'spn',
     method: Literal['get', 'post', 'patch', 'delete'] = 'get',
     return_raw: bool = False,
@@ -44,7 +45,12 @@ def _base_api(
     Base API function to the Microsoft Fabric or Power BI API.
     """
     # Base URL selection based on audience
-    base_url = FABRIC_API if audience == 'fabric' else POWERBI_API
+    if audience == 'graph':
+        base_url = GRAPH_API
+    elif audience == 'fabric':
+        base_url = FABRIC_API
+    else:
+        base_url = POWERBI_API
 
     # Construct the full URL
     url = f'{base_url}{endpoint}'
@@ -380,7 +386,7 @@ def api_request(
     payload: Optional[dict] = None,
     data: Optional[dict] = None,
     params: Optional[dict] = None,
-    audience: Literal['fabric', 'powerbi'] = 'fabric',
+    audience: Literal['fabric', 'powerbi', 'graph'] = 'fabric',
     credential_type: Literal['spn', 'user'] = 'spn',
     method: Literal['get', 'post', 'patch', 'delete'] = 'get',
     support_pagination: Optional[bool] = False,
@@ -402,7 +408,7 @@ def api_request(
         payload (Optional[dict]): The JSON payload to send with the request. Defaults to None.
         data (Optional[dict]): The data to send with the request. Defaults to None.
         params (Optional[dict]): Query parameters to append to the URL. Defaults to None.
-        audience (Literal["fabric", "powerbi"]): The API audience to target. Defaults to "fabric".
+        audience (Literal["fabric", "powerbi", "graph"]): The API audience to target. Defaults to "fabric".
         credential_type (Literal["spn", "user"]): The type of credentials to use for authentication. Defaults to "spn".
         method (Literal["get", "post", "patch", "delete"]): The HTTP method to use for the request. Defaults to "get".
         return_raw (bool, optional): If True, returns the raw response object. Defaults to False.
