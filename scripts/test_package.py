@@ -28,7 +28,7 @@ def test_basic_functions():
             'set_auth_provider',
             'list_workspaces',
             'list_capacities',
-            '_api_request',
+            'api_request',
         ]
 
         for func_name in functions_to_test:

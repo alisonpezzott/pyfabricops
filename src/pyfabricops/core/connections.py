@@ -297,6 +297,75 @@ def delete_connection_role_assignment(
 
 
 @df
+def create_adlsgen2_connection_with_service_principal_credentials(
+    display_name: str,
+    adls_endpoint: str,
+    client_id: str,
+    client_secret: str,
+    tenant_id: str,
+    *,
+    df: Optional[bool] = True,
+) -> Union[DataFrame, Dict[str, Any], None]:
+    """
+    Creates a new ADLS Gen2 connection with service principal credentials.
+
+    Args:
+        display_name (str): The display name for the connection.
+        adls_endpoint (str): The endpoint URL for the ADLS Gen2 storage.
+        client_id (str): The client ID for the service principal.
+        client_secret (str): The client secret for the service principal.
+        tenant_id (str): The tenant ID for the service principal.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
+            If False, returns a list of dictionaries.
+
+    Returns:
+        (Union[DataFrame, Dict[str, Any], None]): The created connection.
+
+    Examples:
+        ```python
+            from dotenv import load_dotenv
+            load_dotenv()
+            pf.create_adlsgen2_connection_with_service_principal_credentials(
+                display_name='pyfabricops-examples',
+                adls_endpoint='https://example.dfs.core.windows.net',
+                client_id=os.getenv('CLIENT_ID'),
+                client_secret=os.getenv('CLIENT_SECRET'),
+                tenant_id=os.getenv('TENANT_ID'),
+                df=True,
+            )
+        ```
+    """
+    payload = {
+        'connectivityType': 'ShareableCloud',
+        'displayName': display_name,
+        'connectionDetails': {
+            'type': 'AzureDataLakeStorage',
+            'creationMethod': 'AzureDataLakeStorage',
+            'parameters': [
+                {'dataType': 'Text', 'name': 'server', 'value': adls_endpoint}
+            ],
+        },
+        'privacyLevel': 'Organizational',
+        'credentialDetails': {
+            'singleSignOnType': 'None',
+            'connectionEncryption': 'NotEncrypted',
+            'credentials': {
+                'credentialType': 'ServicePrincipal',
+                'tenantId': tenant_id,
+                'servicePrincipalClientId': client_id,
+                'servicePrincipalSecret': client_secret,
+            },
+        },
+    }
+
+    return api_request(
+        '/connections',
+        method='post',
+        payload=payload,
+    )
+
+
+@df
 def create_github_source_control_connection(
     display_name: str,
     repository: str,

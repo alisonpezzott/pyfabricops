@@ -284,6 +284,7 @@ def update_item_definition(
         + '/items/'
         + item_id
         + '/updateDefinition',
+        method='post',
         payload=payload,
         params=params,
         support_lro=True,
