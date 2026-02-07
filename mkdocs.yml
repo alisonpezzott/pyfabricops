@@ -27,6 +27,8 @@ nav:
       - Workspaces: functions/core/workspaces.md
     - DMV:
       - DMV: functions/dmv/dmv.md
+    - Graph:
+      - Graph: functions/graph/users.md
     - Helpers:
       - Data Pipelines: functions/helpers/data_pipelines.md
       - Dataflows Gen1: functions/helpers/dataflows_gen1.md

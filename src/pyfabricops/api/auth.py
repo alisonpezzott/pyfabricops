@@ -15,7 +15,7 @@ from ..utils.exceptions import (
     ResourceNotFoundError,
 )
 from ..utils.logging import get_logger
-from .scopes import FABRIC_SCOPE, POWERBI_SCOPE, TOKEN_TEMPLATE
+from .scopes import FABRIC_SCOPE, GRAPH_SCOPE, POWERBI_SCOPE, TOKEN_TEMPLATE
 
 logger = get_logger(__name__)
 
@@ -35,6 +35,10 @@ class TokenCache:
         'POWERBI_USER': {'access_token': '', 'expires_at': 0},
         'POWERBI_INTERACTIVE': {'access_token': '', 'expires_at': 0},
         'POWERBI_NOTEBOOK': {'access_token': '', 'expires_at': 0},
+        'GRAPH_SPN': {'access_token': '', 'expires_at': 0},
+        'GRAPH_USER': {'access_token': '', 'expires_at': 0},
+        'GRAPH_INTERACTIVE': {'access_token': '', 'expires_at': 0},
+        'GRAPH_NOTEBOOK': {'access_token': '', 'expires_at': 0},
     }
 
     def __init__(self, cache_file: Optional[str] = None):
@@ -129,9 +133,18 @@ class OAuthProvider:
         self.cache = cache
 
     def get_token(
-        self, audience: Literal['fabric', 'powerbi'] = 'fabric'
+        self, audience: Literal['fabric', 'powerbi', 'graph'] = 'fabric'
     ) -> Dict:
-        scope = FABRIC_SCOPE if audience == 'fabric' else POWERBI_SCOPE
+        if audience not in ['fabric', 'powerbi', 'graph']:
+            raise OptionNotAvailableError(
+                f'Audience not available. Available: fabric, powerbi, graph. Got: {audience}'
+            )
+        if audience == 'graph':
+            scope == GRAPH_SCOPE
+        elif audience == 'powerbi':
+            scope = POWERBI_SCOPE
+        else:
+            scope = FABRIC_SCOPE
         token_key = f'{audience.upper()}_INTERACTIVE'
 
         # Check if cached token is still valid
@@ -177,7 +190,7 @@ class FabricNotebookProvider:
         return self._notebookutils
 
     def get_token(
-        self, audience: Literal['fabric', 'powerbi'] = 'fabric'
+        self, audience: Literal['fabric', 'powerbi', 'graph'] = 'fabric'
     ) -> Dict:
         """Get token from Fabric notebook context"""
         token_key = f'{audience.upper()}_NOTEBOOK'
@@ -235,11 +248,18 @@ class TokenManager:
 
     def _build_token_payload(
         self,
-        audience: Literal['fabric', 'powerbi'],
+        audience: Literal['fabric', 'powerbi', 'graph'],
         credential_type: Literal['spn', 'user'],
         credentials: Dict[str, str],
     ) -> Dict:
         """Construct the payload for token request"""
+        if audience == 'graph':
+            scope = GRAPH_SCOPE
+        elif audience == 'powerbi':
+            scope = POWERBI_SCOPE
+        else:
+            scope = FABRIC_SCOPE
+
         payload = {
             'client_id': credentials['fab_client_id'],
             'client_secret': credentials['fab_client_secret'],
@@ -247,7 +267,7 @@ class TokenManager:
             'grant_type': 'client_credentials'
             if credential_type == 'spn'
             else 'password',
-            'scope': FABRIC_SCOPE if audience == 'fabric' else POWERBI_SCOPE,
+            'scope': scope,
         }
 
         if credential_type == 'user':
@@ -258,7 +278,7 @@ class TokenManager:
 
     def _retrieve_token_from_api(
         self,
-        audience: Literal['fabric', 'powerbi'],
+        audience: Literal['fabric', 'powerbi', 'graph'],
         credential_type: Literal['spn', 'user'],
     ) -> Dict:
         """Makes an HTTP request to retrieve the token"""
@@ -290,7 +310,7 @@ class TokenManager:
 
     def get_token(
         self,
-        audience: Literal['fabric', 'powerbi'] = 'fabric',
+        audience: Literal['fabric', 'powerbi', 'graph'] = 'fabric',
         credential_type: Literal['spn', 'user'] = 'spn',
     ) -> Dict:
         """Get a valid token, using cache when possible"""
@@ -393,7 +413,7 @@ def clear_token_cache() -> None:
 
 
 def _get_token(
-    audience: Literal['fabric', 'powerbi'] = 'fabric',
+    audience: Literal['fabric', 'powerbi', 'graph'] = 'fabric',
     auth_provider: Literal['env', 'oauth', 'fabric'] = 'env',
     credential_type: Literal['spn', 'user'] = 'spn',
 ) -> Union[dict, None]:
