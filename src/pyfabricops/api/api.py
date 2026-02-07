@@ -1,5 +1,4 @@
 import time
-from email.mime import base
 from typing import Any, Dict, List, Literal, NamedTuple, Optional, Union
 from urllib.parse import urlencode
 
@@ -8,7 +7,6 @@ import requests
 from ..utils.exceptions import (
     AuthenticationError,
     InvalidParameterError,
-    RequestError,
 )
 from ..utils.logging import get_logger
 from .auth import _get_token
