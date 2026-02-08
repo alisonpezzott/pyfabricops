@@ -1,5 +1,5 @@
 import time
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Dict, Literal, Optional, Union
 
 from pandas import DataFrame
 
@@ -554,26 +554,28 @@ def update_my_git_connection(
 
 def ado_connect(
     workspace: str,
+    connection_id: str,
     *,
     organization_name: str,
     project_name: str,
     repository_name: str,
-    branch_name: str = 'main',
-    directory_name: str = '/',
-    credential_type: Literal['spn', 'user'] = 'user',
+    branch_name: str = 'develop',
+    directory_name: str = 'src',
+    credential_type: Literal['spn', 'user'] = 'spn',
 ) -> bool:
     """
     Connects a Fabric workspace to an Azure DevOps repository.
 
     Args:
         workspace (str): The name of the Fabric workspace.
+        connection_id (str): The name or ID of the Git connection.
         organization_name (str): The name of the Azure DevOps organization.
         project_name (str): The name of the Azure DevOps project.
         repository_name (str): The name of the Azure DevOps repository.
         branch_name (str): The name of the branch to connect to.
         directory_name (str, optional): The path to the folder where the repository is located. Defaults to "/".
         credential_type (Literal["spn", "user"], optional):
-            The type of credentials to use for the Git connection. Defaults to "user".
+            The type of credentials to use for the Git connection. Defaults to "spn".
 
     Returns:
         bool: True if the connection was successful, False otherwise.
@@ -585,6 +587,7 @@ def ado_connect(
         ```python
         ado_connect(
             workspace='my_workspace',
+            connection_id='my_connection',
             organization_name='my_organization',
             project_name='my_project',
             repository_name='my_repository',
@@ -601,7 +604,11 @@ def ado_connect(
             'repositoryName': repository_name,
             'branchName': branch_name,
             'directoryName': directory_name,
-        }
+        },
+        'myGitCredentials': {
+            'source': 'ConfiguredConnection',
+            'connectionId': connection_id,
+        },
     }
     return api_request(
         endpoint='/workspaces/'

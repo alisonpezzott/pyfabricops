@@ -139,7 +139,7 @@ def create_report(
         payload['description'] = description
 
     if folder:
-        folder_id = resolve_folder(folder, workspace_id=workspace_id)
+        folder_id = resolve_folder(workspace_id, folder)
         if folder_id:
             payload['folderId'] = folder_id
 
