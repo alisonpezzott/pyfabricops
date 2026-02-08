@@ -516,7 +516,7 @@ def assign_domain_workspaces_by_ids(
 
         ```
     """
-    payload = {'workspaceIds': workspaces}
+    payload = {'workspacesIds': workspaces}
     return api_request(
         '/admin/domains/' + resolve_domain(domain) + '/assignWorkspaces',
         method='post',
@@ -553,7 +553,7 @@ def unassign_domain_workspaces_by_ids(
 
         ```
     """
-    payload = {'workspaceIds': workspaces}
+    payload = {'workspacesIds': workspaces}
     return api_request(
         '/admin/domains/' + resolve_domain(domain) + '/unassignWorkspaces',
         method='post',
