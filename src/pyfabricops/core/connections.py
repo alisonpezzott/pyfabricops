@@ -666,3 +666,69 @@ def bind_semantic_model_connection(
             )
 
     return response
+
+
+@df
+def create_azure_devops_connection_with_service_principal(
+    display_name: str,
+    repository_url: str,
+    client_id: str,
+    client_secret: str,
+    tenant_id: str,
+    df: Optional[bool] = True,
+) -> Union[DataFrame, Dict[str, Any], None]:
+    """
+    Creates a new Azure DevOps source control connection with service principal credentials.
+
+    Args:
+        display_name (str): The display name for the connection.
+        repository_url (str): The URL of the Azure DevOps repository.
+        client_id (str): The client ID for the service principal.
+        client_secret (str): The client secret for the service principal.
+        tenant_id (str): The tenant ID for the service principal.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
+            If False, returns a list of dictionaries.
+
+    Returns:
+        (Union[DataFrame, Dict[str, Any], None]): The created connection.
+
+    Examples:
+        ```python
+        create_azure_devops_connection_with_service_principal(
+            display_name='Azure DevOps Connection',
+            repository_url='https://dev.azure.com/yourorganization/yourproject/_git/yourrepository',
+            client_id=os.getenv('FAB_CLIENT_ID'),
+            client_secret=os.getenv('FAB_CLIENT_SECRET'),
+            tenant_id=os.getenv('FAB_TENANT_ID'),
+            df=True,
+        )
+        ```
+    """
+    payload = {
+        'connectivityType': 'ShareableCloud',
+        'displayName': display_name,
+        'connectionDetails': {
+            'type': 'AzureDevOpsSourceControl',
+            'creationMethod': 'AzureDevOpsSourceControl.Contents',
+            'parameters': [
+                {'dataType': 'Text', 'name': 'url', 'value': repository_url}
+            ],
+        },
+        'privacyLevel': 'Organizational',
+        'credentialDetails': {
+            'singleSignOnType': 'None',
+            'connectionEncryption': 'NotEncrypted',
+            'credentials': {
+                'credentialType': 'ServicePrincipal',
+                'tenantId': tenant_id,
+                'servicePrincipalClientId': client_id,
+                'servicePrincipalSecret': client_secret,
+            },
+        },
+    }
+
+    return api_request(
+        '/connections',
+        method='post',
+        payload=payload,
+    )
