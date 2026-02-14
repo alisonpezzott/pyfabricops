@@ -1,7 +1,7 @@
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Union
 
 import pandas
 from pandas import DataFrame
@@ -288,7 +288,7 @@ def create_folders_from_path_string(workspace: str, path: str) -> str:
     """
     workspace_id = resolve_workspace(workspace)
 
-    if path is None or '/' not in path:
+    if path is None:
         return None
 
     folders_tree = path.split('/')
@@ -300,9 +300,7 @@ def create_folders_from_path_string(workspace: str, path: str) -> str:
         # Get folder_id if folder exists
         folder_id = resolve_folder(workspace_id, folder)
         if folder_id is not None:
-            logger.info(
-                f'Folder `{folder}` already exists with ID `{folder_id}`.'
-            )
+            logger.info(f'Folder {folder} already exists with ID {folder_id}.')
 
         # If not, creates it.
         else:
@@ -313,7 +311,7 @@ def create_folders_from_path_string(workspace: str, path: str) -> str:
                 df=False,
             ).get('id')
             logger.success(
-                f'Folder `{folder}` created with ID `{folder_id}` successfully.'
+                f'Folder {folder} created with ID {folder_id} successfully.'
             )
 
         parent_folder_id = folder_id

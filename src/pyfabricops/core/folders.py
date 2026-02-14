@@ -56,9 +56,7 @@ def get_folder_id(workspace: str, folder_name: str) -> Union[str, None]:
     for _folder in folders:
         if _folder['displayName'] == folder_name:
             return _folder['id']
-    logger.warning(
-        f"Folder '{folder_name}' not found in workspace '{workspace}'."
-    )
+    logger.warning(f'Folder {folder_name} not found in workspace {workspace}.')
     return None
 
 
