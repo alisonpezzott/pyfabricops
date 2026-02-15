@@ -224,7 +224,7 @@ def deploy_all_items(
 
     Args:
         workspace (str): The name or ID of the workspace.
-        path (str): The path to the notebooks.
+        path (str): The path to the items.
         start_path (Optional[str]): The starting path for folder creation.
     """
     workspace_id = resolve_workspace(workspace)
@@ -241,6 +241,7 @@ def deploy_all_items(
         'Lakehouse',
         'Warehouse',
         'Environment',
+        'CopyJob',
     ]
     for type in types:
         item_paths = list_paths_of_type(path, type)
@@ -280,6 +281,6 @@ def deploy_all_items(
                 )
 
     logger.success(
-        f'All items were deployed to workspace "{workspace}" successfully.'
+        f'All items were deployed to workspace {workspace} successfully.'
     )
     return None

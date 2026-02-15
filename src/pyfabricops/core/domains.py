@@ -53,7 +53,7 @@ def get_domain_id(domain_name: str) -> Union[str, None]:
         domain_name (str): The name of the domain.
 
     Returns:
-        str | None: The ID of the domain if found, otherwise None.
+        (str | None):The ID of the domain if found, otherwise None.
     """
     domains = list_domains(df=False)
     for _domain in domains:
@@ -71,7 +71,7 @@ def resolve_domain(domain: str) -> Union[str, None]:
         domain (str): The name or ID of the domain.
 
     Returns:
-        str | None: The ID of the domain if found, otherwise None.
+        (str | None):The ID of the domain if found, otherwise None.
     """
     if is_valid_uuid(domain):
         return domain

@@ -511,7 +511,7 @@ def convert_report_definition_to_by_connection(
         if match:
             dataset_name = match.group(1)
 
-    print(f'Semantic model: {dataset_name}')
+    logger.info(f'Semantic model: {dataset_name}')
 
     # Get the semantic model ID
     semantic_model_id = get_semantic_model_id(workspace_name, dataset_name)

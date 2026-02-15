@@ -152,7 +152,7 @@ def dmv_fetch_partitions_enriched(
     """
     parts = dmv_fetch_partitions_raw(conn_str)
     if parts.empty:
-        print(
+        logger.info(
             'No partitions returned. Check permissions, XMLA endpoint, and semantic model access.'
         )
         return None

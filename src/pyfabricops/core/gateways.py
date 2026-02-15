@@ -40,7 +40,7 @@ def get_gateway_id(gateway_name: str) -> Union[str, None]:
         gateway_name (str): The name of the gateway.
 
     Returns:
-        str | None: The ID of the gateway if found, otherwise None.
+        (str | None):The ID of the gateway if found, otherwise None.
     """
     gateways = list_gateways(df=False)
     for _gateway in gateways:
@@ -58,7 +58,7 @@ def resolve_gateway(gateway: str) -> Union[str, None]:
         gateway (str): The name of the gateway.
 
     Returns:
-        str | None: The ID of the gateway if found, otherwise None.
+        (str | None):The ID of the gateway if found, otherwise None.
     """
     if is_valid_uuid(gateway):
         return gateway

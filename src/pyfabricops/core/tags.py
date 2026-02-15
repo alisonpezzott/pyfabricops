@@ -48,7 +48,7 @@ def get_tag_id(tag_name: str) -> Union[str, None]:
         tag_name (str): The name of the tag.
 
     Returns:
-        str | None: The ID of the tag if found, otherwise None.
+        (str | None):The ID of the tag if found, otherwise None.
     """
     tags = list_tags(df=False)
     for _tag in tags:
@@ -66,7 +66,7 @@ def resolve_tag(tag: str) -> Union[str, None]:
         tag (str): The name or ID of the tag.
 
     Returns:
-        str | None: The ID of the tag if found, otherwise None.
+        (str | None):The ID of the tag if found, otherwise None.
     """
     if is_valid_uuid(tag):
         return tag

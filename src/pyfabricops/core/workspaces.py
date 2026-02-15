@@ -43,7 +43,7 @@ def get_workspace_id(workspace: str) -> Union[str, None]:
         workspace (str): The name of the workspace.
 
     Returns:
-        str | None: The ID of the workspace if found, otherwise None.
+        (str | None): The ID of the workspace if found, otherwise None.
     """
     workspaces = list_workspaces(df=False)
     for _workspace in workspaces:
@@ -62,7 +62,7 @@ def resolve_workspace(workspace: str) -> Union[str, None]:
         workspace (str): The name of the workspace.
 
     Returns:
-        str | None: The ID of the workspace if found, otherwise None.
+        (str | None):The ID of the workspace if found, otherwise None.
     """
     if is_valid_uuid(workspace):
         return workspace

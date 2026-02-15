@@ -47,7 +47,7 @@ def get_folder_id(workspace: str, folder_name: str) -> Union[str, None]:
         folder_name (str): The name of the folder.
 
     Returns:
-        str | None: The ID of the folder if found, otherwise None.
+        (str | None):The ID of the folder if found, otherwise None.
     """
     folders = list_folders(
         workspace=resolve_workspace(workspace),
@@ -69,7 +69,7 @@ def resolve_folder(workspace: str, folder: str) -> Union[str, None]:
         folder (str): The name or ID of the folder.
 
     Returns:
-        str | None: The ID of the folder if found, otherwise None.
+        (str | None):The ID of the folder if found, otherwise None.
     """
     if is_valid_uuid(folder):
         return folder
