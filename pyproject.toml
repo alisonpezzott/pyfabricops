@@ -1,6 +1,6 @@
 [project]
 name = "pyfabricops"
-version = "0.3.14"
+version = "0.3.15"
 description = "A Python wrapper library for Microsoft Fabric and Power BI that provides a simple, consistent interface to the official Fabric REST APIs, with automatic fallback to Power BI REST APIs when required. Designed to run in Fabric notebooks, pure Python scripts, or as part of YAML-based CI/CD workflows."
 authors = [
     {name = "alisonpezzott",email = "alisonpezzott@gmail.com"}
