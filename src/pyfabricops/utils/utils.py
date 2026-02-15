@@ -243,11 +243,11 @@ def pack_item_definition(
 
             # Skip exact matches
             if rel_path in exclude_paths:
-                print(f'Skipping (exact): {rel_path}')
+                logger.info(f'Skipping (exact): {rel_path}')
                 continue
             # Skip patterns
             if any(fnmatch.fnmatch(rel_path, pat) for pat in exclude_patterns):
-                print(f'Skipping (pattern): {rel_path}')
+                logger.info(f'Skipping (pattern): {rel_path}')
                 continue
 
             # Read and encode file

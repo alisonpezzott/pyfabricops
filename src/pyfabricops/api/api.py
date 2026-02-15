@@ -28,7 +28,7 @@ class ApiResult(NamedTuple):
 
 def _base_api(
     endpoint: str,
-    *,  # Force keyword-only arguments after endpoint
+    *,
     content_type: str = 'application/json',
     payload: Optional[dict] = None,
     data: Optional[dict] = None,
@@ -227,8 +227,6 @@ def _lro_handler(api_result: NamedTuple) -> ApiResult:
 
     logger.debug(f'Long-running operation detected at {location_header}')
 
-    logger.debug(f'Long-running operation detected at {location_header}')
-
     headers = api_result.request_kwargs.get('headers')
     logger.debug(f'Headers for LRO request: {headers}')
 
@@ -412,7 +410,7 @@ def api_request(
         return_raw (bool, optional): If True, returns the raw response object. Defaults to False.
 
     Returns:
-        ApiResult (NamedTuple): The response object from the request.
+        ApiResult (NamedTuple): The response object from the request with the following fields:
             success: bool
             status_code: int
             data: Optional[Any] = None
@@ -427,16 +425,16 @@ def api_request(
     Examples:
         ```python
         # Makes a GET request to the 'capacities' endpoint of the Microsoft Fabric API.
-        _base_api('capacities')
+        api_request('capacities')
 
         # Makes a POST request to the 'capacities' endpoint with a JSON payload.
-        _base_api('capacities', method='post', payload={'name': 'New Capacity'})
+        api_request('capacities', method='post', payload={'name': 'New Capacity'})
 
         # Makes a DELETE request to the 'capacities' endpoint for the resource with ID '12345'.
-        _base_api('capacities/12345', method='delete')
+        api_request('capacities/12345', method='delete')
 
         # Makes a GET request to the Power BI API for dataflows in the specified group.
-        _base_api(audience="powerbi", endpoint=f"/groups/MyProject/dataflows")
+        api_request(audience="powerbi", endpoint=f"/groups/MyProject/dataflows")
         ```
     """
     response = _base_api(
@@ -480,7 +478,7 @@ def api_request(
                 return lro_response.data
             else:
                 logger.success(
-                    'Long-running operation completed successfully but without data.'
+                    'Long-running operation completed successfully.'
                 )
                 return None
 

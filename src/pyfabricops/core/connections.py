@@ -44,7 +44,7 @@ def get_connection_id(connection: str) -> str | None:
         connection (str): The name of the connection.
 
     Returns:
-        str | None: The ID of the connection if found, otherwise None.
+        (str | None): The ID of the connection if found, otherwise None.
     """
     connections = list_connections(df=False)
 
@@ -64,7 +64,7 @@ def resolve_connection(connection: str) -> str | None:
         connection (str): The name of the connection.
 
     Returns:
-        str | None: The ID of the connection if found, otherwise None.
+        (str | None): The ID of the connection if found, otherwise None.
     """
     if is_valid_uuid(connection):
         return connection

@@ -36,7 +36,7 @@ def get_capacity_id(capacity_name: str) -> str | None:
         capacity_name (str): The name of the capacity.
 
     Returns:
-        str | None: The ID of the capacity if found, otherwise None.
+        (str | None): The ID of the capacity if found, otherwise None.
     """
     capacities = list_capacities(df=False)
 
@@ -56,7 +56,7 @@ def resolve_capacity(capacity: str) -> str | None:
         capacity (str): The name of the capacity.
 
     Returns:
-        str | None: The ID of the capacity if found, otherwise None.
+        (str | None): The ID of the capacity if found, otherwise None.
     """
     if is_valid_uuid(capacity):
         return capacity

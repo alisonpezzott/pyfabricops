@@ -47,7 +47,7 @@ def get_dataflow_gen1_id(
         dataflow_name (str): The name of the dataflow.
 
     Returns:
-        str | None: The ID of the dataflow if found, otherwise None.
+        (str | None):The ID of the dataflow if found, otherwise None.
     """
     dataflows = list_dataflows_gen1(
         workspace=resolve_workspace(workspace),
@@ -71,7 +71,7 @@ def resolve_dataflow_gen1(workspace: str, dataflow: str) -> Union[str, None]:
         dataflow (str): The name or ID of the dataflow.
 
     Returns:
-        str | None: The ID of the dataflow if found, otherwise None.
+        (str | None):The ID of the dataflow if found, otherwise None.
     """
     if is_valid_uuid(dataflow):
         return dataflow

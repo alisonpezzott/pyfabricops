@@ -47,7 +47,7 @@ def get_deployment_pipeline_id(pipeline_name: str) -> Union[str, None]:
         pipeline_name (str): The name of the deployment pipeline.
 
     Returns:
-        str | None: The ID of the deployment pipeline if found, otherwise None.
+        (str | None):The ID of the deployment pipeline if found, otherwise None.
     """
     pipelines = list_deployment_pipelines(df=False)
     for _pipeline in pipelines:
@@ -66,7 +66,7 @@ def resolve_deployment_pipeline(pipeline: str) -> Union[str, None]:
         pipeline (str): The name or id of the deployment pipeline.
 
     Returns:
-        str | None: The ID of the deployment pipeline if found, otherwise None.
+        (str | None):The ID of the deployment pipeline if found, otherwise None.
     """
     if is_valid_uuid(pipeline):
         return pipeline
@@ -112,7 +112,7 @@ def resolve_deployment_pipeline_stage(
         stage_name (str): The name of the deployment pipeline stage.
 
     Returns:
-        str | None: The ID of the deployment pipeline stage if found, otherwise None.
+        (str | None):The ID of the deployment pipeline stage if found, otherwise None.
     """
     pipeline_id = resolve_deployment_pipeline(pipeline)
     if not pipeline_id:
