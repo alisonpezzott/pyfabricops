@@ -10,6 +10,7 @@ from ..items.dataflows_gen1 import (
     get_dataflow_gen1,
     get_dataflow_gen1_definition,
     list_dataflows_gen1,
+    resolve_dataflow_gen1,
 )
 from ..utils.logging import get_logger
 from ..utils.utils import (
@@ -34,7 +35,7 @@ def get_dataflow_gen1_config(
     Returns:
         (Union[Dict[str, Any], None]): The dict config from the dataflow_gen1.
     """
-    item = dataflow_gen1
+    item = resolve_dataflow_gen1(dataflow_gen1)
     item_data = get_dataflow_gen1(workspace, item, df=False)
 
     if item_data is None:
@@ -105,12 +106,15 @@ def export_dataflow_gen1(
     if workspace_id is None:
         return None
 
+    dataflow_id = resolve_dataflow_gen1(workspace_id, dataflow)
+    if dataflow_id is None:
+        return None
+
     # Get the dataflow details
-    dataflow_ = get_dataflow_gen1(workspace_id, dataflow)
+    dataflow_ = get_dataflow_gen1(workspace_id, dataflow_id, df=False)
     if dataflow_ is None:
         return None
 
-    dataflow_id = dataflow_["objectId"]
     dataflow_name = dataflow_["name"]
 
     definition_response = get_dataflow_gen1_definition(
@@ -122,7 +126,7 @@ def export_dataflow_gen1(
         return None
 
     dataflow_name = dataflow_["name"]
-    dataflow_path = Path(path) / dataflow_name + ".Dataflow"
+    dataflow_path = Path(path) / f"{dataflow_name}.Dataflow"
     os.makedirs(dataflow_path, exist_ok=True)
 
     # Save the model as model.json inside the item folder in single-line format (Power BI portal format)

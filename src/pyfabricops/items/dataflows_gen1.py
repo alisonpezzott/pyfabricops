@@ -54,8 +54,8 @@ def get_dataflow_gen1_id(
         df=False,
     )
     for _dataflow in dataflows:
-        if _dataflow["displayName"] == dataflow_name:
-            return _dataflow["id"]
+        if _dataflow["name"] == dataflow_name:
+            return _dataflow["objectId"]
     logger.warning(
         f"Dataflow '{dataflow_name}' not found in workspace '{workspace}'."
     )
@@ -138,13 +138,7 @@ def get_dataflow_gen1_definition(workspace: str, dataflow: str) -> dict | None:
     dataflow_id = resolve_dataflow_gen1(workspace_id, dataflow)
 
     return api_request(
-        endpoint="/groups/"
-        + workspace_id
-        + "/dataflows/"
-        + dataflow_id
-        + "/getDefinition",
-        method="post",
-        support_lro=True,
+        endpoint="/groups/" + workspace_id + "/dataflows/" + dataflow_id,
         audience="powerbi",
     )
 
