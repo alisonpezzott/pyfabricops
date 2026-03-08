@@ -30,9 +30,9 @@ def list_dataflows_gen1(
         (Union[DataFrame, List[Dict[str, Any]], None]): A list of Gen1 dataflows or a DataFrame if df is True.
     """
     return api_request(
-        endpoint='/groups/' + resolve_workspace(workspace) + '/dataflows',
-        audience='powerbi',
-        method='get',
+        endpoint="/groups/" + resolve_workspace(workspace) + "/dataflows",
+        audience="powerbi",
+        method="get",
         support_pagination=True,
     )
 
@@ -54,8 +54,8 @@ def get_dataflow_gen1_id(
         df=False,
     )
     for _dataflow in dataflows:
-        if _dataflow['displayName'] == dataflow_name:
-            return _dataflow['id']
+        if _dataflow["displayName"] == dataflow_name:
+            return _dataflow["id"]
     logger.warning(
         f"Dataflow '{dataflow_name}' not found in workspace '{workspace}'."
     )
@@ -107,12 +107,12 @@ def get_dataflow_gen1(
     workspace_id = resolve_workspace(workspace)
 
     return api_request(
-        endpoint='/groups/'
+        endpoint="/groups/"
         + workspace_id
-        + '/dataflows/'
+        + "/dataflows/"
         + resolve_dataflow_gen1(workspace_id, dataflow),
-        method='get',
-        audience='powerbi',
+        method="get",
+        audience="powerbi",
     )
 
 
@@ -138,14 +138,14 @@ def get_dataflow_gen1_definition(workspace: str, dataflow: str) -> dict | None:
     dataflow_id = resolve_dataflow_gen1(workspace_id, dataflow)
 
     return api_request(
-        endpoint='/groups/'
+        endpoint="/groups/"
         + workspace_id
-        + '/dataflows/'
+        + "/dataflows/"
         + dataflow_id
-        + '/getDefinition',
-        method='post',
+        + "/getDefinition",
+        method="post",
         support_lro=True,
-        audience='powerbi',
+        audience="powerbi",
     )
 
 
@@ -180,15 +180,15 @@ def update_dataflow_gen1_definition(
 
     dataflow_id = resolve_dataflow_gen1(workspace_id, dataflow)
 
-    params = {'updateMetadata': True}
-    payload = {'definition': item_definition}
+    params = {"updateMetadata": True}
+    payload = {"definition": item_definition}
 
     return api_request(
-        endpoint='/groups/' + workspace_id + '/dataflows/' + dataflow_id,
-        method='patch',
+        endpoint="/groups/" + workspace_id + "/dataflows/" + dataflow_id,
+        method="patch",
         payload=payload,
         params=params,
-        audience='powerbi',
+        audience="powerbi",
     )
 
 
@@ -231,23 +231,23 @@ def create_dataflow_gen1(
     workspace_id = resolve_workspace(workspace)
 
     payload = {
-        'displayName': display_name,
-        'definition': item_definition,
+        "displayName": display_name,
+        "definition": item_definition,
     }
 
     if folder:
         folder_id = resolve_folder(workspace_id, folder)
         if folder_id:
-            payload['folderId'] = folder_id
+            payload["folderId"] = folder_id
 
     if description:
-        payload['description'] = description
+        payload["description"] = description
 
     return api_request(
-        endpoint='/groups/' + workspace_id + '/dataflows',
-        method='post',
+        endpoint="/groups/" + workspace_id + "/dataflows",
+        method="post",
         payload=payload,
-        audience='powerbi',
+        audience="powerbi",
     )
 
 
@@ -286,16 +286,16 @@ def update_dataflow_gen1(
     payload = {}
 
     if display_name:
-        payload['displayName'] = display_name
+        payload["displayName"] = display_name
 
     if description:
-        payload['description'] = description
+        payload["description"] = description
 
     return api_request(
-        endpoint='/groups/' + workspace_id + '/dataflows/' + dataflow_id,
-        method='patch',
+        endpoint="/groups/" + workspace_id + "/dataflows/" + dataflow_id,
+        method="patch",
         payload=payload,
-        audience='powerbi',
+        audience="powerbi",
     )
 
 
@@ -321,9 +321,9 @@ def delete_dataflow_gen1(workspace: str, dataflow: str) -> None:
     dataflow_id = resolve_dataflow_gen1(workspace_id, dataflow)
 
     return api_request(
-        endpoint='/groups/' + workspace_id + '/dataflows/' + dataflow_id,
-        method='delete',
-        audience='powerbi',
+        endpoint="/groups/" + workspace_id + "/dataflows/" + dataflow_id,
+        method="delete",
+        audience="powerbi",
     )
 
 
@@ -346,12 +346,12 @@ def takeover_dataflow_gen1(workspace: str, dataflow: str) -> Union[bool, None]:
     dataflow_id = resolve_dataflow_gen1(workspace_id, dataflow)
 
     return api_request(
-        endpoint='/groups/'
+        endpoint="/groups/"
         + workspace_id
-        + '/dataflows/'
+        + "/dataflows/"
         + dataflow_id
-        + '/Default.Takeover',
-        method='post',
+        + "/Default.Takeover",
+        method="post",
         support_lro=True,
     )
 
@@ -360,10 +360,10 @@ def refresh_dataflow_gen1(
     workspace: str,
     dataflow: str,
     *,
-    process_type: Optional[str] = 'default',
+    process_type: Optional[str] = "default",
     notify_option: Literal[
-        'MailOnFailure', 'NoNotification'
-    ] = 'NoNotification',
+        "MailOnFailure", "NoNotification"
+    ] = "NoNotification",
 ) -> None:
     """
     Refresh a dataflow in the specified workspace.
@@ -387,20 +387,20 @@ def refresh_dataflow_gen1(
 
     dataflow_id = resolve_dataflow_gen1(workspace_id, dataflow)
 
-    payload = {'notifyOption': notify_option}
+    payload = {"notifyOption": notify_option}
 
-    params = {'processType': process_type}
+    params = {"processType": process_type}
 
     return api_request(
-        endpoint='/groups/'
+        endpoint="/groups/"
         + workspace_id
-        + '/dataflows/'
+        + "/dataflows/"
         + dataflow_id
-        + '/refreshes',
-        method='post',
+        + "/refreshes",
+        method="post",
         payload=payload,
         params=params,
-        audience='powerbi',
+        audience="powerbi",
     )
 
 
@@ -434,13 +434,13 @@ def get_dataflow_gen1_transactions(
     dataflow_id = resolve_dataflow_gen1(workspace_id, dataflow)
 
     return api_request(
-        endpoint='/groups/'
+        endpoint="/groups/"
         + workspace_id
-        + '/dataflows/'
+        + "/dataflows/"
         + dataflow_id
-        + '/transactions',
-        method='post',
-        audience='powerbi',
+        + "/transactions",
+        method="post",
+        audience="powerbi",
     )
 
 
@@ -474,11 +474,11 @@ def get_dataflows_gen1_datasources(
     dataflow_id = resolve_dataflow_gen1(workspace_id, dataflow)
 
     return api_request(
-        endpoint='/groups/'
+        endpoint="/groups/"
         + workspace_id
-        + '/dataflows/'
+        + "/dataflows/"
         + dataflow_id
-        + '/datasources',
-        method='post',
-        audience='powerbi',
+        + "/datasources",
+        method="post",
+        audience="powerbi",
     )

@@ -29,7 +29,7 @@ def list_gateways(
         list_gateways()
         ```
     """
-    return api_request('/gateways', support_pagination=True)
+    return api_request("/gateways", support_pagination=True)
 
 
 def get_gateway_id(gateway_name: str) -> Union[str, None]:
@@ -44,8 +44,8 @@ def get_gateway_id(gateway_name: str) -> Union[str, None]:
     """
     gateways = list_gateways(df=False)
     for _gateway in gateways:
-        if _gateway['displayName'] == gateway_name:
-            return _gateway['id']
+        if _gateway["displayName"] == gateway_name:
+            return _gateway["id"]
     logger.warning(f"Gateway '{gateway_name}' not found.")
     return None
 
@@ -93,7 +93,7 @@ def get_gateway(
     if not gateway_id:
         return None
     return api_request(
-        '/gateways/' + gateway_id,
+        "/gateways/" + gateway_id,
     )
 
 
@@ -116,4 +116,4 @@ def get_gateway_public_key(gateway: str) -> dict | None:
     if not response:
         return None
 
-    return response.get('publicKey')
+    return response.get("publicKey")

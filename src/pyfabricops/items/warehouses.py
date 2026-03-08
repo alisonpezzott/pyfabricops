@@ -37,7 +37,7 @@ def list_warehouses(
         ```
     """
     return api_request(
-        endpoint='/workspaces/' + resolve_workspace(workspace) + '/warehouses',
+        endpoint="/workspaces/" + resolve_workspace(workspace) + "/warehouses",
         support_pagination=True,
     )
 
@@ -63,8 +63,8 @@ def get_warehouse_id(workspace: str, warehouse: str) -> Union[str, None]:
         return None
 
     for warehouse_ in warehouses:
-        if warehouse_['displayName'] == warehouse:
-            return warehouse_['id']
+        if warehouse_["displayName"] == warehouse:
+            return warehouse_["id"]
     return None
 
 
@@ -128,7 +128,7 @@ def get_warehouse(
         return None
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/warehouses/' + warehouse_id,
+        endpoint="/workspaces/" + workspace_id + "/warehouses/" + warehouse_id,
     )
 
 
@@ -165,22 +165,22 @@ def create_warehouse(
     """
     workspace_id = resolve_workspace(workspace)
 
-    payload = {'displayName': display_name}
+    payload = {"displayName": display_name}
 
     if description:
-        payload['description'] = description
+        payload["description"] = description
 
     if folder:
         folder_id = resolve_folder(workspace_id, folder)
         if folder_id:
-            payload['folderId'] = folder_id
+            payload["folderId"] = folder_id
 
     if enable_schemas:
-        payload['creationPayload'] = {'enableSchemas': True}
+        payload["creationPayload"] = {"enableSchemas": True}
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/warehouses',
-        method='post',
+        endpoint="/workspaces/" + workspace_id + "/warehouses",
+        method="post",
         payload=payload,
         support_lro=True,
     )
@@ -221,14 +221,14 @@ def update_warehouse(
     payload = {}
 
     if display_name:
-        payload['displayName'] = display_name
+        payload["displayName"] = display_name
 
     if description:
-        payload['description'] = description
+        payload["description"] = description
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/warehouses/' + warehouse_id,
-        method='patch',
+        endpoint="/workspaces/" + workspace_id + "/warehouses/" + warehouse_id,
+        method="patch",
         payload=payload,
     )
 
@@ -253,6 +253,6 @@ def delete_warehouse(workspace: str, warehouse: str) -> None:
     workspace_id = resolve_workspace(workspace)
     warehouse_id = resolve_warehouse(workspace_id, warehouse)
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/warehouses/' + warehouse_id,
-        method='delete',
+        endpoint="/workspaces/" + workspace_id + "/warehouses/" + warehouse_id,
+        method="delete",
     )

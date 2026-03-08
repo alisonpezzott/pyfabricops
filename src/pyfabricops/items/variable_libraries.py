@@ -29,9 +29,9 @@ def list_variable_libraries(
         (Union[DataFrame, List[Dict[str, Any]], None]): A list of variable libraries or a DataFrame if df is True.
     """
     return api_request(
-        endpoint='/workspaces/'
+        endpoint="/workspaces/"
         + resolve_workspace(workspace)
-        + '/VariableLibraries',
+        + "/VariableLibraries",
         support_pagination=True,
     )
 
@@ -58,8 +58,8 @@ def get_variable_library_id(
         workspace=resolve_workspace(workspace), df=False
     )
     for library in libraries:
-        if library.get('displayName') == variable_library_name:
-            return library.get('id')
+        if library.get("displayName") == variable_library_name:
+            return library.get("id")
     return None
 
 
@@ -97,9 +97,9 @@ def get_variable_library(
     workspace_id = resolve_workspace(workspace)
     variable_library_id = resolve_variable_library(workspace, variable_library)
     return api_request(
-        endpoint='/workspaces/'
+        endpoint="/workspaces/"
         + workspace_id
-        + '/VariableLibraries/'
+        + "/VariableLibraries/"
         + variable_library_id,
     )
 
@@ -142,19 +142,19 @@ def create_variable_library(
     """
     workspace_id = resolve_workspace(workspace)
 
-    payload = {'displayName': display_name, 'definition': item_definition}
+    payload = {"displayName": display_name, "definition": item_definition}
 
     if description:
-        payload['description'] = description
+        payload["description"] = description
 
     if folder:
         folder_id = resolve_folder(workspace_id, folder)
         if folder_id:
-            payload['folderId'] = folder_id
+            payload["folderId"] = folder_id
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/VariableLibraries',
-        method='post',
+        endpoint="/workspaces/" + workspace_id + "/VariableLibraries",
+        method="post",
         payload=payload,
         support_lro=True,
     )
@@ -199,17 +199,17 @@ def update_variable_library(
     payload = {}
 
     if display_name:
-        payload['displayName'] = display_name
+        payload["displayName"] = display_name
 
     if description:
-        payload['description'] = description
+        payload["description"] = description
 
     return api_request(
-        endpoint='/workspaces/'
+        endpoint="/workspaces/"
         + workspace_id
-        + '/VariableLibraries/'
+        + "/VariableLibraries/"
         + variable_library_id,
-        method='patch',
+        method="patch",
         payload=payload,
     )
 
@@ -234,11 +234,11 @@ def delete_variable_library(workspace: str, variable_library: str) -> None:
     variable_library_id = resolve_variable_library(workspace, variable_library)
 
     return api_request(
-        endpoint='/workspaces/'
+        endpoint="/workspaces/"
         + workspace_id
-        + '/VariableLibraries/'
+        + "/VariableLibraries/"
         + variable_library_id,
-        method='delete',
+        method="delete",
     )
 
 
@@ -268,12 +268,12 @@ def get_variable_library_definition(
     variable_library_id = resolve_variable_library(workspace, variable_library)
 
     return api_request(
-        endpoint='/workspaces/'
+        endpoint="/workspaces/"
         + workspace_id
-        + '/VariableLibraries/'
+        + "/VariableLibraries/"
         + variable_library_id
-        + '/getDefinition',
-        method='post',
+        + "/getDefinition",
+        method="post",
         support_lro=True,
     )
 
@@ -311,15 +311,15 @@ def update_variable_library_definition(
     """
     workspace_id = resolve_workspace(workspace)
     variable_library_id = resolve_variable_library(workspace, variable_library)
-    params = {'updateMetadata': True}
-    payload = {'definition': item_definition}
+    params = {"updateMetadata": True}
+    payload = {"definition": item_definition}
     return api_request(
-        endpoint='/workspaces/'
+        endpoint="/workspaces/"
         + workspace_id
-        + '/VariableLibraries/'
+        + "/VariableLibraries/"
         + variable_library
-        + '/updateDefinition',
-        method='post',
+        + "/updateDefinition",
+        method="post",
         payload=payload,
         params=params,
         support_lro=True,
