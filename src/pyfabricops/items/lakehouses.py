@@ -25,7 +25,7 @@ def list_lakehouses(
 
     Args:
         workspace (str): The workspace name or ID.
-        ddf (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:

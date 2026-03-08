@@ -274,7 +274,7 @@ def deploy_all_dataflows_gen1(
 
     Args:
         workspace (str): The name or ID of the workspace.
-        path (str): The path to the dataflows_gen2.
+        path (str): The path to the dataflows_gen1.
         start_path (Optional[str]): The starting path for folder creation.
     """
     workspace_id = resolve_workspace(workspace)

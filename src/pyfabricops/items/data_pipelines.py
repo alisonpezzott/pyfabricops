@@ -17,7 +17,7 @@ def list_data_pipelines(
     workspace: str, *, df: Optional[bool] = True
 ) -> Union[DataFrame, List[Dict[str, Any]], None]:
     """
-    Lists all data_pipelines in the specified workspace.
+    Lists all data pipelines in the specified workspace.
 
     Args:
         workspace (str): The name or ID of the workspace.
@@ -49,7 +49,7 @@ def get_data_pipeline_id(
         data_pipeline_name (str): The name of the data pipeline.
 
     Returns:
-        (str | None):The ID of the data pipeline if found, otherwise None.
+        (str | None): The ID of the data pipeline if found, otherwise None.
     """
     data_pipelines = list_data_pipelines(
         workspace=resolve_workspace(workspace),
@@ -75,7 +75,7 @@ def resolve_data_pipeline(
         data_pipeline (str): The name or ID of the data pipeline.
 
     Returns:
-        (str | None):The ID of the data pipeline if found, otherwise None.
+        (str | None): The ID of the data pipeline if found, otherwise None.
     """
     if is_valid_uuid(data_pipeline):
         return data_pipeline

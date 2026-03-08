@@ -45,7 +45,7 @@ def get_semantic_model_config(
 
     Args:
         workspace (str): The name or ID of the workspace.
-        semantic_model (str): The name or ID of the semantic.
+        semantic_model (str): The name or ID of the semantic model.
 
     Returns:
         (Union[Dict[str, Any], None]): The dict config from the semantic model

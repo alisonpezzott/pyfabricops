@@ -128,7 +128,7 @@ def get_current_branch(branch: str = None) -> str:
         str: The branch name
 
     Raises:
-        ConfigurationError: Fallbak to main if error
+        ConfigurationError: Fallback to main if error
 
     Examples:
         ```python
@@ -158,15 +158,15 @@ def get_workspace_suffix(branch: str, branches_path: str) -> str:
     Returns the workspace suffix configured in branches.json
 
     Args:
-        branch(str): Branch of the repository.
-        branches_path(str): The path of branches.json.
+        branch (str): Branch of the repository.
+        branches_path (str): The path of branches.json.
 
     Returns:
         str: The workspace name suffix
 
     Examples:
         ```python
-        get_workspace_suffix('main')
+        get_workspace_suffix('main', 'branches.json')
         ```
     """
     try:
@@ -273,7 +273,7 @@ def unpack_item_definition(item_definition: dict, path: str) -> None:
     Unpack files from JSON definition to a directory structure.
 
     Args:
-        definition (dict): The JSON definition containing the files to unpack.
+        item_definition (dict): The JSON definition containing the files to unpack.
         path (str): The root path where the files will be unpacked.
 
     Returns:
@@ -442,7 +442,7 @@ def parse_definition_report(path: str) -> dict:
 
 def find_and_replace(path: str, find_and_replace: dict) -> None:
     r"""
-    Deploys an item to a specified workspace.
+    Finds and replaces text in files at the specified path.
 
     Args:
         path (str): The source path of the item to be performed.

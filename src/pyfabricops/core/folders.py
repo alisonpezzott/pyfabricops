@@ -47,7 +47,7 @@ def get_folder_id(workspace: str, folder_name: str) -> Union[str, None]:
         folder_name (str): The name of the folder.
 
     Returns:
-        (str | None):The ID of the folder if found, otherwise None.
+        (str | None): The ID of the folder if found, otherwise None.
     """
     folders = list_folders(
         workspace=resolve_workspace(workspace),
@@ -69,7 +69,7 @@ def resolve_folder(workspace: str, folder: str) -> Union[str, None]:
         folder (str): The name or ID of the folder.
 
     Returns:
-        (str | None):The ID of the folder if found, otherwise None.
+        (str | None): The ID of the folder if found, otherwise None.
     """
     if is_valid_uuid(folder):
         return folder
@@ -193,7 +193,7 @@ def update_folder(
     df: Optional[bool] = True,
 ) -> Union[DataFrame, Dict[str, Any], None]:
     """
-    Update a existing folder in the specified workspace.
+    Update an existing folder in the specified workspace.
 
     Args:
         workspace (str): The name or id of the workspace where the folder will be updated.
@@ -237,7 +237,7 @@ def move_folder(
     df: Optional[bool] = True,
 ) -> Union[DataFrame, Dict[str, Any], None]:
     """
-    Move a existing folder into other or root folder.
+    Move an existing folder into another or root folder.
 
     Args:
         workspace (str): The workspace where the folder will be updated.

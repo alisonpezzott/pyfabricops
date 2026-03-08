@@ -76,7 +76,7 @@ def get_app_registration_id(app_name):
 
 
 def get_app_registration_name(app_id):
-    """Get application (app registration) ID by display name"""
+    """Get application (app registration) display name by ID"""
     response = api_request(
         endpoint=f"/applications?$filter=id eq '{app_id}'",
         audience="graph",
@@ -90,7 +90,7 @@ def get_app_registration_name(app_id):
 
 
 def get_service_principal_id(spn_name):
-    """Get application (app registration) ID by display name"""
+    """Get service principal ID by display name"""
     response = api_request(
         endpoint=f"/servicePrincipals?$filter=displayName eq '{spn_name}'",
         audience="graph",
@@ -104,7 +104,7 @@ def get_service_principal_id(spn_name):
 
 
 def get_service_principal_name(spn_id):
-    """Get application (app registration) ID by display name"""
+    """Get service principal name by ID"""
     response = api_request(
         endpoint=f"/servicePrincipals?$filter=id eq '{spn_id}'",
         audience="graph",

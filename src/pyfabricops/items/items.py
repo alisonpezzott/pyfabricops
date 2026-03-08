@@ -75,7 +75,7 @@ def resolve_item(
     item: str,
 ) -> Union[str, None]:
     """
-    Resolves a item name to its ID.
+    Resolves an item name to its ID.
 
     Args:
         workspace (str): The ID of the workspace.
@@ -180,7 +180,7 @@ def update_item(
 
 def delete_item(workspace: str, item: str) -> None:
     """
-    Delete a item from the specified workspace.
+    Delete an item from the specified workspace.
 
     Args:
         workspace (str): The name or ID of the workspace to delete.
@@ -212,7 +212,7 @@ def get_item_definition(
     workspace: str, item: str
 ) -> Union[Dict[str, Any], None]:
     """
-    Retrieves the definition of a item by its name or ID from the specified workspace.
+    Retrieves the definition of an item by its name or ID from the specified workspace.
 
     Args:
         workspace (str): The workspace name or ID.

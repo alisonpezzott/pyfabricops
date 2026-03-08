@@ -75,7 +75,6 @@ def resolve_notebook(
     Args:
         workspace (str): The workspace name or ID.
         notebook (str): The name or ID of the notebook.
-        silent (bool): If True, suppresses warnings. Defaults to False.
 
     Returns:
         Optional[str]: The ID of the notebook if found, otherwise None.
@@ -253,7 +252,7 @@ def update_notebook_definition(
     Args:
         workspace (str): The workspace name or ID.
         notebook (str): The name or ID of the notebook to update.
-        path (str): The path to the notebook definition.
+        item_definition (str): The notebook definition.
 
     Returns:
         (dict or None): The updated notebook details if successful, otherwise None.
@@ -303,15 +302,15 @@ def create_notebook(
         display_name (str): The display name of the notebook.
         description (str, optional): A description for the notebook.
         folder (str, optional): The folder to create the notebook in.
-        path (str): The path to the notebook definition file.
+        item_definition (str): The notebook definition.
 
     Returns:
         (dict): The created notebook details.
 
     Examples:
         ```python
-        create_notebook('MyProjectWorkspace', 'SalesDataModel', 'path/to/definition.json')
-        create_notebook('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', 'path/to/definition.json')
+        create_notebook('MyProjectWorkspace', 'SalesDataNotebook', item_definition={...})
+        create_notebook('MyProjectWorkspace', 'SalesDataNotebook', item_definition={...}, description='My notebook')
         ```
     """
     workspace_id = resolve_workspace(workspace)

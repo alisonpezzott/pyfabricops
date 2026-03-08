@@ -124,7 +124,7 @@ def dmv_fetch_tables_raw(
     conn_str: str,
 ) -> pd.DataFrame:
     """
-    Build a lookup to map TableID -> Table Name (from TMSCHEMA_TABLES)
+    Fetch raw table data from TMSCHEMA_TABLES.
     """
     query = """
     SELECT * FROM $SYSTEM.TMSCHEMA_TABLES
@@ -136,7 +136,7 @@ def dmv_fetch_partitions_raw(
     conn_str: str,
 ) -> pd.DataFrame:
     """
-    Build a lookup to map TableID -> Table Name (from TMSCHEMA_PARTITIONS)
+    Fetch raw partition data from TMSCHEMA_PARTITIONS.
     """
     query = """
     SELECT * FROM $SYSTEM.TMSCHEMA_PARTITIONS

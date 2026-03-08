@@ -18,8 +18,8 @@ def get_workspace_config(
 
     Examples:
         ```python
-        get_workspace_details('123e4567-e89b-12d3-a456-426614174000')
-        get_workspace_details('MyProject')
+        get_workspace_config('123e4567-e89b-12d3-a456-426614174000')
+        get_workspace_config('MyProject')
         ```
     """
     # Retrieving details from the workspace

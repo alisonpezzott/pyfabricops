@@ -62,7 +62,7 @@ def resolve_workspace(workspace: str) -> Union[str, None]:
         workspace (str): The name of the workspace.
 
     Returns:
-        (str | None):The ID of the workspace if found, otherwise None.
+        (str | None): The ID of the workspace if found, otherwise None.
     """
     if is_valid_uuid(workspace):
         return workspace
@@ -356,7 +356,7 @@ def update_workspace_role_assignment(
     df: Optional[bool] = True,
 ) -> Union[DataFrame, Dict[str, Any], None]:
     """
-    Update a role to a existing workspace role assignment.
+    Update a role in an existing workspace role assignment.
 
     Args:
         workspace (str): The ID or name of the workspace.

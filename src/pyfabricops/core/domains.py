@@ -53,7 +53,7 @@ def get_domain_id(domain_name: str) -> Union[str, None]:
         domain_name (str): The name of the domain.
 
     Returns:
-        (str | None):The ID of the domain if found, otherwise None.
+        (str | None): The ID of the domain if found, otherwise None.
     """
     domains = list_domains(df=False)
     for _domain in domains:
@@ -71,7 +71,7 @@ def resolve_domain(domain: str) -> Union[str, None]:
         domain (str): The name or ID of the domain.
 
     Returns:
-        (str | None):The ID of the domain if found, otherwise None.
+        (str | None): The ID of the domain if found, otherwise None.
     """
     if is_valid_uuid(domain):
         return domain
@@ -180,7 +180,7 @@ def update_domain(
     df: Optional[bool] = True,
 ) -> Union[DataFrame, Dict[str, Any], None]:
     """
-    Update a existing domain.
+    Update an existing domain.
 
     Args:
         domain (str): The name or id of the current domain.
@@ -224,6 +224,7 @@ def list_domain_workspaces(
     Returns a list of the workspaces assigned to the specified domain.
 
     Args:
+        domain (str): The name or ID of the domain.
         df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
@@ -252,6 +253,7 @@ def list_domain_workspaces(
     Returns a list of the workspaces assigned to the specified domain.
 
     Args:
+        domain (str): The name or ID of the domain.
         df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
@@ -280,6 +282,7 @@ def list_domain_role_assignments(
     Returns a list of the role assignments assigned to the specified domain.
 
     Args:
+        domain (str): The name or ID of the domain.
         df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
@@ -369,7 +372,7 @@ def domain_role_assignments_bulk_unassign(
     df: Optional[bool] = True,
 ) -> Union[DataFrame, List[Dict[str, Any]], None]:
     """
-    Assign the specified admins or contributors to the domain.
+    Unassign the specified admins or contributors from the domain.
 
     Args:
         domain (str): The name or ID of the domain.

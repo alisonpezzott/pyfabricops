@@ -40,7 +40,7 @@ def get_environment_config(
 
     Args:
         workspace (str): The name or ID of the workspace.
-        environment (str): The name or ID of the semantic.
+        environment (str): The name or ID of the environment.
 
     Returns:
         (Union[Dict[str, Any], None]): The dict config from the environment
@@ -106,7 +106,7 @@ def export_environment(
     path: Union[str, Path],
 ) -> None:
     """
-    Export a environment to path.
+    Export an environment to path.
 
     Args:
         workspace (str): The name or ID of the workspace.
@@ -153,7 +153,7 @@ def export_all_environments(
     path: Union[str, Path],
 ) -> None:
     """
-    Export a environment to path.
+    Export all environments to path.
 
     Args:
         workspace (str): The name or ID of the workspace.

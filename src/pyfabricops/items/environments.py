@@ -79,7 +79,7 @@ def resolve_environment(
     environment: str,
 ) -> Union[str, None]:
     """
-    Resolves a environment name to its ID.
+    Resolves an environment name to its ID.
 
     Args:
         workspace (str): The ID of the workspace.
@@ -190,7 +190,7 @@ def update_environment(
 
 def delete_environment(workspace: str, environment: str) -> None:
     """
-    Delete a environment from the specified workspace.
+    Delete an environment from the specified workspace.
 
     Args:
         workspace (str): The name or ID of the workspace to delete.
@@ -225,7 +225,7 @@ def get_environment_definition(
     workspace: str, environment: str
 ) -> Union[Dict[str, Any], None]:
     """
-    Retrieves the definition of a environment by its name or ID from the specified workspace.
+    Retrieves the definition of an environment by its name or ID from the specified workspace.
 
     Args:
         workspace (str): The workspace name or ID.

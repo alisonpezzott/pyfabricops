@@ -156,7 +156,7 @@ def create_workspace_custom_pool(
     df: Optional[bool] = True,
 ) -> Union[DataFrame, Dict[str, Any], None]:
     """
-    Creates the properties of the specified workspace custom pool.
+    Creates a new workspace custom pool in the specified workspace.
 
     Args:
         workspace (str): The workspace name or ID.

@@ -21,7 +21,7 @@ def list_variable_libraries(
     Returns a list of variable libraries in a specified workspace.
 
     Args:
-        workspace_id (str): The ID of the workspace.
+        workspace (str): The workspace name or ID.
         df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
@@ -81,7 +81,7 @@ def get_variable_library(
     Retrieves a variable_library by its name or ID from the specified workspace.
 
     Args:
-        workspace_id (str): The workspace ID.
+        workspace (str): The workspace name or ID.
         variable_library (str): The ID or name of the variable_library.
         df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
@@ -174,7 +174,7 @@ def update_variable_library(
 
     Args:
         workspace (str): The workspace name or ID.
-        report (str): The ID of the variable_library to update.
+        variable_library (str): The name or ID of the variable library to update.
         display_name (str, optional): The new display name for the variable_library.
         description (str, optional): The new description for the variable_library.
         df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
@@ -216,11 +216,11 @@ def update_variable_library(
 
 def delete_variable_library(workspace: str, variable_library: str) -> None:
     """
-    Delete a semantic model from the specified workspace.
+    Delete a variable library from the specified workspace.
 
     Args:
         workspace (str): The workspace name or ID.
-        variable_library (str): The name or ID of the semantic model to delete.
+        variable_library (str): The name or ID of the variable library to delete.
 
     Returns:
         None
