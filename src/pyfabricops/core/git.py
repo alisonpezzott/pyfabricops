@@ -18,9 +18,9 @@ def github_connect(
     owner_name: str,
     repository_name: str,
     *,
-    branch_name: str = "main",
-    directory_name: str = "/",
-    credential_type: Literal["spn", "user"] = "spn",
+    branch_name: str = 'main',
+    directory_name: str = '/',
+    credential_type: Literal['spn', 'user'] = 'spn',
 ) -> bool:
     """
     Connects a Fabric workspace to a Git repository.
@@ -63,21 +63,21 @@ def github_connect(
 
     # Prepare the payload for the Git connection
     payload = {
-        "gitProviderDetails": {
-            "ownerName": owner_name,
-            "gitProviderType": "GitHub",
-            "repositoryName": repository_name,
-            "branchName": branch_name,
-            "directoryName": directory_name,
+        'gitProviderDetails': {
+            'ownerName': owner_name,
+            'gitProviderType': 'GitHub',
+            'repositoryName': repository_name,
+            'branchName': branch_name,
+            'directoryName': directory_name,
         },
-        "myGitCredentials": {
-            "source": "ConfiguredConnection",
-            "connectionId": connection_id,
+        'myGitCredentials': {
+            'source': 'ConfiguredConnection',
+            'connectionId': connection_id,
         },
     }
     response = api_request(
-        endpoint=f"/workspaces/{workspace_id}/git/connect",
-        method="post",
+        endpoint=f'/workspaces/{workspace_id}/git/connect',
+        method='post',
         payload=payload,
         return_raw=True,
         credential_type=credential_type,
@@ -99,9 +99,9 @@ def git_init(
     workspace: str,
     *,
     initialize_strategy: Literal[
-        "PreferWorkspace", "PreferRemote", "None"
-    ] = "PreferWorkspace",
-    credential_type: Literal["spn", "user"] = "spn",
+        'PreferWorkspace', 'PreferRemote', 'None'
+    ] = 'PreferWorkspace',
+    credential_type: Literal['spn', 'user'] = 'spn',
     df: Optional[bool] = False,
 ) -> Union[DataFrame, Dict[str, Any], None]:
     """
@@ -136,11 +136,11 @@ def git_init(
     if not workspace_id:
         return None
 
-    payload = {"initializationStrategy": initialize_strategy}
+    payload = {'initializationStrategy': initialize_strategy}
 
     return api_request(
-        method="post",
-        endpoint=f"/workspaces/{workspace_id}/git/initializeConnection",
+        method='post',
+        endpoint=f'/workspaces/{workspace_id}/git/initializeConnection',
         payload=payload,
         credential_type=credential_type,
         support_lro=True,
@@ -151,7 +151,7 @@ def git_init(
 def git_status(
     workspace: str,
     *,
-    credential_type: Literal["spn", "user"] = "spn",
+    credential_type: Literal['spn', 'user'] = 'spn',
     df: Optional[bool] = True,
 ) -> Union[DataFrame, Dict[str, Any], None]:
     """
@@ -183,7 +183,7 @@ def git_status(
         return None
 
     return api_request(
-        endpoint=f"/workspaces/{workspace_id}/git/status",
+        endpoint=f'/workspaces/{workspace_id}/git/status',
         credential_type=credential_type,
         support_lro=True,
     )
@@ -193,10 +193,10 @@ def update_from_git(
     workspace: str,
     *,
     conflict_resolution_policy: Literal[
-        "PreferRemote", "PreferWorkspace"
-    ] = "PreferWorkspace",
+        'PreferRemote', 'PreferWorkspace'
+    ] = 'PreferWorkspace',
     allow_override_items: bool = True,
-    credential_type: Literal["spn", "user"] = "spn",
+    credential_type: Literal['spn', 'user'] = 'spn',
 ) -> bool:
     """
     Poll the workspace"s Git status and update from Git if not up to date.
@@ -236,18 +236,18 @@ def update_from_git(
     RETRY_INTERVAL = 20
 
     for attempt in range(1, MAX_RETRIES + 1):
-        logger.info(f"Attempt {attempt}/{MAX_RETRIES}: Checking Git status...")
+        logger.info(f'Attempt {attempt}/{MAX_RETRIES}: Checking Git status...')
         status = git_status(workspace_id, df=False)
 
         if not status:
-            logger.info("No status retrieved; retrying after delay...")
+            logger.info('No status retrieved; retrying after delay...')
             time.sleep(RETRY_INTERVAL)
             continue
 
-        remote_commit = status.get("remoteCommitHash") or None
-        workspace_head = status.get("workspaceHead") or None
+        remote_commit = status.get('remoteCommitHash') or None
+        workspace_head = status.get('workspaceHead') or None
         logger.info(
-            f"Remote Commit: {remote_commit} | Workspace Head: {workspace_head}"
+            f'Remote Commit: {remote_commit} | Workspace Head: {workspace_head}'
         )
 
         # If already up to date
@@ -256,73 +256,73 @@ def update_from_git(
             and workspace_head
             and remote_commit == workspace_head
         ):
-            logger.success("Workspace is already up to date.")
+            logger.success('Workspace is already up to date.')
             return True
 
         # Not up to date—prepare updateFromGit request
-        logger.info("Workspace out of sync. Issuing updateFromGit request...")
+        logger.info('Workspace out of sync. Issuing updateFromGit request...')
         payload = {
-            "remoteCommitHash": remote_commit,
-            "workspaceHead": workspace_head,
-            "conflictResolution": {
-                "conflictResolutionPolicy": conflict_resolution_policy,
-                "conflictResolutionType": "Workspace",
+            'remoteCommitHash': remote_commit,
+            'workspaceHead': workspace_head,
+            'conflictResolution': {
+                'conflictResolutionPolicy': conflict_resolution_policy,
+                'conflictResolutionType': 'Workspace',
             },
-            "options": {"allowOverrideItems": allow_override_items},
+            'options': {'allowOverrideItems': allow_override_items},
         }
         resp = api_request(
-            method="post",
-            endpoint=f"/workspaces/{workspace_id}/git/updateFromGit",
+            method='post',
+            endpoint=f'/workspaces/{workspace_id}/git/updateFromGit',
             payload=payload,
             return_raw=True,
         )
 
         if resp.status_code in [200, 202]:
-            logger.info("Update request sent successfully.")
+            logger.info('Update request sent successfully.')
         else:
             logger.error(
-                f"Failed to send update request: {resp.json().get('errorCode')} - {resp.json().get('message')}"
+                f'Failed to send update request: {resp.json().get("errorCode")} - {resp.json().get("message")}'
             )
             time.sleep(RETRY_INTERVAL)
             continue
 
         # Wait before re-checking status
         logger.info(
-            f"Waiting {RETRY_INTERVAL} seconds before rechecking status..."
+            f'Waiting {RETRY_INTERVAL} seconds before rechecking status...'
         )
         time.sleep(RETRY_INTERVAL)
 
         # Re-check status after sending update
         status_after = git_status(workspace_id, df=False)
         if status_after:
-            remote_after = status_after.get("remoteCommitHash") or None
-            head_after = status_after.get("workspaceHead") or None
+            remote_after = status_after.get('remoteCommitHash') or None
+            head_after = status_after.get('workspaceHead') or None
             logger.warning(
-                f"Post-update | Remote: {remote_after} | Head: {head_after}"
+                f'Post-update | Remote: {remote_after} | Head: {head_after}'
             )
             if remote_after and head_after and remote_after == head_after:
                 logger.success(
-                    "Update successful. Workspace is now up to date."
+                    'Update successful. Workspace is now up to date.'
                 )
                 return True
             else:
-                logger.warning("Workspace still not up to date; retrying...")
+                logger.warning('Workspace still not up to date; retrying...')
         else:
             logger.error(
-                "Failed to retrieve status after update attempt; retrying..."
+                'Failed to retrieve status after update attempt; retrying...'
             )
             return False
-    logger.error("Max retries reached. The workspace may still be updating.")
+    logger.error('Max retries reached. The workspace may still be updating.')
     return False
 
 
 def commit_to_git(
     workspace: str,
     *,
-    mode: Literal["All", "Selective"] = "All",
+    mode: Literal['All', 'Selective'] = 'All',
     comment: str = None,
     selective_payload: dict = None,
-    credential_type: Literal["spn", "user"] = "spn",
+    credential_type: Literal['spn', 'user'] = 'spn',
     df: Optional[bool] = False,
 ) -> Union[DataFrame, Dict[str, Any], None]:
     """
@@ -360,18 +360,18 @@ def commit_to_git(
     if not workspace_id:
         return None
 
-    payload = {"mode": mode}
+    payload = {'mode': mode}
 
     if comment:
-        payload["comment"] = comment
+        payload['comment'] = comment
 
-    if mode == "Selective" and selective_payload:
+    if mode == 'Selective' and selective_payload:
         # If in selective mode, include the specific changes to commit
         payload.update(selective_payload)
 
     return api_request(
-        endpoint=f"/workspaces/{workspace_id}/git/commitToGit",
-        method="post",
+        endpoint=f'/workspaces/{workspace_id}/git/commitToGit',
+        method='post',
         payload=payload,
         credential_type=credential_type,
         support_lro=True,
@@ -379,7 +379,7 @@ def commit_to_git(
 
 
 def git_disconnect(
-    workspace: str, *, credential_type: Literal["spn", "user"] = "spn"
+    workspace: str, *, credential_type: Literal['spn', 'user'] = 'spn'
 ) -> None:
     """
     Disconnects the workspace from Git.
@@ -403,16 +403,16 @@ def git_disconnect(
         ```
     """
     response = api_request(
-        "/workspaces/" + resolve_workspace(workspace) + "/git/disconnect",
-        method="post",
+        '/workspaces/' + resolve_workspace(workspace) + '/git/disconnect',
+        method='post',
         credential_type=credential_type,
         return_raw=True,
     )
     if response.status_code == 200:
-        logger.success("Successfully disconnected from Git.")
+        logger.success('Successfully disconnected from Git.')
         return None
     else:
-        logger.error("Failed to disconnect from Git.")
+        logger.error('Failed to disconnect from Git.')
         return None
 
 
@@ -420,7 +420,7 @@ def git_disconnect(
 def get_git_connection(
     workspace: str,
     *,
-    credential_type: Literal["spn", "user"] = "spn",
+    credential_type: Literal['spn', 'user'] = 'spn',
     df: bool = False,
 ) -> dict:
     """
@@ -446,9 +446,9 @@ def get_git_connection(
         ```
     """
     return api_request(
-        endpoint="/workspaces/"
+        endpoint='/workspaces/'
         + resolve_workspace(workspace)
-        + "/git/connection",
+        + '/git/connection',
         credential_type=credential_type,
     )
 
@@ -457,7 +457,7 @@ def get_git_connection(
 def get_my_git_credentials(
     workspace: str,
     *,
-    credential_type: Literal["spn", "user"] = "spn",
+    credential_type: Literal['spn', 'user'] = 'spn',
     df: bool = False,
 ) -> dict:
     """
@@ -483,9 +483,9 @@ def get_my_git_credentials(
         ```
     """
     return api_request(
-        endpoint="/workspaces/"
+        endpoint='/workspaces/'
         + resolve_workspace(workspace)
-        + "/git/myGitCredentials",
+        + '/git/myGitCredentials',
         credential_type=credential_type,
     )
 
@@ -494,12 +494,12 @@ def update_my_git_connection(
     workspace: str,
     *,
     request_body_type: Literal[
-        "UpdateGitCredentialsToAutomaticRequest",
-        "UpdateGitCredentialsToConfiguredConnectionRequest",
-        "UpdateGitCredentialsToNoneRequest",
-    ] = "UpdateGitCredentialsToAutomaticRequest",
+        'UpdateGitCredentialsToAutomaticRequest',
+        'UpdateGitCredentialsToConfiguredConnectionRequest',
+        'UpdateGitCredentialsToNoneRequest',
+    ] = 'UpdateGitCredentialsToAutomaticRequest',
     connection_id: str = None,
-    credential_type: Literal["spn", "user"] = "spn",
+    credential_type: Literal['spn', 'user'] = 'spn',
 ) -> dict:
     """
     Updates the Git connection for a Fabric workspace.
@@ -526,27 +526,27 @@ def update_my_git_connection(
         )
         ```
     """
-    payload_automatic = {"source": "Automatic"}
+    payload_automatic = {'source': 'Automatic'}
     payload_configured = {
-        "source": "ConfiguredConnection",
-        "connectionId": connection_id,
+        'source': 'ConfiguredConnection',
+        'connectionId': connection_id,
     }
-    payload_none = {"source": "None"}
-    if request_body_type == "UpdateGitCredentialsToAutomaticRequest":
+    payload_none = {'source': 'None'}
+    if request_body_type == 'UpdateGitCredentialsToAutomaticRequest':
         payload = payload_automatic
     elif (
         request_body_type
-        == "UpdateGitCredentialsToConfiguredConnectionRequest"
+        == 'UpdateGitCredentialsToConfiguredConnectionRequest'
     ):
         payload = payload_configured
-    elif request_body_type == "UpdateGitCredentialsToNoneRequest":
+    elif request_body_type == 'UpdateGitCredentialsToNoneRequest':
         payload = payload_none
 
     return api_request(
-        endpoint=f"/workspaces/"
+        endpoint=f'/workspaces/'
         + resolve_workspace(workspace)
-        + "/git/myGitCredentials",
-        method="patch",
+        + '/git/myGitCredentials',
+        method='patch',
         payload=payload,
         credential_type=credential_type,
     )
@@ -559,9 +559,9 @@ def ado_connect(
     organization_name: str,
     project_name: str,
     repository_name: str,
-    branch_name: str = "develop",
-    directory_name: str = "src",
-    credential_type: Literal["spn", "user"] = "spn",
+    branch_name: str = 'develop',
+    directory_name: str = 'src',
+    credential_type: Literal['spn', 'user'] = 'spn',
 ) -> bool:
     """
     Connects a Fabric workspace to an Azure DevOps repository.
@@ -597,24 +597,24 @@ def ado_connect(
         ```
     """
     payload = {
-        "gitProviderDetails": {
-            "gitProviderType": "AzureDevOps",
-            "organizationName": organization_name,
-            "projectName": project_name,
-            "repositoryName": repository_name,
-            "branchName": branch_name,
-            "directoryName": directory_name,
+        'gitProviderDetails': {
+            'gitProviderType': 'AzureDevOps',
+            'organizationName': organization_name,
+            'projectName': project_name,
+            'repositoryName': repository_name,
+            'branchName': branch_name,
+            'directoryName': directory_name,
         },
-        "myGitCredentials": {
-            "source": "ConfiguredConnection",
-            "connectionId": connection_id,
+        'myGitCredentials': {
+            'source': 'ConfiguredConnection',
+            'connectionId': connection_id,
         },
     }
     return api_request(
-        endpoint="/workspaces/"
+        endpoint='/workspaces/'
         + resolve_workspace(workspace)
-        + "/git/connect",
-        method="post",
+        + '/git/connect',
+        method='post',
         payload=payload,
         credential_type=credential_type,
     )

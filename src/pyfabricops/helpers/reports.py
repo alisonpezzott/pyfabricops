@@ -57,15 +57,15 @@ def get_report_config(
 
     else:
         config = {}
-        config = config[item_data.get("displayName")] = {}
+        config = config[item_data.get('displayName')] = {}
 
         config = {
-            "id": item_data["id"],
-            "description": item_data.get("description", None),
-            "folder_id": ""
-            if item_data.get("folderId") is None
-            or pd.isna(item_data.get("folderId"))
-            else item_data["folderId"],
+            'id': item_data['id'],
+            'description': item_data.get('description', None),
+            'folder_id': ''
+            if item_data.get('folderId') is None
+            or pd.isna(item_data.get('folderId'))
+            else item_data['folderId'],
         }
 
         return config
@@ -91,14 +91,15 @@ def get_all_reports_config(
     config = {}
 
     for item in items:
-        item_data = get_report(workspace, item["id"], df=False)
 
-        config[item["displayName"]] = {
-            "id": item["id"],
-            "description": item.get("description", None),
-            "folder_id": ""
-            if item.get("folderId") is None or pd.isna(item.get("folderId"))
-            else item["folderId"],
+        item_data = get_report(workspace, item['id'], df=False)
+
+        config[item['displayName']] = {
+            'id': item['id'],
+            'description': item.get('description', None),
+            'folder_id': ''
+            if item.get('folderId') is None or pd.isna(item.get('folderId'))
+            else item['folderId'],
         }
 
     return config
@@ -124,28 +125,28 @@ def export_report(
     item = get_report(workspace_id, report, df=False)
     try:
         folder_path = resolve_folder_from_id_to_path(
-            workspace_id, item["folderId"]
+            workspace_id, item['folderId']
         )
     except:
-        logger.info(f"{item['displayName']}.Report is not inside a folder.")
+        logger.info(f'{item["displayName"]}.Report is not inside a folder.')
         folder_path = None
 
     if folder_path is None:
-        item_path = Path(path) / (item["displayName"] + ".Report")
+        item_path = Path(path) / (item['displayName'] + '.Report')
     else:
         item_path = (
-            Path(path) / folder_path / (item["displayName"] + ".Report")
+            Path(path) / folder_path / (item['displayName'] + '.Report')
         )
     os.makedirs(item_path, exist_ok=True)
 
-    definition = get_report_definition(workspace_id, item["id"])
+    definition = get_report_definition(workspace_id, item['id'])
     if definition is None:
         return None
 
     unpack_item_definition(definition, item_path)
 
     logger.success(
-        f"`{item['displayName']}.Report` was exported to {item_path} successfully."
+        f'`{item["displayName"]}.Report` was exported to {item_path} successfully.'
     )
     return None
 
@@ -172,29 +173,29 @@ def export_all_reports(
     for item in items:
         try:
             folder_path = resolve_folder_from_id_to_path(
-                workspace_id, item["folderId"]
+                workspace_id, item['folderId']
             )
         except:
             logger.info(
-                f"{item['displayName']}.Report is not inside a folder."
+                f'{item["displayName"]}.Report is not inside a folder.'
             )
             folder_path = None
 
         if folder_path is None:
-            item_path = Path(path) / (item["displayName"] + ".Report")
+            item_path = Path(path) / (item['displayName'] + '.Report')
         else:
             item_path = (
-                Path(path) / folder_path / (item["displayName"] + ".Report")
+                Path(path) / folder_path / (item['displayName'] + '.Report')
             )
         os.makedirs(item_path, exist_ok=True)
 
-        definition = get_report_definition(workspace_id, item["id"])
+        definition = get_report_definition(workspace_id, item['id'])
         if definition is None:
             return None
 
         unpack_item_definition(definition, item_path)
 
-    logger.success(f"All reports were exported to {path} successfully.")
+    logger.success(f'All reports were exported to {path} successfully.')
     return None
 
 
@@ -218,37 +219,37 @@ def extract_report_definition_pbir(path: Union[str, Path]) -> Dict[str, str]:
         parse_definition_report('MyProject/workspace/path/to/Financials.Report/definition.pbir')
         ```
     """
-    path = Path(path) / "definition.pbir"
-    with open(path, encoding="utf-8") as f:
+    path = Path(path) / 'definition.pbir'
+    with open(path, encoding='utf-8') as f:
         data = json.load(f)
 
     # Check if the file contains the expected structure
     if (
-        "datasetReference" not in data
-        or "byConnection" not in data["datasetReference"]
+        'datasetReference' not in data
+        or 'byConnection' not in data['datasetReference']
     ):
         raise ResourceNotFoundError(
-            f"Invalid report definition file: {path}. Expected structure not found."
+            f'Invalid report definition file: {path}. Expected structure not found.'
         )
-    by_conn = data["datasetReference"]["byConnection"]
-    conn_str = by_conn["connectionString"]
+    by_conn = data['datasetReference']['byConnection']
+    conn_str = by_conn['connectionString']
     # model_id = by_conn['pbiModelDatabaseName']
 
     # 1) workspace_name: part after the last slash and before the semicolon
-    workspace_name = conn_str.split("/")[-1].split(";")[0]
+    workspace_name = conn_str.split('/')[-1].split(';')[0]
 
     # 2) semantic_model_name: "initial catalog" value from the connection string
-    m = re.search(r"initial catalog=([^;]+)", conn_str, re.IGNORECASE)
+    m = re.search(r'initial catalog=([^;]+)', conn_str, re.IGNORECASE)
     semantic_model_name = m.group(1) if m else None
 
     # 3) semantic_model_id: takes directly from the pbiModelDatabaseName field
-    m_id = re.search(r"semanticmodelid=([^;]+)", conn_str, re.IGNORECASE)
+    m_id = re.search(r'semanticmodelid=([^;]+)', conn_str, re.IGNORECASE)
     semantic_model_id = m_id.group(1) if m_id else None
 
     return {
-        "workspace_name": workspace_name,
-        "semantic_model_name": semantic_model_name,
-        "semantic_model_id": semantic_model_id,
+        'workspace_name': workspace_name,
+        'semantic_model_name': semantic_model_name,
+        'semantic_model_id': semantic_model_id,
     }
 
 
@@ -326,9 +327,10 @@ def deploy_all_reports(
     if workspace_id is None:
         return None
 
-    reports_paths = list_paths_of_type(path, "Report")
+    reports_paths = list_paths_of_type(path, 'Report')
 
     for path_ in reports_paths:
+
         display_name = extract_display_name_from_platform(path_)
         if display_name is None:
             return None
@@ -377,67 +379,67 @@ def convert_report_definition_to_by_path(
         workspace_path (Union[str, Path]): The file path to the workspace.
     """
     # Read the current definition.pbir
-    definition_path = f"{report_path}/definition.pbir"
+    definition_path = f'{report_path}/definition.pbir'
 
     if not os.path.exists(definition_path):
-        logger.warning(f"definition.pbir not found: {definition_path}")
+        logger.warning(f'definition.pbir not found: {definition_path}')
         return None
 
     try:
-        with open(definition_path, "r", encoding="utf-8") as f:
+        with open(definition_path, 'r', encoding='utf-8') as f:
             report_definition = json.load(f)
     except Exception as e:
-        logger.error(f"Error reading definition.pbir: {e}")
+        logger.error(f'Error reading definition.pbir: {e}')
         return None
 
     # Check if it already uses byPath
-    dataset_reference = report_definition.get("datasetReference", {})
+    dataset_reference = report_definition.get('datasetReference', {})
 
-    if "byPath" in dataset_reference:
-        logger.info(f"Report already uses byPath reference.")
+    if 'byPath' in dataset_reference:
+        logger.info(f'Report already uses byPath reference.')
         return None
 
-    if "byConnection" not in dataset_reference:
-        logger.warning(f"Report has no byConnection reference.")
+    if 'byConnection' not in dataset_reference:
+        logger.warning(f'Report has no byConnection reference.')
         return None
 
     # Extract semantic model name from connection string
-    connection_string = dataset_reference["byConnection"].get(
-        "connectionString", ""
+    connection_string = dataset_reference['byConnection'].get(
+        'connectionString', ''
     )
 
     # Capture the value after "initial catalog="
-    match = re.search(r"initial catalog=([^;]+)", connection_string)
+    match = re.search(r'initial catalog=([^;]+)', connection_string)
     if not match:
         logger.warning(
-            f"Could not extract semantic model name from connection string."
+            f'Could not extract semantic model name from connection string.'
         )
         return None
 
     semantic_model_name = match.group(1).strip('"')
 
-    logger.info(f"Found semantic model: {semantic_model_name}")
+    logger.info(f'Found semantic model: {semantic_model_name}')
 
     # Find the semantic model directory relative to the report
     # Look for *.SemanticModel directories in the project
     semantic_model_pattern = (
-        f"{workspace_path}/**/{semantic_model_name}.SemanticModel"
+        f'{workspace_path}/**/{semantic_model_name}.SemanticModel'
     )
     semantic_model_paths = glob.glob(semantic_model_pattern, recursive=True)
 
     if not semantic_model_paths:
         logger.error(
-            f"Semantic model directory not found: {semantic_model_name}.SemanticModel"
+            f'Semantic model directory not found: {semantic_model_name}.SemanticModel'
         )
         return None
 
     if len(semantic_model_paths) > 1:
         logger.warning(
-            f"Multiple semantic model directories found for {semantic_model_name}, using first one"
+            f'Multiple semantic model directories found for {semantic_model_name}, using first one'
         )
 
     semantic_model_path = semantic_model_paths[0]
-    logger.info(f"Found semantic model at: {semantic_model_path}")
+    logger.info(f'Found semantic model at: {semantic_model_path}')
 
     # Calculate relative path from definition.pbir to semantic model
     # The definition.pbir is inside the Report directory, so we need to go up one level first
@@ -445,28 +447,28 @@ def convert_report_definition_to_by_path(
     relative_path = os.path.relpath(semantic_model_path, definition_dir)
 
     # Convert backslashes to forward slashes for consistency
-    relative_path = relative_path.replace("\\", "/")
+    relative_path = relative_path.replace('\\', '/')
 
-    logger.info(f"Relative path from definition.pbir: {relative_path}")
+    logger.info(f'Relative path from definition.pbir: {relative_path}')
 
     # Update the dataset reference
-    new_dataset_reference = {"byPath": {"path": relative_path}}
+    new_dataset_reference = {'byPath': {'path': relative_path}}
 
     # Create updated definition
     updated_definition = report_definition.copy()
-    updated_definition["datasetReference"] = new_dataset_reference
+    updated_definition['datasetReference'] = new_dataset_reference
 
     # Write the updated definition back to file
     try:
-        with open(definition_path, "w", encoding="utf-8") as f:
+        with open(definition_path, 'w', encoding='utf-8') as f:
             json.dump(updated_definition, f, indent=2)
 
         logger.success(
-            f"Successfully converted report to use byPath reference"
+            f'Successfully converted report to use byPath reference'
         )
 
     except Exception as e:
-        logger.error(f"Error writing updated definition.pbir: {e}")
+        logger.error(f'Error writing updated definition.pbir: {e}')
 
     return None
 
@@ -493,42 +495,42 @@ def convert_report_definition_to_by_connection(
         workspace_name: The name of the Power BI workspace.
         report_path: The file path to the report.
     """
-    with open(f"{report_path}/definition.pbir", "r") as f:
+    with open(f'{report_path}/definition.pbir', 'r') as f:
         report_definition = json.load(f)
 
-    dataset_reference = report_definition["datasetReference"]
+    dataset_reference = report_definition['datasetReference']
 
-    if "byPath" in dataset_reference:
-        dataset_path = dataset_reference["byPath"]["path"]
-        dataset_name = dataset_path.split("/")[-1].split(".SemanticModel")[0]
+    if 'byPath' in dataset_reference:
+        dataset_path = dataset_reference['byPath']['path']
+        dataset_name = dataset_path.split('/')[-1].split('.SemanticModel')[0]
 
-    elif "byConnection" in dataset_reference:
-        text_to_search = dataset_reference["byConnection"]["connectionString"]
+    elif 'byConnection' in dataset_reference:
+        text_to_search = dataset_reference['byConnection']['connectionString']
         # Capture the value after "initial catalog="
-        match = re.search(r"initial catalog=([^;]+)", text_to_search)
+        match = re.search(r'initial catalog=([^;]+)', text_to_search)
         if match:
             dataset_name = match.group(1)
 
-    logger.info(f"Semantic model: {dataset_name}")
+    logger.info(f'Semantic model: {dataset_name}')
 
     # Get the semantic model ID
     semantic_model_id = get_semantic_model_id(workspace_name, dataset_name)
     if semantic_model_id is None:
-        logger.error(f"Could not find semantic model ID for {dataset_name}")
+        logger.error(f'Could not find semantic model ID for {dataset_name}')
         return None
 
     report_definition_template = REPORT_DEFINITION
 
     report_definition_updated = report_definition_template.replace(
-        "#{workspace_name}#", workspace_name
+        '#{workspace_name}#', workspace_name
     )
     report_definition_updated = report_definition_updated.replace(
-        "#{semantic_model_name}#", dataset_name
+        '#{semantic_model_name}#', dataset_name
     )
     report_definition_updated = report_definition_updated.replace(
-        "#{semantic_model_id}#", semantic_model_id
+        '#{semantic_model_id}#', semantic_model_id
     )
 
     # Write the updated report definition to the definition.pbir
-    with open(f"{report_path}/definition.pbir", "w", encoding="utf-8") as f:
+    with open(f'{report_path}/definition.pbir', 'w', encoding='utf-8') as f:
         f.write(report_definition_updated)

@@ -34,7 +34,7 @@ def list_tags(
         ```
     """
     resp = api_request(
-        "/admin/tags",
+        '/admin/tags',
         support_pagination=True,
     )
     return resp
@@ -52,8 +52,8 @@ def get_tag_id(tag_name: str) -> Union[str, None]:
     """
     tags = list_tags(df=False)
     for _tag in tags:
-        if _tag["displayName"] == tag_name:
-            return _tag["id"]
+        if _tag['displayName'] == tag_name:
+            return _tag['id']
     logger.warning(f"Tag '{tag_name}' not found.")
     return None
 
@@ -136,9 +136,9 @@ def bulk_create_tags(
         ```
     """
     return api_request(
-        "/admin/tags/bulkCreateTags",
+        '/admin/tags/bulkCreateTags',
         payload=payload,
-        method="post",
+        method='post',
     )
 
 
@@ -161,8 +161,8 @@ def delete_tag(tag: str) -> None:
         https://learn.microsoft.com/en-us/rest/api/fabric/admin/tags/delete-tag
     """
     return api_request(
-        "/admin/domains/" + resolve_tag(tag),
-        method="delete",
+        '/admin/domains/' + resolve_tag(tag),
+        method='delete',
     )
 
 
@@ -193,10 +193,10 @@ def update_tag(
         )
         ```
     """
-    payload = {"displayName": display_name}
+    payload = {'displayName': display_name}
 
     return api_request(
-        "/admin/domains/" + resolve_tag(tag),
+        '/admin/domains/' + resolve_tag(tag),
         payload=payload,
-        method="patch",
+        method='patch',
     )

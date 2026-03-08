@@ -29,7 +29,7 @@ def list_reports(
         (Union[DataFrame, List[Dict[str, Any]], None]): A list of reports or a DataFrame if df is True.
     """
     return api_request(
-        endpoint="/workspaces/" + resolve_workspace(workspace) + "/reports",
+        endpoint='/workspaces/' + resolve_workspace(workspace) + '/reports',
         support_pagination=True,
     )
 
@@ -52,8 +52,8 @@ def get_report_id(workspace: str, report_name: str) -> Union[str, None]:
     """
     reports = list_reports(workspace=resolve_workspace(workspace), df=False)
     for report in reports:
-        if report.get("displayName") == report_name:
-            return report.get("id")
+        if report.get('displayName') == report_name:
+            return report.get('id')
     return None
 
 
@@ -91,7 +91,7 @@ def get_report(
     workspace_id = resolve_workspace(workspace)
     report_id = resolve_report(workspace, report)
     return api_request(
-        endpoint="/workspaces/" + workspace_id + "/reports/" + report_id,
+        endpoint='/workspaces/' + workspace_id + '/reports/' + report_id,
     )
 
 
@@ -133,19 +133,19 @@ def create_report(
     """
     workspace_id = resolve_workspace(workspace)
 
-    payload = {"displayName": display_name, "definition": item_definition}
+    payload = {'displayName': display_name, 'definition': item_definition}
 
     if description:
-        payload["description"] = description
+        payload['description'] = description
 
     if folder:
         folder_id = resolve_folder(workspace_id, folder)
         if folder_id:
-            payload["folderId"] = folder_id
+            payload['folderId'] = folder_id
 
     return api_request(
-        endpoint="/workspaces/" + workspace_id + "/reports",
-        method="post",
+        endpoint='/workspaces/' + workspace_id + '/reports',
+        method='post',
         payload=payload,
         support_lro=True,
     )
@@ -190,14 +190,14 @@ def update_report(
     payload = {}
 
     if display_name:
-        payload["displayName"] = display_name
+        payload['displayName'] = display_name
 
     if description:
-        payload["description"] = description
+        payload['description'] = description
 
     return api_request(
-        endpoint="/workspaces/" + workspace_id + "/reports/" + report_id,
-        method="patch",
+        endpoint='/workspaces/' + workspace_id + '/reports/' + report_id,
+        method='patch',
         payload=payload,
     )
 
@@ -222,8 +222,8 @@ def delete_report(workspace: str, report: str) -> None:
     report_id = resolve_report(workspace, report)
 
     return api_request(
-        endpoint="/workspaces/" + workspace_id + "/reports/" + report_id,
-        method="delete",
+        endpoint='/workspaces/' + workspace_id + '/reports/' + report_id,
+        method='delete',
     )
 
 
@@ -253,12 +253,12 @@ def get_report_definition(
     report_id = resolve_report(workspace, report)
 
     return api_request(
-        endpoint="/workspaces/"
+        endpoint='/workspaces/'
         + workspace_id
-        + "/reports/"
+        + '/reports/'
         + report_id
-        + "/getDefinition",
-        method="post",
+        + '/getDefinition',
+        method='post',
         support_lro=True,
     )
 
@@ -296,15 +296,15 @@ def update_report_definition(
     """
     workspace_id = resolve_workspace(workspace)
     report_id = resolve_report(workspace, report)
-    params = {"updateMetadata": True}
-    payload = {"definition": item_definition}
+    params = {'updateMetadata': True}
+    payload = {'definition': item_definition}
     return api_request(
-        endpoint="/workspaces/"
+        endpoint='/workspaces/'
         + workspace_id
-        + "/reports/"
+        + '/reports/'
         + report_id
-        + "/updateDefinition",
-        method="post",
+        + '/updateDefinition',
+        method='post',
         payload=payload,
         params=params,
         support_lro=True,

@@ -53,15 +53,15 @@ def get_dataflow_gen2_config(
 
     else:
         config = {}
-        config = config[item_data.get("displayName")] = {}
+        config = config[item_data.get('displayName')] = {}
 
         config = {
-            "id": item_data["id"],
-            "description": item_data.get("description", None),
-            "folder_id": ""
-            if item_data.get("folderId") is None
-            or pd.isna(item_data.get("folderId"))
-            else item_data["folderId"],
+            'id': item_data['id'],
+            'description': item_data.get('description', None),
+            'folder_id': ''
+            if item_data.get('folderId') is None
+            or pd.isna(item_data.get('folderId'))
+            else item_data['folderId'],
         }
 
         return config
@@ -87,14 +87,15 @@ def get_all_dataflows_gen2_config(
     config = {}
 
     for item in items:
-        item_data = get_dataflow_gen2(workspace, item["id"], df=False)
 
-        config[item["displayName"]] = {
-            "id": item["id"],
-            "description": item.get("description", None),
-            "folder_id": ""
-            if item.get("folderId") is None or pd.isna(item.get("folderId"))
-            else item["folderId"],
+        item_data = get_dataflow_gen2(workspace, item['id'], df=False)
+
+        config[item['displayName']] = {
+            'id': item['id'],
+            'description': item.get('description', None),
+            'folder_id': ''
+            if item.get('folderId') is None or pd.isna(item.get('folderId'))
+            else item['folderId'],
         }
 
     return config
@@ -120,28 +121,28 @@ def export_dataflow_gen2(
     item = get_dataflow_gen2(workspace_id, dataflow_gen2, df=False)
     try:
         folder_path = resolve_folder_from_id_to_path(
-            workspace_id, item["folderId"]
+            workspace_id, item['folderId']
         )
     except:
-        logger.info(f"{item['displayName']}.Dataflow is not inside a folder.")
+        logger.info(f'{item["displayName"]}.Dataflow is not inside a folder.')
         folder_path = None
 
     if folder_path is None:
-        item_path = Path(path) / (item["displayName"] + ".Dataflow")
+        item_path = Path(path) / (item['displayName'] + '.Dataflow')
     else:
         item_path = (
-            Path(path) / folder_path / (item["displayName"] + ".Dataflow")
+            Path(path) / folder_path / (item['displayName'] + '.Dataflow')
         )
     os.makedirs(item_path, exist_ok=True)
 
-    definition = get_dataflow_gen2_definition(workspace_id, item["id"])
+    definition = get_dataflow_gen2_definition(workspace_id, item['id'])
     if definition is None:
         return None
 
     unpack_item_definition(definition, item_path)
 
     logger.success(
-        f"`{item['displayName']}.Dataflow` was exported to {item_path} successfully."
+        f'`{item["displayName"]}.Dataflow` was exported to {item_path} successfully.'
     )
     return None
 
@@ -168,29 +169,29 @@ def export_all_dataflows_gen2(
     for item in items:
         try:
             folder_path = resolve_folder_from_id_to_path(
-                workspace_id, item["folderId"]
+                workspace_id, item['folderId']
             )
         except:
             logger.info(
-                f"{item['displayName']}.Dataflow is not inside a folder."
+                f'{item["displayName"]}.Dataflow is not inside a folder.'
             )
             folder_path = None
 
         if folder_path is None:
-            item_path = Path(path) / (item["displayName"] + ".Dataflow")
+            item_path = Path(path) / (item['displayName'] + '.Dataflow')
         else:
             item_path = (
-                Path(path) / folder_path / (item["displayName"] + ".Dataflow")
+                Path(path) / folder_path / (item['displayName'] + '.Dataflow')
             )
         os.makedirs(item_path, exist_ok=True)
 
-        definition = get_dataflow_gen2_definition(workspace_id, item["id"])
+        definition = get_dataflow_gen2_definition(workspace_id, item['id'])
         if definition is None:
             return None
 
         unpack_item_definition(definition, item_path)
 
-    logger.success(f"All dataflows_gen2 were exported to {path} successfully.")
+    logger.success(f'All dataflows_gen2 were exported to {path} successfully.')
     return None
 
 
@@ -268,9 +269,10 @@ def deploy_all_dataflows_gen2(
     if workspace_id is None:
         return None
 
-    dataflows_gen2_paths = list_paths_of_type(path, "Dataflow")
+    dataflows_gen2_paths = list_paths_of_type(path, 'Dataflow')
 
     for path_ in dataflows_gen2_paths:
+
         display_name = extract_display_name_from_platform(path_)
         if display_name is None:
             return None
@@ -315,9 +317,9 @@ def extract_dataflow_gen2_variables(path: str) -> List[Dict[str, Any]]:
     Returns:
         (List[Dict[str, Any]]): List of dictionaries containing the extracted variables for each destination
     """
-    path = Path(path) / "mashup.pq"
+    path = Path(path) / 'mashup.pq'
 
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, 'r', encoding='utf-8') as f:
         content = f.read()
 
     variables = []
@@ -325,45 +327,45 @@ def extract_dataflow_gen2_variables(path: str) -> List[Dict[str, Any]]:
     # Pattern to find DataDestination sections
     # Look for shared QueryName_DataDestination = let
     destination_pattern = (
-        r"shared\s+(\w+)_DataDestination\s*=\s*let(.*?)in\s*\w+;"
+        r'shared\s+(\w+)_DataDestination\s*=\s*let(.*?)in\s*\w+;'
     )
     destination_matches = re.findall(destination_pattern, content, re.DOTALL)
 
     for query_name, destination_content in destination_matches:
         param_dict = {
-            "destination_name": f"{query_name}_DataDestination",
-            "query_name": query_name,
+            'destination_name': f'{query_name}_DataDestination',
+            'query_name': query_name,
         }
 
         # Extract workspaceId
         workspace_pattern = r'workspaceId\s*=\s*"([a-f0-9-]+)"'
         workspace_match = re.search(workspace_pattern, destination_content)
         if workspace_match:
-            param_dict["workspaceId"] = workspace_match.group(1)
+            param_dict['workspaceId'] = workspace_match.group(1)
 
         # Extract lakehouseId
         lakehouse_pattern = r'lakehouseId\s*=\s*"([a-f0-9-]+)"'
         lakehouse_match = re.search(lakehouse_pattern, destination_content)
         if lakehouse_match:
-            param_dict["lakehouseId"] = lakehouse_match.group(1)
-            param_dict["destination_type"] = "Lakehouse"
+            param_dict['lakehouseId'] = lakehouse_match.group(1)
+            param_dict['destination_type'] = 'Lakehouse'
 
         # Extract warehouseId
         warehouse_pattern = r'warehouseId\s*=\s*"([a-f0-9-]+)"'
         warehouse_match = re.search(warehouse_pattern, destination_content)
         if warehouse_match:
-            param_dict["warehouseId"] = warehouse_match.group(1)
-            param_dict["destination_type"] = "Warehouse"
+            param_dict['warehouseId'] = warehouse_match.group(1)
+            param_dict['destination_type'] = 'Warehouse'
 
         # Extract semanticModelId (if present)
         semantic_pattern = r'semanticModelId\s*=\s*"([a-f0-9-]+)"'
         semantic_match = re.search(semantic_pattern, destination_content)
         if semantic_match:
-            param_dict["semanticModelId"] = semantic_match.group(1)
-            param_dict["destination_type"] = "SemanticModel"
+            param_dict['semanticModelId'] = semantic_match.group(1)
+            param_dict['destination_type'] = 'SemanticModel'
 
         # Only add if we found at least one ID parameter
-        if any(key.endswith("Id") for key in param_dict.keys()):
+        if any(key.endswith('Id') for key in param_dict.keys()):
             variables.append(param_dict)
 
     return variables
@@ -383,54 +385,54 @@ def replace_dataflow_gen2_variables_with_placeholders(
     Returns:
         str: Modified content with placeholders
     """
-    dataflow_name = path.split("/")[-1].split(".Dataflow")[0]
+    dataflow_name = path.split('/')[-1].split('.Dataflow')[0]
 
-    path = Path(path) / "mashup.pq"
+    path = Path(path) / 'mashup.pq'
 
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, 'r', encoding='utf-8') as f:
         content = f.read()
     # Replace each destination's variables with unique placeholders
     for var_dict in variables:
-        query_name = var_dict["query_name"]
+        query_name = var_dict['query_name']
 
         # Replace workspaceId
-        if "workspaceId" in var_dict:
-            workspace_id = var_dict["workspaceId"]
-            placeholder = f"#{{{dataflow_name}_{query_name}_workspaceId}}#"
+        if 'workspaceId' in var_dict:
+            workspace_id = var_dict['workspaceId']
+            placeholder = f'#{{{dataflow_name}_{query_name}_workspaceId}}#'
             content = content.replace(
                 f'workspaceId = "{workspace_id}"',
                 f'workspaceId = "{placeholder}"',
             )
 
         # Replace lakehouseId
-        if "lakehouseId" in var_dict:
-            lakehouse_id = var_dict["lakehouseId"]
-            placeholder = f"#{{{dataflow_name}_{query_name}_lakehouseId}}#"
+        if 'lakehouseId' in var_dict:
+            lakehouse_id = var_dict['lakehouseId']
+            placeholder = f'#{{{dataflow_name}_{query_name}_lakehouseId}}#'
             content = content.replace(
                 f'lakehouseId = "{lakehouse_id}"',
                 f'lakehouseId = "{placeholder}"',
             )
 
         # Replace warehouseId
-        if "warehouseId" in var_dict:
-            warehouse_id = var_dict["warehouseId"]
-            placeholder = f"#{{{dataflow_name}_{query_name}_warehouseId}}#"
+        if 'warehouseId' in var_dict:
+            warehouse_id = var_dict['warehouseId']
+            placeholder = f'#{{{dataflow_name}_{query_name}_warehouseId}}#'
             content = content.replace(
                 f'warehouseId = "{warehouse_id}"',
                 f'warehouseId = "{placeholder}"',
             )
 
         # Replace semanticModelId
-        if "semanticModelId" in var_dict:
-            semantic_id = var_dict["semanticModelId"]
-            placeholder = f"#{{{dataflow_name}_{query_name}_semanticModelId}}#"
+        if 'semanticModelId' in var_dict:
+            semantic_id = var_dict['semanticModelId']
+            placeholder = f'#{{{dataflow_name}_{query_name}_semanticModelId}}#'
             content = content.replace(
                 f'semanticModelId = "{semantic_id}"',
                 f'semanticModelId = "{placeholder}"',
             )
 
     # Save the modified content back to the file
-    with open(path, "w", encoding="utf-8") as file:
+    with open(path, 'w', encoding='utf-8') as file:
         file.write(content)
 
 
@@ -447,52 +449,52 @@ def replace_dataflow_gen2_placeholders_with_parameters(
     Returns:
         str: Modified content with actual parameter values
     """
-    dataflow_name = path.split("/")[-1].split(".Dataflow")[0]
+    dataflow_name = path.split('/')[-1].split('.Dataflow')[0]
 
-    path = Path(path) / "mashup.pq"
+    path = Path(path) / 'mashup.pq'
 
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, 'r', encoding='utf-8') as f:
         content = f.read()
 
     # Replace placeholders with actual values for each destination
     for var_dict in variables:
-        query_name = var_dict["query_name"]
+        query_name = var_dict['query_name']
 
         # Replace workspaceId placeholder
-        if "workspaceId" in var_dict:
-            workspace_id = var_dict["workspaceId"]
-            placeholder = f"#{{{dataflow_name}_{query_name}_workspaceId}}#"
+        if 'workspaceId' in var_dict:
+            workspace_id = var_dict['workspaceId']
+            placeholder = f'#{{{dataflow_name}_{query_name}_workspaceId}}#'
             content = content.replace(
                 f'workspaceId = "{placeholder}"',
                 f'workspaceId = "{workspace_id}"',
             )
 
         # Replace lakehouseId placeholder
-        if "lakehouseId" in var_dict:
-            lakehouse_id = var_dict["lakehouseId"]
-            placeholder = f"#{{{dataflow_name}_{query_name}_lakehouseId}}#"
+        if 'lakehouseId' in var_dict:
+            lakehouse_id = var_dict['lakehouseId']
+            placeholder = f'#{{{dataflow_name}_{query_name}_lakehouseId}}#'
             content = content.replace(
                 f'lakehouseId = "{placeholder}"',
                 f'lakehouseId = "{lakehouse_id}"',
             )
 
         # Replace warehouseId placeholder
-        if "warehouseId" in var_dict:
-            warehouse_id = var_dict["warehouseId"]
-            placeholder = f"#{{{dataflow_name}_{query_name}_warehouseId}}#"
+        if 'warehouseId' in var_dict:
+            warehouse_id = var_dict['warehouseId']
+            placeholder = f'#{{{dataflow_name}_{query_name}_warehouseId}}#'
             content = content.replace(
                 f'warehouseId = "{placeholder}"',
                 f'warehouseId = "{warehouse_id}"',
             )
 
         # Replace semanticModelId placeholder
-        if "semanticModelId" in var_dict:
-            semantic_id = var_dict["semanticModelId"]
-            placeholder = f"#{{{dataflow_name}_{query_name}_semanticModelId}}#"
+        if 'semanticModelId' in var_dict:
+            semantic_id = var_dict['semanticModelId']
+            placeholder = f'#{{{dataflow_name}_{query_name}_semanticModelId}}#'
             content = content.replace(
                 f'semanticModelId = "{placeholder}"',
                 f'semanticModelId = "{semantic_id}"',
             )
 
-    with open(path, "w", encoding="utf-8") as f:
+    with open(path, 'w', encoding='utf-8') as f:
         f.write(content)

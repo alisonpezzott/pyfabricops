@@ -12,43 +12,43 @@ logger = get_logger(__name__)
 
 
 shortcuts_payloads_targets = {
-    "adlsGen2": {
-        "connectionId": "{{target_connection_id}}",
-        "location": "{{target_location}}",
-        "subpath": "{{target_subpath}}",
+    'adlsGen2': {
+        'connectionId': '{{target_connection_id}}',
+        'location': '{{target_location}}',
+        'subpath': '{{target_subpath}}',
     },
-    "amazonS3": {
-        "connectionId": "{{target_connection_id}}",
-        "location": "{{target_location}}",
-        "subpath": "{{target_subpath}}",
+    'amazonS3': {
+        'connectionId': '{{target_connection_id}}',
+        'location': '{{target_location}}',
+        'subpath': '{{target_subpath}}',
     },
-    "azureBlobStorage": {
-        "connectionId": "{{target_connection_id}}",
-        "location": "{{target_location}}",
-        "subpath": "{{target_subpath}}",
+    'azureBlobStorage': {
+        'connectionId': '{{target_connection_id}}',
+        'location': '{{target_location}}',
+        'subpath': '{{target_subpath}}',
     },
-    "dataverse": {
-        "connectionId": "{{target_connection_id}}",
-        "deltaLakeFolder": "{{target_delta_lake_folder}}",
-        "environmentDomain": "{{target_environment_domain}}",
-        "tableName": "{{target_table_name}}",
+    'dataverse': {
+        'connectionId': '{{target_connection_id}}',
+        'deltaLakeFolder': '{{target_delta_lake_folder}}',
+        'environmentDomain': '{{target_environment_domain}}',
+        'tableName': '{{target_table_name}}',
     },
-    "googleCloudStorage": {
-        "connectionId": "{{target_connection_id}}",
-        "location": "{{target_location}}",
-        "subpath": "{{target_subpath}}",
+    'googleCloudStorage': {
+        'connectionId': '{{target_connection_id}}',
+        'location': '{{target_location}}',
+        'subpath': '{{target_subpath}}',
     },
-    "oneLake": {
-        "itemId": "{{target_item_id}}",
-        "path": "{{target_path}}",
-        "workspace_id": "{{target_workspace_id}}",
-        "connectionId": "{{target_connection_id}}",
+    'oneLake': {
+        'itemId': '{{target_item_id}}',
+        'path': '{{target_path}}',
+        'workspace_id': '{{target_workspace_id}}',
+        'connectionId': '{{target_connection_id}}',
     },
-    "s3Compatible": {
-        "bucket": "{{target_bucket}}",
-        "connectionId": "{{target_connection_id}}",
-        "location": "{{target_location}}",
-        "subpath": "{{target_subpath}}",
+    's3Compatible': {
+        'bucket': '{{target_bucket}}',
+        'connectionId': '{{target_connection_id}}',
+        'location': '{{target_location}}',
+        'subpath': '{{target_subpath}}',
     },
 }
 
@@ -83,11 +83,11 @@ def list_shortcuts(
     lakehouse_id = resolve_lakehouse(workspace_id, lakehouse)
 
     return api_request(
-        endpoint="/workspaces/"
+        endpoint='/workspaces/'
         + workspace_id
-        + "/items/"
+        + '/items/'
         + lakehouse_id
-        + "/shortcuts",
+        + '/shortcuts',
         support_pagination=True,
     )
 
@@ -124,13 +124,13 @@ def get_shortcut(
     workspace_id = resolve_workspace(workspace)
     lakehouse_id = resolve_lakehouse(workspace_id, lakehouse)
     return api_request(
-        endpoint="/workspaces/"
+        endpoint='/workspaces/'
         + workspace_id
-        + "/items/"
+        + '/items/'
         + lakehouse_id
-        + "/shortcuts/"
+        + '/shortcuts/'
         + shortcut_path
-        + "/"
+        + '/'
         + shortcut_name,
     )
 
@@ -159,15 +159,15 @@ def delete_shortcut(
     workspace_id = resolve_workspace(workspace)
     lakehouse_id = resolve_lakehouse(workspace_id, lakehouse)
     return api_request(
-        endpoint="/workspaces/"
+        endpoint='/workspaces/'
         + workspace_id
-        + "/items/"
+        + '/items/'
         + lakehouse_id
-        + "/shortcuts/"
+        + '/shortcuts/'
         + shortcut_path
-        + "/"
+        + '/'
         + shortcut_name,
-        method="delete",
+        method='delete',
     )
 
 
@@ -178,17 +178,17 @@ def create_shortcut(
     shortcut_path: str,
     shortcut_name: str,
     conflict_policy: Literal[
-        "Abort", "GenerateUniqueName", "CreateOrOverwrite", "OverwriteOnly"
-    ] = "Abort",
+        'Abort', 'GenerateUniqueName', 'CreateOrOverwrite', 'OverwriteOnly'
+    ] = 'Abort',
     target_type: Literal[
-        "adlsGen2",
-        "amazonS3",
-        "azureBlobStorage",
-        "dataverse",
-        "googleCloudStorage",
-        "oneLake",
-        "s3Compatible",
-    ] = "oneLake",
+        'adlsGen2',
+        'amazonS3',
+        'azureBlobStorage',
+        'dataverse',
+        'googleCloudStorage',
+        'oneLake',
+        's3Compatible',
+    ] = 'oneLake',
     *,
     target_connection_id: Optional[str] = None,
     target_location: Optional[str] = None,
@@ -262,38 +262,38 @@ def create_shortcut(
     lakehouse_id = resolve_lakehouse(workspace_id, lakehouse)
 
     available_conflict_policies = [
-        "Abort",
-        "GenerateUniqueName",
-        "CreateOrOverwrite",
-        "OverwriteOnly",
+        'Abort',
+        'GenerateUniqueName',
+        'CreateOrOverwrite',
+        'OverwriteOnly',
     ]
     if conflict_policy not in available_conflict_policies:
-        logger.warning(f"Invalid conflict policy: {conflict_policy}.")
+        logger.warning(f'Invalid conflict policy: {conflict_policy}.')
         return None
 
     payload = {
-        "path": shortcut_path,
-        "name": shortcut_name,
+        'path': shortcut_path,
+        'name': shortcut_name,
     }
 
     if custom_target_payload:
-        payload["target"] = custom_target_payload
+        payload['target'] = custom_target_payload
     else:
         # Get the base template for the target type
         target_template = shortcuts_payloads_targets[target_type].copy()
 
         # Create mapping of placeholders to actual values
         placeholder_mapping = {
-            "{{target_connection_id}}": target_connection_id,
-            "{{target_location}}": target_location,
-            "{{target_subpath}}": target_subpath,
-            "{{target_delta_lake_folder}}": target_delta_lake_folder,
-            "{{target_environment_domain}}": target_environment_domain,
-            "{{target_table_name}}": target_table_name,
-            "{{target_item_id}}": target_item_id,
-            "{{target_path}}": target_path,
-            "{{target_workspace_id}}": target_workspace_id,
-            "{{target_bucket}}": target_bucket,
+            '{{target_connection_id}}': target_connection_id,
+            '{{target_location}}': target_location,
+            '{{target_subpath}}': target_subpath,
+            '{{target_delta_lake_folder}}': target_delta_lake_folder,
+            '{{target_environment_domain}}': target_environment_domain,
+            '{{target_table_name}}': target_table_name,
+            '{{target_item_id}}': target_item_id,
+            '{{target_path}}': target_path,
+            '{{target_workspace_id}}': target_workspace_id,
+            '{{target_bucket}}': target_bucket,
         }
 
         # Replace placeholders with actual values and remove None values
@@ -307,17 +307,17 @@ def create_shortcut(
                 # If it's not a placeholder, use the value as-is
                 target_payload[key] = template_value
 
-        payload["target"] = target_payload
+        payload['target'] = target_payload
 
-    params = {"shortcutConflictPolicy": conflict_policy}
+    params = {'shortcutConflictPolicy': conflict_policy}
 
     return api_request(
-        endpoint="/workspaces/"
+        endpoint='/workspaces/'
         + workspace_id
-        + "/items/"
+        + '/items/'
         + lakehouse_id
-        + "/shortcuts",
-        method="post",
+        + '/shortcuts',
+        method='post',
         payload=payload,
         params=params,
     )

@@ -45,7 +45,7 @@ def copy_to_staging(path: str) -> str:
     current_folder = os.path.dirname(__file__)
 
     # ensure staging folder exists
-    path_staging = os.path.join(current_folder, "_stg", os.path.basename(path))
+    path_staging = os.path.join(current_folder, '_stg', os.path.basename(path))
 
     if os.path.exists(path_staging):
         shutil.rmtree(path_staging)
@@ -80,10 +80,10 @@ def read_json(path: str) -> dict:
         ```
     """
     try:
-        with open(path, "r", encoding="utf-8") as file:
+        with open(path, 'r', encoding='utf-8') as file:
             data = json.load(file)
     except FileNotFoundError as e:
-        logger.error(f"Error reading JSON file: {e}")
+        logger.error(f'Error reading JSON file: {e}')
         return {}
     return data
 
@@ -106,7 +106,7 @@ def write_json(data: dict, path: str) -> None:
     """
     if not os.path.exists(os.path.dirname(path)):
         os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as file:
+    with open(path, 'w', encoding='utf-8') as file:
         json.dump(data, file, ensure_ascii=False, indent=4)
 
 
@@ -139,7 +139,7 @@ def get_current_branch(branch: str = None) -> str:
         return branch
     try:
         result = subprocess.run(
-            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            ['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
             capture_output=True,
             text=True,
             check=True,
@@ -148,9 +148,9 @@ def get_current_branch(branch: str = None) -> str:
         return branch
     except ConfigurationError:
         logger.error(
-            "Error getting the branch name. Are you in a git repository?"
+            'Error getting the branch name. Are you in a git repository?'
         )
-        return "main"  # default fallback
+        return 'main'  # default fallback
 
 
 def get_workspace_suffix(branch: str, branches_path: str) -> str:
@@ -172,13 +172,13 @@ def get_workspace_suffix(branch: str, branches_path: str) -> str:
     try:
         branches_dict = read_json(branches_path)
     except:
-        raise ResourceNotFoundError(f"Dict not found at {branches_path}")
+        raise ResourceNotFoundError(f'Dict not found at {branches_path}')
 
     try:
         suffix = branches_dict[branch]
     except KeyError:
         raise ResourceNotFoundError(
-            "The branch is not configured in branches dictionary."
+            'The branch is not configured in branches dictionary.'
         )
 
     return suffix
@@ -209,7 +209,7 @@ def is_valid_uuid(input: str) -> bool:
 def pack_item_definition(
     path: str,
     exclude_paths: list = None,
-    exclude_patterns: list = ["*/.pbi/localSettings.json", "*/.pbi/cache.abf"],
+    exclude_patterns: list = ['*/.pbi/localSettings.json', '*/.pbi/cache.abf'],
 ) -> dict[dict, str]:
     """
     Pack the definition files into a JSON structure.
@@ -239,31 +239,31 @@ def pack_item_definition(
         for filename in filenames:
             full_path = os.path.join(dirpath, filename)
             # Compute path relative to input_path
-            rel_path = os.path.relpath(full_path, path).replace(os.sep, "/")
+            rel_path = os.path.relpath(full_path, path).replace(os.sep, '/')
 
             # Skip exact matches
             if rel_path in exclude_paths:
-                logger.info(f"Skipping (exact): {rel_path}")
+                logger.info(f'Skipping (exact): {rel_path}')
                 continue
             # Skip patterns
             if any(fnmatch.fnmatch(rel_path, pat) for pat in exclude_patterns):
-                logger.info(f"Skipping (pattern): {rel_path}")
+                logger.info(f'Skipping (pattern): {rel_path}')
                 continue
 
             # Read and encode file
-            with open(full_path, "rb") as f:
-                payload_b64 = base64.b64encode(f.read()).decode("utf-8")
+            with open(full_path, 'rb') as f:
+                payload_b64 = base64.b64encode(f.read()).decode('utf-8')
 
             parts.append(
                 {
-                    "path": rel_path,
-                    "payload": payload_b64,
-                    "payloadType": "InlineBase64",
+                    'path': rel_path,
+                    'payload': payload_b64,
+                    'payloadType': 'InlineBase64',
                 }
             )
 
     # Build model object
-    model = {"parts": parts}
+    model = {'parts': parts}
 
     return model
 
@@ -285,11 +285,11 @@ def unpack_item_definition(item_definition: dict, path: str) -> None:
         ```
     """
     # Iterate over each part of the model
-    for part in item_definition.get("definition", {}).get("parts", []):
+    for part in item_definition.get('definition', {}).get('parts', []):
         relative_path = part[
-            "path"
-        ]  # Relative file path (e.g., "definition/tables/..." or ".platform")
-        payload_b64 = part["payload"]  # Base64 content
+            'path'
+        ]   # Relative file path (e.g., "definition/tables/..." or ".platform")
+        payload_b64 = part['payload']  # Base64 content
 
         # Decode the payload
         content_bytes = base64.b64decode(payload_b64)
@@ -303,10 +303,10 @@ def unpack_item_definition(item_definition: dict, path: str) -> None:
             os.makedirs(parent_dir, exist_ok=True)
 
         # Write the decoded file
-        with open(out_path, "wb") as out_file:
+        with open(out_path, 'wb') as out_file:
             out_file.write(content_bytes)
 
-    logger.debug(f"Item definition unpacked to {path}")
+    logger.debug(f'Item definition unpacked to {path}')
 
 
 def parse_tmdl_parameters(path: str) -> dict:
@@ -330,13 +330,13 @@ def parse_tmdl_parameters(path: str) -> dict:
     """
     # Check if the file exists
     if not os.path.exists(path):
-        raise FileNotFoundError(f"File not found: {path}")
+        raise FileNotFoundError(f'File not found: {path}')
 
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, 'r', encoding='utf-8') as f:
             expressions = f.read()
     except Exception as e:
-        raise ValueError(f"Error reading file {path}: {str(e)}")
+        raise ValueError(f'Error reading file {path}: {str(e)}')
 
     params = {}
 
@@ -349,12 +349,12 @@ def parse_tmdl_parameters(path: str) -> dict:
         variable_value = match[1]
         # Skip if it's already a placeholder
         if not (
-            variable_value.startswith("#{") and variable_value.endswith("}#")
+            variable_value.startswith('#{') and variable_value.endswith('}#')
         ):
             params[variable_name] = variable_value
 
     # Pattern 2: Parameters starting with # (like #date, #datetime, #time, etc.)
-    pattern2 = r"expression\s+(\w+)\s*=\s*(#\w+\([^)]*\))"
+    pattern2 = r'expression\s+(\w+)\s*=\s*(#\w+\([^)]*\))'
     matches2 = re.findall(pattern2, expressions)
 
     for match in matches2:
@@ -362,7 +362,7 @@ def parse_tmdl_parameters(path: str) -> dict:
         variable_value = match[1]
         # Skip if it's already a placeholder
         if not (
-            variable_value.startswith("#{") and variable_value.endswith("}#")
+            variable_value.startswith('#{') and variable_value.endswith('}#')
         ):
             params[variable_name] = variable_value
 
@@ -375,15 +375,15 @@ def parse_tmdl_parameters(path: str) -> dict:
         database_value = match[1]
 
         # Skip if they're already placeholders
-        if not (server_value.startswith("#{") and server_value.endswith("}#")):
-            params["ServerEndpoint"] = server_value
+        if not (server_value.startswith('#{') and server_value.endswith('}#')):
+            params['ServerEndpoint'] = server_value
         if not (
-            database_value.startswith("#{") and database_value.endswith("}#")
+            database_value.startswith('#{') and database_value.endswith('}#')
         ):
-            params["DatabaseId"] = database_value
+            params['DatabaseId'] = database_value
 
     if not params:
-        logger.warning(f"No parameters found in file: {path}")
+        logger.warning(f'No parameters found in file: {path}')
 
     return params
 
@@ -408,35 +408,35 @@ def parse_definition_report(path: str) -> dict:
         parse_definition_report('MyProject/workspace/path/to/Financials.Report/definition.pbir')
         ```
     """
-    with open(path, encoding="utf-8") as f:
+    with open(path, encoding='utf-8') as f:
         data = json.load(f)
 
     # Check if the file contains the expected structure
     if (
-        "datasetReference" not in data
-        or "byConnection" not in data["datasetReference"]
+        'datasetReference' not in data
+        or 'byConnection' not in data['datasetReference']
     ):
         raise ResourceNotFoundError(
-            f"Invalid report definition file: {path}. Expected structure not found."
+            f'Invalid report definition file: {path}. Expected structure not found.'
         )
-    by_conn = data["datasetReference"]["byConnection"]
-    conn_str = by_conn["connectionString"]
-    model_id = by_conn["pbiModelDatabaseName"]
+    by_conn = data['datasetReference']['byConnection']
+    conn_str = by_conn['connectionString']
+    model_id = by_conn['pbiModelDatabaseName']
 
     # 1) workspace_name: part after the last slash and before the semicolon
-    workspace_name = conn_str.split("/")[-1].split(";")[0]
+    workspace_name = conn_str.split('/')[-1].split(';')[0]
 
     # 2) semantic_model_name: "initial catalog" value from the connection string
-    m = re.search(r"initial catalog=([^;]+)", conn_str, re.IGNORECASE)
+    m = re.search(r'initial catalog=([^;]+)', conn_str, re.IGNORECASE)
     semantic_model_name = m.group(1) if m else None
 
     # 3) semantic_model_id: takes directly from the pbiModelDatabaseName field
     semantic_model_id = model_id
 
     return {
-        "workspace_name": workspace_name,
-        "semantic_model_name": semantic_model_name,
-        "semantic_model_id": semantic_model_id,
+        'workspace_name': workspace_name,
+        'semantic_model_name': semantic_model_name,
+        'semantic_model_id': semantic_model_id,
     }
 
 
@@ -471,7 +471,7 @@ def find_and_replace(path: str, find_and_replace: dict) -> None:
             for file in files:
                 file_path = os.path.join(root, file)
                 with open(
-                    file_path, "r", encoding="utf-8", errors="replace"
+                    file_path, 'r', encoding='utf-8', errors='replace'
                 ) as file:
                     text = file.read()
 
@@ -490,7 +490,7 @@ def find_and_replace(path: str, find_and_replace: dict) -> None:
                                 f"Find & replace in file '{file_path}' with regex '{find_and_replace_file_find}'"
                             )
                             with open(
-                                file_path, "w", encoding="utf-8"
+                                file_path, 'w', encoding='utf-8'
                             ) as file:
                                 file.write(text)
 
@@ -512,17 +512,17 @@ def load_and_sanitize(path: str) -> dict:
         ```
     """
     try:
-        with open(path, "r", encoding="utf-8-sig") as f:
+        with open(path, 'r', encoding='utf-8-sig') as f:
             data = json5.load(f)
-        logger.info(f"Loaded JSON file with json5: {path}")
+        logger.info(f'Loaded JSON file with json5: {path}')
     except (ImportError, json5.JSONError, FileNotFoundError) as e:
         try:
             # Fallback to standard json
-            with open(path, "r", encoding="utf-8-sig") as f:
+            with open(path, 'r', encoding='utf-8-sig') as f:
                 data = json.load(f)
-            logger.info(f"Loaded JSON file with standard json: {path}")
+            logger.info(f'Loaded JSON file with standard json: {path}')
         except (json.JSONDecodeError, FileNotFoundError) as e:
-            logger.error(f"Error reading JSON file: {e}")
+            logger.error(f'Error reading JSON file: {e}')
             return {}
     return data
 
@@ -546,11 +546,11 @@ def write_single_line_json(data: dict, path: str) -> None:
     """
     if not os.path.exists(os.path.dirname(path)):
         os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as file:
-        json.dump(data, file, ensure_ascii=False, separators=(",", ":"))
+    with open(path, 'w', encoding='utf-8') as file:
+        json.dump(data, file, ensure_ascii=False, separators=(',', ':'))
 
 
-def _flatten_json(data, parent_key="", sep="_"):
+def _flatten_json(data, parent_key='', sep='_'):
     """
     Helper function to flatten nested JSON.
 
@@ -564,7 +564,7 @@ def _flatten_json(data, parent_key="", sep="_"):
     """
     items = []
     for k, v in data.items():
-        new_key = f"{parent_key}{sep}{k}" if parent_key else k
+        new_key = f'{parent_key}{sep}{k}' if parent_key else k
         if isinstance(v, dict):
             items.extend(_flatten_json(v, new_key, sep=sep).items())
         else:
@@ -593,6 +593,7 @@ def json_to_df(data: dict | list) -> DataFrame:
         return None
 
     if isinstance(data, dict):
+
         # If it"s a simple dictionary
         if all(not isinstance(v, (dict, list)) for v in data.values()):
             return pandas.DataFrame([data])
@@ -603,18 +604,19 @@ def json_to_df(data: dict | list) -> DataFrame:
             return pandas.DataFrame([flattened_data])
 
     elif isinstance(data, list):
+
         # If it"s a list of dictionaries
         if all(isinstance(item, dict) for item in data):
             flattened_list = [_flatten_json(item) for item in data]
             return pandas.DataFrame(flattened_list)
         else:
             raise ValueError(
-                "The list contains items that are not dictionaries."
+                'The list contains items that are not dictionaries.'
             )
 
     else:
         raise TypeError(
-            "Input type must be a dictionary or a list of dictionaries."
+            'Input type must be a dictionary or a list of dictionaries.'
         )
 
 
@@ -631,7 +633,7 @@ def dataframe_to_list(df: DataFrame) -> list[dict]:
     if df is None or df.empty:
         return []
 
-    return df.to_dict(orient="records")
+    return df.to_dict(orient='records')
 
 
 def list_paths_of_type(
@@ -640,7 +642,7 @@ def list_paths_of_type(
     """
     Returns a list of paths given a type of the items
     """
-    paths = glob.glob(f"{path}/**/*.{type}", recursive=True)
+    paths = glob.glob(f'{path}/**/*.{type}', recursive=True)
     return [str(Path(p).as_posix()) for p in paths]
 
 
@@ -650,27 +652,27 @@ def extract_middle_path(
     """
     Extract the middle of a full path given a start.
     """
-    path_list = path.split("/")[:-1]
+    path_list = path.split('/')[:-1]
     if len(path_list) == 0:
         return None
 
-    middle_path = "/".join(path_list)
+    middle_path = '/'.join(path_list)
 
     if start_path is None:
         return middle_path
     else:
         try:
-            middle_path = middle_path.split(start_path + "/")[1]
+            middle_path = middle_path.split(start_path + '/')[1]
             return middle_path
         except:
             return None
 
 
 def extract_display_name_from_platform(path: str) -> str:
-    with open(Path(path) / ".platform", "r", encoding="utf-8") as f:
+    with open(Path(path) / '.platform', 'r', encoding='utf-8') as f:
         platform_dict = json.load(f)
 
-    return platform_dict.get("metadata").get("displayName")
+    return platform_dict.get('metadata').get('displayName')
 
 
 def delete_path(path: str) -> None:

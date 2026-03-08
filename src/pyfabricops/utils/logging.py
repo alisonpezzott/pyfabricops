@@ -12,7 +12,6 @@ T    # Colored symbols for each log level
     }e provides a centralized logging system with customizable formatters,
 handlers, and configuration options for better debugging and monitoring.
 """
-
 import logging
 import logging.handlers
 import os
@@ -22,19 +21,19 @@ from pathlib import Path
 from typing import Literal, Optional, Union
 
 __all__ = [
-    "PyFabricOpsFormatter",
-    "PyFabricOpsFilter",
-    "setup_logging",
-    "get_logger",
-    "enable_debug_mode",
-    "disable_logging",
-    "reset_logging",
-    "SUCCESS_LEVEL",
+    'PyFabricOpsFormatter',
+    'PyFabricOpsFilter',
+    'setup_logging',
+    'get_logger',
+    'enable_debug_mode',
+    'disable_logging',
+    'reset_logging',
+    'SUCCESS_LEVEL',
 ]
 
 # Define custom SUCCESS level (between INFO and WARNING)
 SUCCESS_LEVEL = 25
-logging.addLevelName(SUCCESS_LEVEL, "SUCCESS")
+logging.addLevelName(SUCCESS_LEVEL, 'SUCCESS')
 
 
 def success(self, message, *args, **kwargs):
@@ -50,36 +49,36 @@ logging.Logger.success = success
 class PyFabricOpsFormatter(logging.Formatter):
     """Custom formatter for pyfabricops with colored output and structured format."""
 
-    ESC = "\x1b["
+    ESC = '\x1b['
 
     COLORS = {
-        "DEBUG": ESC + "36m",  # Cyan text
-        "INFO": ESC + "34m",  # Blue text
-        "SUCCESS": ESC + "32m",  # Green text
-        "WARNING": ESC + "33m",  # Yellow text
-        "ERROR": ESC + "31m",  # Red text
-        "CRITICAL": ESC + "31m",  # Red text
-        "RESET": ESC + "0m",  # Reset
+        'DEBUG': ESC + '36m',  # Cyan text
+        'INFO': ESC + '34m',  # Blue text
+        'SUCCESS': ESC + '32m',  # Green text
+        'WARNING': ESC + '33m',  # Yellow text
+        'ERROR': ESC + '31m',  # Red text
+        'CRITICAL': ESC + '31m',  # Red text
+        'RESET': ESC + '0m',  # Reset
     }
 
     # Colored symbols for each log level
     SYMBOLS = {
-        "DEBUG": ESC + "36m○\033[0m",  # Cyan circle
-        "INFO": ESC + "34mi\033[0m",  # Blue “i”
-        "SUCCESS": ESC + "32m✓\033[0m",  # Green check
-        "WARNING": ESC + "33m△\033[0m",  # Yellow triangle
-        "ERROR": ESC + "31m✕\033[0m",  # Red X
-        "CRITICAL": ESC + "31m⊗\033[0m",  # Red circled times
+        'DEBUG': ESC + '36m○\033[0m',  # Cyan circle
+        'INFO': ESC + '34mi\033[0m',  # Blue “i”
+        'SUCCESS': ESC + '32m✓\033[0m',  # Green check
+        'WARNING': ESC + '33m△\033[0m',  # Yellow triangle
+        'ERROR': ESC + '31m✕\033[0m',  # Red X
+        'CRITICAL': ESC + '31m⊗\033[0m',  # Red circled times
     }
 
     # Fallback symbols without colors (for terminals that don't support colors)
     SYMBOLS_NO_COLOR = {
-        "DEBUG": "○",  # Wrench
-        "INFO": "i",  # Check mark
-        "SUCCESS": "✓",  # Check mark
-        "WARNING": "△",  # Warning
-        "ERROR": "✕",  # X mark
-        "CRITICAL": "⊗",  # Siren
+        'DEBUG': '○',  # Wrench
+        'INFO': 'i',  # Check mark
+        'SUCCESS': '✓',  # Check mark
+        'WARNING': '△',  # Warning
+        'ERROR': '✕',  # X mark
+        'CRITICAL': '⊗',  # Siren
     }
 
     def __init__(
@@ -105,35 +104,35 @@ class PyFabricOpsFormatter(logging.Formatter):
 
         # Base format without colors
         if ultra_minimal:
-            base_format = "%(message)s"
+            base_format = '%(message)s'
         else:
-            base_format = "%(asctime)s"
+            base_format = '%(asctime)s'
             if include_module:
-                base_format += " | %(name)-20s"
-            base_format += " | %(levelname)-8s | %(message)s"
+                base_format += ' | %(name)-20s'
+            base_format += ' | %(levelname)-8s | %(message)s'
 
-        super().__init__(base_format, datefmt="%H:%M:%S")
+        super().__init__(base_format, datefmt='%H:%M:%S')
 
     def _supports_color(self) -> bool:
         """Check if the current terminal supports colors."""
         # Check if we're in a terminal that supports colors
-        if not hasattr(sys.stdout, "isatty") or not sys.stdout.isatty():
+        if not hasattr(sys.stdout, 'isatty') or not sys.stdout.isatty():
             return False
 
         # Check environment variables
-        if os.environ.get("NO_COLOR"):
+        if os.environ.get('NO_COLOR'):
             return False
 
-        if os.environ.get("FORCE_COLOR"):
+        if os.environ.get('FORCE_COLOR'):
             return True
 
         # Check common terminals that support colors
-        term = os.environ.get("TERM", "").lower()
-        return "color" in term or term in [
-            "xterm",
-            "xterm-256color",
-            "screen",
-            "tmux",
+        term = os.environ.get('TERM', '').lower()
+        return 'color' in term or term in [
+            'xterm',
+            'xterm-256color',
+            'screen',
+            'tmux',
         ]
 
     def format(self, record: logging.LogRecord) -> str:
@@ -143,10 +142,10 @@ class PyFabricOpsFormatter(logging.Formatter):
             message = record.getMessage()
             if self.include_symbols:
                 if self.include_colors:
-                    symbol = self.SYMBOLS.get(record.levelname, "")
+                    symbol = self.SYMBOLS.get(record.levelname, '')
                 else:
-                    symbol = self.SYMBOLS_NO_COLOR.get(record.levelname, "")
-                return f"{symbol} {message}"
+                    symbol = self.SYMBOLS_NO_COLOR.get(record.levelname, '')
+                return f'{symbol} {message}'
             return message
 
         # Create a copy of the record to avoid modifying the original
@@ -155,7 +154,7 @@ class PyFabricOpsFormatter(logging.Formatter):
         # Add colors if enabled
         if self.include_colors:
             level_color = self.COLORS.get(
-                record_copy.levelname, self.COLORS["RESET"]
+                record_copy.levelname, self.COLORS['RESET']
             )
             record_copy.levelname = (
                 f"{level_color}{record_copy.levelname}{self.COLORS['RESET']}"
@@ -163,10 +162,10 @@ class PyFabricOpsFormatter(logging.Formatter):
 
             # Add color to module name if it's a pyfabricops module
             if (
-                hasattr(record_copy, "name")
-                and "pyfabricops" in record_copy.name
+                hasattr(record_copy, 'name')
+                and 'pyfabricops' in record_copy.name
             ):
-                record_copy.name = f"\033[34m{record_copy.name}\033[0m"  # Blue
+                record_copy.name = f'\033[34m{record_copy.name}\033[0m'  # Blue
 
         # Format the message with the base formatter
         formatted_message = super().format(record_copy)
@@ -174,10 +173,10 @@ class PyFabricOpsFormatter(logging.Formatter):
         # Add colored symbol prefix if enabled
         if self.include_symbols:
             if self.include_colors:
-                symbol = self.SYMBOLS.get(record.levelname, "")
+                symbol = self.SYMBOLS.get(record.levelname, '')
             else:
-                symbol = self.SYMBOLS_NO_COLOR.get(record.levelname, "")
-            return f"{symbol} {formatted_message}"
+                symbol = self.SYMBOLS_NO_COLOR.get(record.levelname, '')
+            return f'{symbol} {formatted_message}'
 
         return formatted_message
 
@@ -198,7 +197,7 @@ class PyFabricOpsFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         """Filter log records based on configuration."""
         # Always include pyfabricops logs
-        if record.name.startswith("pyfabricops"):
+        if record.name.startswith('pyfabricops'):
             return True
 
         # Include external logs only if explicitly enabled
@@ -207,7 +206,7 @@ class PyFabricOpsFilter(logging.Filter):
 
 def setup_logging(
     level: Union[str, int] = logging.INFO,
-    format_style: Literal["standard", "minimal", "detailed"] = "standard",
+    format_style: Literal['standard', 'minimal', 'detailed'] = 'standard',
     include_colors: bool = True,
     include_module: bool = True,
     include_symbols: bool = True,
@@ -238,7 +237,7 @@ def setup_logging(
         level = getattr(logging, level.upper(), logging.INFO)
 
     # Get the root logger for pyfabricops
-    root_logger = logging.getLogger("pyfabricops")
+    root_logger = logging.getLogger('pyfabricops')
 
     # Clear existing handlers to avoid duplicates
     for handler in root_logger.handlers[:]:
@@ -252,14 +251,14 @@ def setup_logging(
     console_handler.setLevel(level)
 
     # Create formatter based on style
-    if format_style == "minimal":
+    if format_style == 'minimal':
         formatter = PyFabricOpsFormatter(
             include_colors=include_colors,
             include_module=False,
             ultra_minimal=True,
             include_symbols=include_symbols,
         )
-    elif format_style == "detailed":
+    elif format_style == 'detailed':
         formatter = PyFabricOpsFormatter(
             include_colors=include_colors,
             include_module=True,
@@ -293,7 +292,7 @@ def setup_logging(
             log_path,
             maxBytes=max_file_size,
             backupCount=backup_count,
-            encoding="utf-8",
+            encoding='utf-8',
         )
         file_handler.setLevel(level)
 
@@ -321,11 +320,11 @@ def get_logger(name: str) -> logging.Logger:
         logging.Logger: Configured logger instance
     """
     # Ensure the name starts with pyfabricops
-    if not name.startswith("pyfabricops"):
-        if name == "__main__":
-            name = "pyfabricops.main"
+    if not name.startswith('pyfabricops'):
+        if name == '__main__':
+            name = 'pyfabricops.main'
         else:
-            name = f"pyfabricops.{name}"
+            name = f'pyfabricops.{name}'
 
     logger = logging.getLogger(name)
 
@@ -345,7 +344,7 @@ def enable_debug_mode(include_external: bool = True) -> None:
     """
     setup_logging(
         level=logging.DEBUG,
-        format_style="detailed",
+        format_style='detailed',
         include_colors=True,
         include_module=True,
         include_external=include_external,
@@ -354,12 +353,12 @@ def enable_debug_mode(include_external: bool = True) -> None:
 
 def disable_logging() -> None:
     """Disable all logging output."""
-    logging.getLogger("pyfabricops").setLevel(logging.CRITICAL + 1)
+    logging.getLogger('pyfabricops').setLevel(logging.CRITICAL + 1)
 
 
 def reset_logging() -> None:
     """Reset logging to default configuration."""
-    root_logger = logging.getLogger("pyfabricops")
+    root_logger = logging.getLogger('pyfabricops')
 
     # Clear all handlers
     for handler in root_logger.handlers[:]:
@@ -379,7 +378,7 @@ def _ensure_default_config():
     global _default_configured
     if not _default_configured:
         # Set up minimal logging by default
-        root_logger = logging.getLogger("pyfabricops")
+        root_logger = logging.getLogger('pyfabricops')
         if not root_logger.handlers:
             root_logger.addHandler(logging.NullHandler())
             root_logger.setLevel(logging.WARNING)

@@ -57,38 +57,38 @@ def export_item(
     if not item_:
         return None
 
-    item_id = item_["id"]
+    item_id = item_['id']
     definition = get_item_definition(workspace_id, item_id)
     if not definition:
         return None
 
-    item_type = item_["type"]
-    item_name = item_["displayName"]
+    item_type = item_['type']
+    item_name = item_['displayName']
 
     folder_id = None
     folder_path = None
 
-    if "folderId" in item_:
-        folder_id = item_["folderId"]
+    if 'folderId' in item_:
+        folder_id = item_['folderId']
         try:
             folder_path = resolve_folder_from_id_to_path(
                 workspace_id, folder_id
             )
         except:
-            logger.info(f"{item_name}.{item_type} is not inside a folder.")
+            logger.info(f'{item_name}.{item_type} is not inside a folder.')
             folder_path = None
 
     if folder_path is None:
-        item_path = Path(path) / f"{item_name}.{item_type}"
+        item_path = Path(path) / f'{item_name}.{item_type}'
     else:
-        item_path = Path(path) / folder_path / f"{item_name}.{item_type}"
+        item_path = Path(path) / folder_path / f'{item_name}.{item_type}'
 
     os.makedirs(item_path, exist_ok=True)
 
     unpack_item_definition(definition, item_path)
 
     logger.success(
-        f"{item_name}.{item_type} was exported to {item_path} successfully."
+        f'{item_name}.{item_type} was exported to {item_path} successfully.'
     )
     return None
 
@@ -113,17 +113,17 @@ def export_all_items(
     if items is None:
         return None
 
-    items = [item for item in items if item["type"] != "SQLEndpoint"]
+    items = [item for item in items if item['type'] != 'SQLEndpoint']
 
     for item in items:
-        item_id = item["id"]
+        item_id = item['id']
         item_ = get_item(workspace_id, item_id, df=False)
         if not item_:
             return None
 
-        item_id = item_["id"]
-        item_name = item_["displayName"]
-        item_type = item_["type"]
+        item_id = item_['id']
+        item_name = item_['displayName']
+        item_type = item_['type']
 
         definition = get_item_definition(workspace_id, item_id)
         if not definition:
@@ -132,8 +132,8 @@ def export_all_items(
         folder_id = None
         folder_path = None
 
-        if "folderId" in item_:
-            folder_id = item_["folderId"]
+        if 'folderId' in item_:
+            folder_id = item_['folderId']
 
             try:
                 folder_path = resolve_folder_from_id_to_path(
@@ -141,20 +141,20 @@ def export_all_items(
                 )
             except:
                 logger.info(
-                    f"{item['displayName']}.{item_type} is not inside a folder."
+                    f'{item["displayName"]}.{item_type} is not inside a folder.'
                 )
                 folder_path = None
 
         if folder_path is None:
-            item_path = Path(path) / f"{item_name}.{item_type}"
+            item_path = Path(path) / f'{item_name}.{item_type}'
         else:
-            item_path = Path(path) / folder_path / f"{item_name}.{item_type}"
+            item_path = Path(path) / folder_path / f'{item_name}.{item_type}'
         os.makedirs(item_path, exist_ok=True)
 
         unpack_item_definition(definition, item_path)
 
         logger.success(
-            f"{item_name}.{item_type} was exported to {item_path} successfully."
+            f'{item_name}.{item_type} was exported to {item_path} successfully.'
         )
     return None
 
@@ -185,8 +185,8 @@ def deploy_item(
     display_name = extract_display_name_from_platform(path)
     if display_name is None:
         return None
-    item_type = path.split(".")[-1]
-    item_with_type = f"{display_name}.{item_type}"
+    item_type = path.split('.')[-1]
+    item_with_type = f'{display_name}.{item_type}'
     item_id = resolve_item(workspace_id, item_with_type)
 
     item_definition = pack_item_definition(path)
@@ -232,26 +232,27 @@ def deploy_all_items(
         return None
 
     types = [
-        "Notebook",
-        "DataPipeline",
-        "Dataflow",
-        "SemanticModel",
-        "Report",
-        "VariableLibrary",
-        "Lakehouse",
-        "Warehouse",
-        "Environment",
-        "CopyJob",
+        'Notebook',
+        'DataPipeline',
+        'Dataflow',
+        'SemanticModel',
+        'Report',
+        'VariableLibrary',
+        'Lakehouse',
+        'Warehouse',
+        'Environment',
+        'CopyJob',
     ]
     for type in types:
         item_paths = list_paths_of_type(path, type)
 
         for path_ in item_paths:
+
             display_name = extract_display_name_from_platform(path_)
             if display_name is None:
                 return None
-            item_type = path_.split(".")[-1]
-            item_with_type = f"{display_name}.{item_type}"
+            item_type = path_.split('.')[-1]
+            item_with_type = f'{display_name}.{item_type}'
             item_id = resolve_item(workspace_id, item_with_type)
 
             item_definition = pack_item_definition(path_)
@@ -280,6 +281,6 @@ def deploy_all_items(
                 )
 
     logger.success(
-        f"All items were deployed to workspace {workspace} successfully."
+        f'All items were deployed to workspace {workspace} successfully.'
     )
     return None

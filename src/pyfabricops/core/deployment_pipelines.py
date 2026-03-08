@@ -34,7 +34,7 @@ def list_deployment_pipelines(
         ```
     """
     return api_request(
-        "/deploymentPipelines",
+        '/deploymentPipelines',
         support_pagination=True,
     )
 
@@ -51,8 +51,8 @@ def get_deployment_pipeline_id(pipeline_name: str) -> Union[str, None]:
     """
     pipelines = list_deployment_pipelines(df=False)
     for _pipeline in pipelines:
-        if _pipeline["displayName"] == pipeline_name:
-            return _pipeline["id"]
+        if _pipeline['displayName'] == pipeline_name:
+            return _pipeline['id']
 
     logger.warning(f"Deployment pipeline '{pipeline_name}' not found.")
     return None
@@ -97,7 +97,7 @@ def get_deployment_pipeline(
         ```
     """
     return api_request(
-        "/deploymentPipelines/" + resolve_deployment_pipeline(pipeline)
+        '/deploymentPipelines/' + resolve_deployment_pipeline(pipeline)
     )
 
 
@@ -118,9 +118,9 @@ def resolve_deployment_pipeline_stage(
     if not pipeline_id:
         return None
     pipeline_details = get_deployment_pipeline(pipeline, df=False)
-    for stage in pipeline_details.get("stages", []):
-        if stage["displayName"] == stage_name:
-            return stage["id"]
+    for stage in pipeline_details.get('stages', []):
+        if stage['displayName'] == stage_name:
+            return stage['id']
 
     logger.warning(
         f"Stage '{stage_name}' not found in deployment pipeline '{pipeline}'."
@@ -176,14 +176,14 @@ def create_deployment_pipeline(
         ```
     """
     payload = {
-        "displayName": display_name,
-        "stages": stages,
+        'displayName': display_name,
+        'stages': stages,
     }
     if description:
-        payload["description"] = description
+        payload['description'] = description
     return api_request(
-        "/deploymentPipelines",
-        method="POST",
+        '/deploymentPipelines',
+        method='POST',
         payload=payload,
     )
 
@@ -227,9 +227,9 @@ def assign_workspace_to_stage(
         return None
 
     return api_request(
-        f"/deploymentPipelines/{pipeline_id}/stages/{stage_id}/assignWorkspace",
-        method="POST",
-        payload={"workspaceId": workspace_id},
+        f'/deploymentPipelines/{pipeline_id}/stages/{stage_id}/assignWorkspace',
+        method='POST',
+        payload={'workspaceId': workspace_id},
     )
 
 
@@ -253,8 +253,8 @@ def unassign_workspace_to_stage(
         return None
 
     return api_request(
-        f"/deploymentPipelines/{pipeline_id}/stages/{stage_id}/unassignWorkspace",
-        method="POST",
+        f'/deploymentPipelines/{pipeline_id}/stages/{stage_id}/unassignWorkspace',
+        method='POST',
     )
 
 
@@ -263,9 +263,9 @@ def add_deployment_pipeline_role_assignment(
     pipeline: str,
     user_uuid: str,
     user_type: Literal[
-        "User", "Group", "ServicePrincipal", "ServicePrincipalProfile"
-    ] = "User",
-    role: Literal["Admin", "Contributor", "Member", "Viewer"] = "Admin",
+        'User', 'Group', 'ServicePrincipal', 'ServicePrincipalProfile'
+    ] = 'User',
+    role: Literal['Admin', 'Contributor', 'Member', 'Viewer'] = 'Admin',
     *,
     df: Optional[bool] = True,
 ) -> Union[DataFrame, Dict[str, Any], None]:
@@ -296,26 +296,26 @@ def add_deployment_pipeline_role_assignment(
         ```
     """
     if user_type not in [
-        "User",
-        "Group",
-        "ServicePrincipal",
-        "ServicePrincipalProfile",
+        'User',
+        'Group',
+        'ServicePrincipal',
+        'ServicePrincipalProfile',
     ]:
         raise OptionNotAvailableError(
-            f"Invalid user type: {user_type}. Must be one of: User, Group, ServicePrincipal, ServicePrincipalProfile"
+            f'Invalid user type: {user_type}. Must be one of: User, Group, ServicePrincipal, ServicePrincipalProfile'
         )
-    if role not in ["Admin", "Contributor", "Member", "Viewer"]:
+    if role not in ['Admin', 'Contributor', 'Member', 'Viewer']:
         raise OptionNotAvailableError(
-            f"Invalid role: {role}. Must be one of: Admin, Contributor, Member, Viewer"
+            f'Invalid role: {role}. Must be one of: Admin, Contributor, Member, Viewer'
         )
-    payload = {"principal": {"id": user_uuid, "type": user_type}, "role": role}
+    payload = {'principal': {'id': user_uuid, 'type': user_type}, 'role': role}
 
     return api_request(
-        "/deploymentPipelines/"
+        '/deploymentPipelines/'
         + resolve_deployment_pipeline(pipeline)
-        + "/roleAssignments",
+        + '/roleAssignments',
         payload=payload,
-        method="post",
+        method='post',
     )
 
 
@@ -342,10 +342,10 @@ def list_deployment_pipeline_role_assignments(
         ```
     """
     return api_request(
-        "/deploymentPipelines/"
+        '/deploymentPipelines/'
         + resolve_deployment_pipeline(pipeline)
-        + "/roleAssignments",
-        method="GET",
+        + '/roleAssignments',
+        method='GET',
         support_pagination=True,
     )
 
@@ -419,22 +419,22 @@ def deploy_stage_content(
         return None
 
     payload = {
-        "sourceStageId": source_stage_id,
-        "targetStageId": target_stage_id,
+        'sourceStageId': source_stage_id,
+        'targetStageId': target_stage_id,
     }
 
     if items:
-        payload["items"] = items
+        payload['items'] = items
     if note:
-        payload["note"] = note
+        payload['note'] = note
     if options:
-        payload["options"] = options
+        payload['options'] = options
 
     return api_request(
-        "/deploymentPipelines/"
+        '/deploymentPipelines/'
         + resolve_deployment_pipeline(pipeline)
-        + "/deploy",
-        method="POST",
+        + '/deploy',
+        method='POST',
         payload=payload,
         support_lro=True,
     )
@@ -462,8 +462,8 @@ def list_deployment_pipeline_operations(
         return None
 
     return api_request(
-        "/deploymentPipelines/" + pipeline_id + "/operations",
-        method="GET",
+        '/deploymentPipelines/' + pipeline_id + '/operations',
+        method='GET',
         support_pagination=True,
     )
 
@@ -492,8 +492,8 @@ def get_deployment_pipeline_operation(
         return None
 
     return api_request(
-        "/deploymentPipelines/" + pipeline_id + "/operations/" + operation_id,
-        method="GET",
+        '/deploymentPipelines/' + pipeline_id + '/operations/' + operation_id,
+        method='GET',
     )
 
 
@@ -533,13 +533,13 @@ def update_deployment_pipeline(
 
     payload = {}
     if display_name:
-        payload["displayName"] = display_name
+        payload['displayName'] = display_name
     if description:
-        payload["description"] = description
+        payload['description'] = description
 
     return api_request(
-        "/deploymentPipelines/" + pipeline_id,
-        method="PATCH",
+        '/deploymentPipelines/' + pipeline_id,
+        method='PATCH',
         payload=payload,
     )
 
@@ -573,15 +573,15 @@ def update_deployment_pipeline_stage(
 
     payload = {}
     if display_name:
-        payload["displayName"] = display_name
+        payload['displayName'] = display_name
     if description:
-        payload["description"] = description
+        payload['description'] = description
     if is_public is not None:
-        payload["isPublic"] = is_public
+        payload['isPublic'] = is_public
 
     return api_request(
-        f"/deploymentPipelines/{pipeline_id}/stages/{stage_id}",
-        method="PATCH",
+        f'/deploymentPipelines/{pipeline_id}/stages/{stage_id}',
+        method='PATCH',
         payload=payload,
     )
 
@@ -608,8 +608,8 @@ def delete_deployment_pipeline(
         return None
 
     api_request(
-        "/deploymentPipelines/" + pipeline_id,
-        method="DELETE",
+        '/deploymentPipelines/' + pipeline_id,
+        method='DELETE',
     )
 
 
@@ -640,9 +640,9 @@ def delete_deployment_pipeline_role_assignment(
         return None
 
     api_request(
-        "/deploymentPipelines/"
+        '/deploymentPipelines/'
         + pipeline_id
-        + "/roleAssignments/"
+        + '/roleAssignments/'
         + role_assignment_id,
-        method="DELETE",
+        method='DELETE',
     )

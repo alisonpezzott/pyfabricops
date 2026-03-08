@@ -21,7 +21,7 @@ logger = get_logger(__name__)
 
 def _generate_lakehouse_platform(
     display_name: str,
-    description: Optional[str] = "",
+    description: Optional[str] = '',
 ) -> Dict[str, Any]:
     """
     Generate the lakehouse .platform file
@@ -34,15 +34,15 @@ def _generate_lakehouse_platform(
         (Dict[str, Any]): The .platform dict.
     """
     return {
-        "$schema": PLATFORM_SCHEMA,
-        "metadata": {
-            "type": "Lakehouse",
-            "displayName": display_name,
-            "description": description,
+        '$schema': PLATFORM_SCHEMA,
+        'metadata': {
+            'type': 'Lakehouse',
+            'displayName': display_name,
+            'description': description,
         },
-        "config": {
-            "version": PLATFORM_VERSION,
-            "logicalId": "00000000-0000-0000-0000-000000000000",
+        'config': {
+            'version': PLATFORM_VERSION,
+            'logicalId': '00000000-0000-0000-0000-000000000000',
         },
     }
 
@@ -58,7 +58,7 @@ def _save_lakehouse_platform(
         platform (Dict[str, Any]): The .platform dict.
         path (str): The lakehouse directory path to save to.
     """
-    with open(Path(path) / ".platform", "w") as f:
+    with open(Path(path) / '.platform', 'w') as f:
         json.dump(platform, f, indent=2)
 
 
@@ -69,7 +69,7 @@ def _save_lakehouse_metadata_json(path: str) -> None:
     Args:
         path (str): The lakehouse's path
     """
-    with open(Path(path) / "metadata.json", "w") as f:
+    with open(Path(path) / 'metadata.json', 'w') as f:
         json.dump({}, f, indent=2)
 
 
@@ -94,20 +94,20 @@ def get_lakehouse_config(
 
     else:
         config = {}
-        config = config[item_data.get("displayName")] = {}
+        config = config[item_data.get('displayName')] = {}
 
         config = {
-            "id": item_data["id"],
-            "description": item_data.get("description", None),
-            "folder_id": ""
-            if item_data.get("folderId") is None
-            or pd.isna(item_data.get("folderId"))
-            else item_data["folderId"],
-            "sql_endpoint_connection_string": item_data.get(
-                "properties_sqlEndpointProperties_connectionString"
+            'id': item_data['id'],
+            'description': item_data.get('description', None),
+            'folder_id': ''
+            if item_data.get('folderId') is None
+            or pd.isna(item_data.get('folderId'))
+            else item_data['folderId'],
+            'sql_endpoint_connection_string': item_data.get(
+                'properties_sqlEndpointProperties_connectionString'
             ),
-            "sql_endpoint_id": item_data.get(
-                "properties_sqlEndpointProperties_id"
+            'sql_endpoint_id': item_data.get(
+                'properties_sqlEndpointProperties_id'
             ),
         }
 
@@ -132,20 +132,21 @@ def get_all_lakehouses_config(workspace: str) -> Union[Dict[str, Any], None]:
     config = {}
 
     for item in items:
-        item_data = get_lakehouse(workspace, item["id"], df=False)
 
-        config[item["displayName"]] = {
-            "id": item["id"],
-            "description": item.get("description", None),
-            "folder_id": ""
-            if item.get("folderId") is None or pd.isna(item.get("folderId"))
-            else item["folderId"],
-            "sql_endpoint_connection_string": item_data["properties"][
-                "sqlEndpointProperties"
-            ]["connectionString"],
-            "sql_endpoint_id": item_data["properties"][
-                "sqlEndpointProperties"
-            ]["id"],
+        item_data = get_lakehouse(workspace, item['id'], df=False)
+
+        config[item['displayName']] = {
+            'id': item['id'],
+            'description': item.get('description', None),
+            'folder_id': ''
+            if item.get('folderId') is None or pd.isna(item.get('folderId'))
+            else item['folderId'],
+            'sql_endpoint_connection_string': item_data['properties'][
+                'sqlEndpointProperties'
+            ]['connectionString'],
+            'sql_endpoint_id': item_data['properties'][
+                'sqlEndpointProperties'
+            ]['id'],
         }
 
     return config
@@ -171,8 +172,8 @@ def list_valid_lakehouses(
         return None
 
     return items[
-        ~items["displayName"].str.contains("staging", case=False, na=False)
-    ].to_dict(orient="records")
+        ~items['displayName'].str.contains('staging', case=False, na=False)
+    ].to_dict(orient='records')
 
 
 def generate_lakehouse_shortcuts_metadata(
@@ -189,40 +190,40 @@ def generate_lakehouse_shortcuts_metadata(
     shortcuts_list_new = []
 
     for shortcut_dict in shortcuts_list:
-        shortcut_target = shortcut_dict["target"]
+        shortcut_target = shortcut_dict['target']
         shortcut_target_type = (
-            shortcut_target["type"][0].lower() + shortcut_target["type"][1:]
+            shortcut_target['type'][0].lower() + shortcut_target['type'][1:]
         )
         shortcut_target_workspace_id = shortcut_target[shortcut_target_type][
-            "workspaceId"
+            'workspaceId'
         ]
         shortcut_target_item_id = shortcut_target[shortcut_target_type][
-            "itemId"
+            'itemId'
         ]
 
         workspace_items = list_items(shortcut_target_workspace_id, df=False)
         for item in workspace_items:
-            if item["id"] == shortcut_target_item_id:
-                shortcut_target_item_type = item["type"]
+            if item['id'] == shortcut_target_item_id:
+                shortcut_target_item_type = item['type']
                 break
 
     # Check if the workspace_id is equal shortcut_target_workspace_id then uuid zero
     if shortcut_target_workspace_id == resolve_workspace(workspace):
-        shortcut_target_workspace_id = "00000000-0000-0000-0000-000000000000"
+        shortcut_target_workspace_id = '00000000-0000-0000-0000-000000000000'
 
     # Create item type if not exists
-    if "artifactType" not in shortcut_dict["target"][shortcut_target_type]:
-        shortcut_dict["target"][shortcut_target_type]["artifactType"] = ""
-    if "workspaceId" not in shortcut_dict["target"][shortcut_target_type]:
-        shortcut_dict["target"][shortcut_target_type]["workspaceId"] = ""
+    if 'artifactType' not in shortcut_dict['target'][shortcut_target_type]:
+        shortcut_dict['target'][shortcut_target_type]['artifactType'] = ''
+    if 'workspaceId' not in shortcut_dict['target'][shortcut_target_type]:
+        shortcut_dict['target'][shortcut_target_type]['workspaceId'] = ''
 
     # Update if exists
-    shortcut_dict["target"]["oneLake"]["artifactType"] = (
-        shortcut_target_item_type
-    )
-    shortcut_dict["target"]["oneLake"]["workspaceId"] = (
-        shortcut_target_workspace_id
-    )
+    shortcut_dict['target']['oneLake'][
+        'artifactType'
+    ] = shortcut_target_item_type
+    shortcut_dict['target']['oneLake'][
+        'workspaceId'
+    ] = shortcut_target_workspace_id
 
     shortcuts_list_new.append(shortcut_dict)
 
@@ -233,7 +234,7 @@ def save_lakehouse_shortcuts_metadata(
     shortcuts_metadata: Dict[str, Any], path: str
 ) -> None:
     """ """
-    with open(Path(path) / "shortcuts.metadata.json", "w") as f:
+    with open(Path(path) / 'shortcuts.metadata.json', 'w') as f:
         json.dump(shortcuts_metadata, f, indent=2)
 
 
@@ -252,35 +253,35 @@ def export_lakehouse(
 
     try:
         folder_path = resolve_folder_from_id_to_path(
-            workspace_id, item["folderId"]
+            workspace_id, item['folderId']
         )
     except:
-        logger.info(f"{item['displayName']}.Lakehouse is not inside a folder.")
+        logger.info(f'{item["displayName"]}.Lakehouse is not inside a folder.')
         folder_path = None
 
     if folder_path is None:
-        item_path = Path(path) / (item["displayName"] + ".Lakehouse")
+        item_path = Path(path) / (item['displayName'] + '.Lakehouse')
     else:
         item_path = (
-            Path(path) / folder_path / (item["displayName"] + ".Lakehouse")
+            Path(path) / folder_path / (item['displayName'] + '.Lakehouse')
         )
     os.makedirs(item_path, exist_ok=True)
 
     platform = _generate_lakehouse_platform(
-        display_name=item["displayName"],
-        description=item["description"],
+        display_name=item['displayName'],
+        description=item['description'],
     )
 
     _save_lakehouse_platform(platform, item_path)
 
     _save_lakehouse_metadata_json(item_path)
 
-    shortcuts = generate_lakehouse_shortcuts_metadata(workspace_id, item["id"])
+    shortcuts = generate_lakehouse_shortcuts_metadata(workspace_id, item['id'])
 
     save_lakehouse_shortcuts_metadata(shortcuts, item_path)
 
     logger.success(
-        f"Lakehouse `{lakehouse}` from workspace `{workspace}` was exported to `{path}` successfully."
+        f'Lakehouse `{lakehouse}` from workspace `{workspace}` was exported to `{path}` successfully.'
     )
     return None
 
@@ -297,25 +298,25 @@ def export_all_lakehouses(workspace: str, path: Union[str, Path]) -> None:
     for item in items:
         try:
             folder_path = resolve_folder_from_id_to_path(
-                workspace_id, item["folderId"]
+                workspace_id, item['folderId']
             )
         except:
             logger.info(
-                f"{item['displayName']}.Lakehouse is not inside a folder."
+                f'{item["displayName"]}.Lakehouse is not inside a folder.'
             )
             folder_path = None
 
         if folder_path is None:
-            item_path = Path(path) / (item["displayName"] + ".Lakehouse")
+            item_path = Path(path) / (item['displayName'] + '.Lakehouse')
         else:
             item_path = (
-                Path(path) / folder_path / (item["displayName"] + ".Lakehouse")
+                Path(path) / folder_path / (item['displayName'] + '.Lakehouse')
             )
         os.makedirs(item_path, exist_ok=True)
 
         platform = _generate_lakehouse_platform(
-            display_name=item["displayName"],
-            description=item["description"],
+            display_name=item['displayName'],
+            description=item['description'],
         )
 
         _save_lakehouse_platform(platform, item_path)
@@ -323,10 +324,10 @@ def export_all_lakehouses(workspace: str, path: Union[str, Path]) -> None:
         _save_lakehouse_metadata_json(item_path)
 
         shortcuts = generate_lakehouse_shortcuts_metadata(
-            workspace_id, item["id"]
+            workspace_id, item['id']
         )
 
         save_lakehouse_shortcuts_metadata(shortcuts, item_path)
 
-    logger.success(f"All lakehouses exported to {path} successfully.")
+    logger.success(f'All lakehouses exported to {path} successfully.')
     return None

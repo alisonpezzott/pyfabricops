@@ -27,7 +27,7 @@ def df(func):
 
     @wraps(func)
     def _wrapper(*args, **kwargs):
-        df = kwargs.pop("df", True)
+        df = kwargs.pop('df', True)
         result = func(*args, **kwargs)
 
         if result is None:
@@ -41,7 +41,7 @@ def df(func):
     return _wrapper
 
 
-def _flatten_json(data, parent_key="", sep="_"):
+def _flatten_json(data, parent_key='', sep='_'):
     """
     Helper function to flatten nested JSON.
 
@@ -55,7 +55,7 @@ def _flatten_json(data, parent_key="", sep="_"):
     """
     items = []
     for k, v in data.items():
-        new_key = f"{parent_key}{sep}{k}" if parent_key else k
+        new_key = f'{parent_key}{sep}{k}' if parent_key else k
         if isinstance(v, dict):
             items.extend(_flatten_json(v, new_key, sep=sep).items())
         else:
@@ -78,6 +78,7 @@ def _json_df(data):
         return None
 
     if isinstance(data, dict):
+
         # If it"s a simple dictionary
         if all(not isinstance(v, (dict, list)) for v in data.values()):
             return pd.DataFrame([data])
@@ -88,16 +89,17 @@ def _json_df(data):
             return pd.DataFrame([flattened_data])
 
     elif isinstance(data, list):
+
         # If it"s a list of dictionaries
         if all(isinstance(item, dict) for item in data):
             flattened_list = [_flatten_json(item) for item in data]
             return pd.DataFrame(flattened_list)
         else:
             raise ValueError(
-                "The list contains items that are not dictionaries."
+                'The list contains items that are not dictionaries.'
             )
 
     else:
         raise TypeError(
-            "Input type must be a dictionary or a list of dictionaries."
+            'Input type must be a dictionary or a list of dictionaries.'
         )

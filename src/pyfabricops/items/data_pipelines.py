@@ -34,7 +34,7 @@ def list_data_pipelines(
         ```
     """
     return api_request(
-        "/workspaces/" + resolve_workspace(workspace) + "/dataPipelines",
+        '/workspaces/' + resolve_workspace(workspace) + '/dataPipelines',
         support_pagination=True,
     )
 
@@ -56,8 +56,8 @@ def get_data_pipeline_id(
         df=False,
     )
     for _data_pipeline in data_pipelines:
-        if _data_pipeline["displayName"] == data_pipeline_name:
-            return _data_pipeline["id"]
+        if _data_pipeline['displayName'] == data_pipeline_name:
+            return _data_pipeline['id']
     logger.warning(
         f"DataPipeline '{data_pipeline_name}' not found in workspace '{workspace}'."
     )
@@ -108,9 +108,9 @@ def get_data_pipeline(
     """
     workspace_id = resolve_workspace(workspace)
     return api_request(
-        "/workspaces/"
+        '/workspaces/'
         + workspace_id
-        + "/dataPipelines/"
+        + '/dataPipelines/'
         + resolve_data_pipeline(workspace_id, data_pipeline),
     )
 
@@ -150,14 +150,14 @@ def update_data_pipeline(
     payload = {}
 
     if display_name:
-        payload["displayName"] = display_name
+        payload['displayName'] = display_name
 
     if description:
-        payload["description"] = description
+        payload['description'] = description
 
     return api_request(
-        "/workspaces/" + workspace_id + "/dataPipelines/" + data_pipeline_id,
-        method="patch",
+        '/workspaces/' + workspace_id + '/dataPipelines/' + data_pipeline_id,
+        method='patch',
         payload=payload,
     )
 
@@ -187,8 +187,8 @@ def delete_data_pipeline(workspace: str, data_pipeline: str) -> None:
     data_pipeline_id = resolve_data_pipeline(workspace_id, data_pipeline)
 
     return api_request(
-        "/workspaces/" + workspace_id + "/dataPipelines/" + data_pipeline_id,
-        method="delete",
+        '/workspaces/' + workspace_id + '/dataPipelines/' + data_pipeline_id,
+        method='delete',
     )
 
 
@@ -215,12 +215,12 @@ def get_data_pipeline_definition(workspace: str, data_pipeline: str) -> dict:
     data_pipeline_id = resolve_data_pipeline(workspace_id, data_pipeline)
 
     return api_request(
-        endpoint="/workspaces/"
+        endpoint='/workspaces/'
         + workspace_id
-        + "/dataPipelines/"
+        + '/dataPipelines/'
         + data_pipeline_id
-        + "/getDefinition",
-        method="post",
+        + '/getDefinition',
+        method='post',
         support_lro=True,
     )
 
@@ -256,15 +256,15 @@ def update_data_pipeline_definition(
 
     data_pipeline_id = resolve_data_pipeline(workspace_id, data_pipeline)
 
-    params = {"updateMetadata": True}
-    payload = {"definition": item_definition}
+    params = {'updateMetadata': True}
+    payload = {'definition': item_definition}
 
     return api_request(
-        endpoint="/workspaces/"
+        endpoint='/workspaces/'
         + workspace_id
-        + "/dataPipelines/"
+        + '/dataPipelines/'
         + data_pipeline_id,
-        method="post",
+        method='post',
         payload=payload,
         params=params,
     )
@@ -309,21 +309,21 @@ def create_data_pipeline(
     workspace_id = resolve_workspace(workspace)
 
     payload = {
-        "displayName": display_name,
-        "definition": item_definition,
+        'displayName': display_name,
+        'definition': item_definition,
     }
 
     if folder:
         folder_id = resolve_folder(workspace_id, folder)
         if folder_id:
-            payload["folderId"] = folder_id
+            payload['folderId'] = folder_id
 
     if description:
-        payload["description"] = description
+        payload['description'] = description
 
     return api_request(
-        endpoint="/workspaces/" + workspace_id + "/dataPipelines",
-        method="post",
+        endpoint='/workspaces/' + workspace_id + '/dataPipelines',
+        method='post',
         payload=payload,
     )
 
@@ -350,9 +350,9 @@ def delete_data_pipeline(workspace: str, data_pipeline: str) -> None:
     data_pipeline_id = resolve_data_pipeline(workspace_id, data_pipeline)
 
     return api_request(
-        endpoint="/workspaces/"
+        endpoint='/workspaces/'
         + workspace_id
-        + "/dataPipelines/"
+        + '/dataPipelines/'
         + data_pipeline_id,
-        method="delete",
+        method='delete',
     )

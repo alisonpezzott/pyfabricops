@@ -52,7 +52,8 @@ packages = [{include = "pyfabricops", from = "src"}]
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.4.1"
 pytest-cov = "^6.2.1"
-ruff = ">=0.11.0"
+blue = "^0.9.1"
+isort = "^6.0.1"
 taskipy = "^1.14.1"
 ipykernel = "^6.29.5"
 twine = "^6.1.0"
@@ -70,17 +71,16 @@ build-backend = "poetry.core.masonry.api"
 python = "."
 addopts = "--doctest-modules"
 
-[tool.ruff]
-line-length = 79
+[tool.blue]
+line_length = 79
+quote_style = "single"
 
-[tool.ruff.lint]
-select = ["I"]
-
-[tool.ruff.lint.isort]
-known-first-party = ["pyfabricops"]
+[tool.isort]
+profile = "black"
+line_length = 79
 
 [tool.taskipy.tasks]
-lint = "ruff format --check --diff . && ruff check ."
+lint = "blue --check --diff . && isort --check --diff ."
 docs = "poetry run mkdocs serve"
 pre_test = "task lint"
 test = "poetry run pytest -s -x --cov=pyfabricops -v"
