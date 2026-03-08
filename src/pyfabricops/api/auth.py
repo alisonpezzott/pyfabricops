@@ -20,43 +20,43 @@ from .scopes import FABRIC_SCOPE, GRAPH_SCOPE, POWERBI_SCOPE, TOKEN_TEMPLATE
 logger = get_logger(__name__)
 
 # Define what should be publicly exported from this module
-__all__ = ['set_auth_provider', 'clear_token_cache']
+__all__ = ["set_auth_provider", "clear_token_cache"]
 
 
 class TokenCache:
     """Manage the token cache in a temporary file"""
 
     CACHE_TEMPLATE = {
-        'FABRIC_SPN': {'access_token': '', 'expires_at': 0},
-        'FABRIC_USER': {'access_token': '', 'expires_at': 0},
-        'FABRIC_INTERACTIVE': {'access_token': '', 'expires_at': 0},
-        'FABRIC_NOTEBOOK': {'access_token': '', 'expires_at': 0},
-        'POWERBI_SPN': {'access_token': '', 'expires_at': 0},
-        'POWERBI_USER': {'access_token': '', 'expires_at': 0},
-        'POWERBI_INTERACTIVE': {'access_token': '', 'expires_at': 0},
-        'POWERBI_NOTEBOOK': {'access_token': '', 'expires_at': 0},
-        'GRAPH_SPN': {'access_token': '', 'expires_at': 0},
-        'GRAPH_USER': {'access_token': '', 'expires_at': 0},
-        'GRAPH_INTERACTIVE': {'access_token': '', 'expires_at': 0},
-        'GRAPH_NOTEBOOK': {'access_token': '', 'expires_at': 0},
+        "FABRIC_SPN": {"access_token": "", "expires_at": 0},
+        "FABRIC_USER": {"access_token": "", "expires_at": 0},
+        "FABRIC_INTERACTIVE": {"access_token": "", "expires_at": 0},
+        "FABRIC_NOTEBOOK": {"access_token": "", "expires_at": 0},
+        "POWERBI_SPN": {"access_token": "", "expires_at": 0},
+        "POWERBI_USER": {"access_token": "", "expires_at": 0},
+        "POWERBI_INTERACTIVE": {"access_token": "", "expires_at": 0},
+        "POWERBI_NOTEBOOK": {"access_token": "", "expires_at": 0},
+        "GRAPH_SPN": {"access_token": "", "expires_at": 0},
+        "GRAPH_USER": {"access_token": "", "expires_at": 0},
+        "GRAPH_INTERACTIVE": {"access_token": "", "expires_at": 0},
+        "GRAPH_NOTEBOOK": {"access_token": "", "expires_at": 0},
     }
 
     def __init__(self, cache_file: Optional[str] = None):
         self.cache_file = cache_file or os.path.join(
-            tempfile.gettempdir(), 'pf_token_cache.json'
+            tempfile.gettempdir(), "pf_token_cache.json"
         )
         self._init_cache()
 
     def _init_cache(self):
         """Initialize the cache file if it does not exist"""
         if not os.path.exists(self.cache_file):
-            with open(self.cache_file, 'w') as f:
+            with open(self.cache_file, "w") as f:
                 json.dump(self.CACHE_TEMPLATE, f)
 
     def load_tokens(self) -> Dict:
         """Load tokens from cache"""
         try:
-            with open(self.cache_file, 'r') as f:
+            with open(self.cache_file, "r") as f:
                 return json.load(f)
         except (FileNotFoundError, json.JSONDecodeError):
             self._init_cache()
@@ -64,7 +64,7 @@ class TokenCache:
 
     def save_tokens(self, tokens: Dict):
         """Save tokens to cache"""
-        with open(self.cache_file, 'w') as f:
+        with open(self.cache_file, "w") as f:
             json.dump(tokens, f, indent=4)
 
     def get_token(self, token_key: str) -> Optional[Dict]:
@@ -77,19 +77,19 @@ class TokenCache:
     ) -> bool:
         """Check if a token is still valid"""
         token_data = self.get_token(token_key)
-        if not token_data or not token_data.get('access_token'):
+        if not token_data or not token_data.get("access_token"):
             return False
 
         now = time.time()
-        expires_at = token_data.get('expires_at', 0)
+        expires_at = token_data.get("expires_at", 0)
         return (expires_at - now) > buffer_seconds
 
     def store_token(self, token_key: str, access_token: str, expires_in: int):
         """Store a new token in cache"""
         tokens = self.load_tokens()
         tokens[token_key] = {
-            'access_token': access_token,
-            'expires_at': time.time() + expires_in,
+            "access_token": access_token,
+            "expires_at": time.time() + expires_in,
         }
         self.save_tokens(tokens)
 
@@ -97,9 +97,9 @@ class TokenCache:
         """Clear the token cache by deleting the cache file"""
         if os.path.exists(self.cache_file):
             os.remove(self.cache_file)
-            logger.info(f'Token cache cleared: {self.cache_file}')
+            logger.info(f"Token cache cleared: {self.cache_file}")
         else:
-            logger.warning(f'Cache file not found: {self.cache_file}')
+            logger.warning(f"Cache file not found: {self.cache_file}")
 
 
 class CredentialProvider(ABC):
@@ -117,12 +117,12 @@ class EnvCredentialProvider(CredentialProvider):
     def get_credentials(self) -> Dict[str, str]:
         load_dotenv()
         return {
-            'fab_client_id': os.getenv('FAB_CLIENT_ID'),
-            'fab_client_secret': os.getenv('FAB_CLIENT_SECRET'),
-            'fab_tenant_id': os.getenv('FAB_TENANT_ID'),
-            'fab_username': os.getenv('FAB_USERNAME'),
-            'fab_password': os.getenv('FAB_PASSWORD'),
-            'github_token': os.getenv('GH_TOKEN'),
+            "fab_client_id": os.getenv("FAB_CLIENT_ID"),
+            "fab_client_secret": os.getenv("FAB_CLIENT_SECRET"),
+            "fab_tenant_id": os.getenv("FAB_TENANT_ID"),
+            "fab_username": os.getenv("FAB_USERNAME"),
+            "fab_password": os.getenv("FAB_PASSWORD"),
+            "github_token": os.getenv("GH_TOKEN"),
         }
 
 
@@ -133,32 +133,32 @@ class OAuthProvider:
         self.cache = cache
 
     def get_token(
-        self, audience: Literal['fabric', 'powerbi', 'graph'] = 'fabric'
+        self, audience: Literal["fabric", "powerbi", "graph"] = "fabric"
     ) -> Dict:
-        if audience not in ['fabric', 'powerbi', 'graph']:
+        if audience not in ["fabric", "powerbi", "graph"]:
             raise OptionNotAvailableError(
-                f'Audience not available. Available: fabric, powerbi, graph. Got: {audience}'
+                f"Audience not available. Available: fabric, powerbi, graph. Got: {audience}"
             )
-        if audience == 'graph':
+        if audience == "graph":
             scope == GRAPH_SCOPE
-        elif audience == 'powerbi':
+        elif audience == "powerbi":
             scope = POWERBI_SCOPE
         else:
             scope = FABRIC_SCOPE
-        token_key = f'{audience.upper()}_INTERACTIVE'
+        token_key = f"{audience.upper()}_INTERACTIVE"
 
         # Check if cached token is still valid
         if self.cache.is_token_valid(token_key):
             return self.cache.get_token(token_key)
 
-        logger.info('Opening browser for user authentication...')
+        logger.info("Opening browser for user authentication...")
         credential = InteractiveBrowserCredential()
         new_token = credential.get_token(scope)
 
         if not new_token:
-            raise ResourceNotFoundError('Access token not found.')
+            raise ResourceNotFoundError("Access token not found.")
 
-        logger.success('Token retrieved successfully.')
+        logger.success("Token retrieved successfully.")
 
         # Calculate expires_in based on expires_on
         expires_in = int(new_token.expires_on - time.time())
@@ -183,37 +183,37 @@ class FabricNotebookProvider:
                 self._notebookutils = credentials
             except ImportError:
                 raise AuthenticationError(
-                    'notebookutils is not available. '
-                    'This authentication method only works inside Microsoft Fabric notebooks. '
+                    "notebookutils is not available. "
+                    "This authentication method only works inside Microsoft Fabric notebooks. "
                     'If you are running outside Fabric, use set_auth_provider("env") or set_auth_provider("oauth") instead.'
                 )
         return self._notebookutils
 
     def get_token(
-        self, audience: Literal['fabric', 'powerbi', 'graph'] = 'fabric'
+        self, audience: Literal["fabric", "powerbi", "graph"] = "fabric"
     ) -> Dict:
         """Get token from Fabric notebook context"""
-        token_key = f'{audience.upper()}_NOTEBOOK'
+        token_key = f"{audience.upper()}_NOTEBOOK"
 
         # Check if cached token is still valid
         if self.cache.is_token_valid(token_key):
             return self.cache.get_token(token_key)
 
-        logger.info('Getting token from Fabric notebook context...')
+        logger.info("Getting token from Fabric notebook context...")
         credentials = self._get_notebookutils()
 
         # Get token using notebookutils
         # For Power BI API, use 'pbi' resource
         # For Fabric API, use 'storage' or the appropriate resource
-        resource = 'pbi' if audience == 'powerbi' else 'pbi'
+        resource = "pbi" if audience == "powerbi" else "pbi"
         access_token = credentials.getToken(resource)
 
         if not access_token:
             raise ResourceNotFoundError(
-                f'Access token not found for resource: {resource}'
+                f"Access token not found for resource: {resource}"
             )
 
-        logger.success('Token retrieved successfully from Fabric notebook.')
+        logger.success("Token retrieved successfully from Fabric notebook.")
 
         # Store in cache with default expiration (1 hour)
         expires_in = 3600
@@ -226,71 +226,71 @@ class TokenManager:
     """Main token and authentication manager"""
 
     def __init__(
-        self, auth_provider: Literal['env', 'oauth', 'fabric'] = 'env'
+        self, auth_provider: Literal["env", "oauth", "fabric"] = "env"
     ):
         self.cache = TokenCache()
         self.auth_provider = auth_provider
         self._credential_providers = {
-            'env': EnvCredentialProvider(),
+            "env": EnvCredentialProvider(),
         }
         self.oauth_provider = OAuthProvider(self.cache)
         self.fabric_provider = FabricNotebookProvider(self.cache)
 
     def set_auth_provider(
-        self, source: Literal['env', 'oauth', 'fabric'] = 'env'
+        self, source: Literal["env", "oauth", "fabric"] = "env"
     ):
         """Define the authentication provider"""
-        if source not in ['env', 'oauth', 'fabric']:
+        if source not in ["env", "oauth", "fabric"]:
             raise OptionNotAvailableError(
-                f'Source not available. Available: env, oauth, fabric. Got: {source}'
+                f"Source not available. Available: env, oauth, fabric. Got: {source}"
             )
         self.auth_provider = source
 
     def _build_token_payload(
         self,
-        audience: Literal['fabric', 'powerbi', 'graph'],
-        credential_type: Literal['spn', 'user'],
+        audience: Literal["fabric", "powerbi", "graph"],
+        credential_type: Literal["spn", "user"],
         credentials: Dict[str, str],
     ) -> Dict:
         """Construct the payload for token request"""
-        if audience == 'graph':
+        if audience == "graph":
             scope = GRAPH_SCOPE
-        elif audience == 'powerbi':
+        elif audience == "powerbi":
             scope = POWERBI_SCOPE
         else:
             scope = FABRIC_SCOPE
 
         payload = {
-            'client_id': credentials['fab_client_id'],
-            'client_secret': credentials['fab_client_secret'],
-            'tenant_id': credentials['fab_tenant_id'],
-            'grant_type': 'client_credentials'
-            if credential_type == 'spn'
-            else 'password',
-            'scope': scope,
+            "client_id": credentials["fab_client_id"],
+            "client_secret": credentials["fab_client_secret"],
+            "tenant_id": credentials["fab_tenant_id"],
+            "grant_type": "client_credentials"
+            if credential_type == "spn"
+            else "password",
+            "scope": scope,
         }
 
-        if credential_type == 'user':
-            payload['username'] = credentials['fab_username']
-            payload['password'] = credentials['fab_password']
+        if credential_type == "user":
+            payload["username"] = credentials["fab_username"]
+            payload["password"] = credentials["fab_password"]
 
         return payload
 
     def _retrieve_token_from_api(
         self,
-        audience: Literal['fabric', 'powerbi', 'graph'],
-        credential_type: Literal['spn', 'user'],
+        audience: Literal["fabric", "powerbi", "graph"],
+        credential_type: Literal["spn", "user"],
     ) -> Dict:
         """Makes an HTTP request to retrieve the token"""
         if self.auth_provider not in self._credential_providers:
             raise OptionNotAvailableError(
-                f'Invalid auth provider: {self.auth_provider}'
+                f"Invalid auth provider: {self.auth_provider}"
             )
 
         credentials = self._credential_providers[
             self.auth_provider
         ].get_credentials()
-        tenant_id = credentials['fab_tenant_id']
+        tenant_id = credentials["fab_tenant_id"]
         url = TOKEN_TEMPLATE.format(tenant_id=tenant_id)
 
         payload = self._build_token_payload(
@@ -303,28 +303,28 @@ class TokenManager:
                 return resp.json()
             else:
                 raise AuthenticationError(
-                    f'Token request failed: {resp.status_code} - {resp.text}'
+                    f"Token request failed: {resp.status_code} - {resp.text}"
                 )
         except Exception as e:
-            raise AuthenticationError(f'Failed to retrieve token: {str(e)}')
+            raise AuthenticationError(f"Failed to retrieve token: {str(e)}")
 
     def get_token(
         self,
-        audience: Literal['fabric', 'powerbi', 'graph'] = 'fabric',
-        credential_type: Literal['spn', 'user'] = 'spn',
+        audience: Literal["fabric", "powerbi", "graph"] = "fabric",
+        credential_type: Literal["spn", "user"] = "spn",
     ) -> Dict:
         """Get a valid token, using cache when possible"""
 
         # OAuth uses a different flow
-        if self.auth_provider == 'oauth':
+        if self.auth_provider == "oauth":
             return self.oauth_provider.get_token(audience)
 
         # Fabric notebook uses notebookutils
-        if self.auth_provider == 'fabric':
+        if self.auth_provider == "fabric":
             return self.fabric_provider.get_token(audience)
 
         # For env, use cache + API
-        token_key = f'{audience.upper()}_{credential_type.upper()}'
+        token_key = f"{audience.upper()}_{credential_type.upper()}"
 
         # Check if cached token is still valid
         if self.cache.is_token_valid(token_key):
@@ -335,13 +335,13 @@ class TokenManager:
             audience, credential_type
         )
         if not token_response:
-            raise ResourceNotFoundError('Access token not found.')
+            raise ResourceNotFoundError("Access token not found.")
 
         # Store in cache
         self.cache.store_token(
             token_key,
-            token_response['access_token'],
-            token_response['expires_in'],
+            token_response["access_token"],
+            token_response["expires_in"],
         )
 
         return self.cache.get_token(token_key)
@@ -353,7 +353,7 @@ _token_manager = TokenManager()
 
 
 def set_auth_provider(
-    source: Literal['env', 'oauth', 'fabric'] = 'env'
+    source: Literal["env", "oauth", "fabric"] = "env",
 ) -> None:
     """
     Set the authentication provider for token retrieval.
@@ -413,9 +413,9 @@ def clear_token_cache() -> None:
 
 
 def _get_token(
-    audience: Literal['fabric', 'powerbi', 'graph'] = 'fabric',
-    auth_provider: Literal['env', 'oauth', 'fabric'] = 'env',
-    credential_type: Literal['spn', 'user'] = 'spn',
+    audience: Literal["fabric", "powerbi", "graph"] = "fabric",
+    auth_provider: Literal["env", "oauth", "fabric"] = "env",
+    credential_type: Literal["spn", "user"] = "spn",
 ) -> Union[dict, None]:
     """Get a token"""
     return _token_manager.get_token(audience, credential_type)

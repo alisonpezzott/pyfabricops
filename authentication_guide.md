@@ -106,7 +106,7 @@ workspaces = pf.list_workspaces()
 Under the hood, this method uses:
 ```python
 from notebookutils import credentials
-access_token = credentials.getToken('pbi')
+access_token = credentials.getToken("pbi")
 ```
 
 **Pros:**
@@ -146,7 +146,7 @@ import pyfabricops as pf
 
 # Use OAuth for easy local development
 pf.set_auth_provider("oauth")
-pf.setup_logging(level='info')
+pf.setup_logging(level="info")
 
 workspaces = pf.list_workspaces()
 print(f"Found {len(workspaces)} workspaces")
@@ -165,7 +165,7 @@ workspace = pf.get_workspace("my-workspace-name")
 print(workspace)
 
 # List items
-items = pf.list_items(workspace['id'])
+items = pf.list_items(workspace["id"])
 for item in items:
     print(f"- {item['displayName']} ({item['type']})")
 ```

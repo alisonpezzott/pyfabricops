@@ -38,7 +38,7 @@ def list_environments(
     """
     workspace_id = resolve_workspace(workspace)
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/environments',
+        endpoint="/workspaces/" + workspace_id + "/environments",
         support_pagination=True,
     )
 
@@ -66,8 +66,8 @@ def get_environment_id(workspace: str, environment: str) -> str | None:
     )
 
     for _environment in environments:
-        if _environment['displayName'] == environment:
-            return _environment['id']
+        if _environment["displayName"] == environment:
+            return _environment["id"]
     logger.warning(
         f"environment '{environment}' not found in workspace '{workspace}'."
     )
@@ -79,7 +79,7 @@ def resolve_environment(
     environment: str,
 ) -> Union[str, None]:
     """
-    Resolves a environment name to its ID.
+    Resolves an environment name to its ID.
 
     Args:
         workspace (str): The ID of the workspace.
@@ -130,9 +130,9 @@ def get_environment(
     environment_id = resolve_environment(workspace_id, environment)
 
     return api_request(
-        endpoint='/workspaces/'
+        endpoint="/workspaces/"
         + workspace_id
-        + '/environments/'
+        + "/environments/"
         + environment_id,
     )
 
@@ -173,24 +173,24 @@ def update_environment(
     payload = {}
 
     if display_name:
-        payload['displayName'] = display_name
+        payload["displayName"] = display_name
 
     if description:
-        payload['description'] = description
+        payload["description"] = description
 
     return api_request(
-        endpoint='/workspaces/'
+        endpoint="/workspaces/"
         + workspace_id
-        + '/environments/'
+        + "/environments/"
         + environment_id,
-        method='patch',
+        method="patch",
         payload=payload,
     )
 
 
 def delete_environment(workspace: str, environment: str) -> None:
     """
-    Delete a environment from the specified workspace.
+    Delete an environment from the specified workspace.
 
     Args:
         workspace (str): The name or ID of the workspace to delete.
@@ -213,11 +213,11 @@ def delete_environment(workspace: str, environment: str) -> None:
     environment_id = resolve_environment(workspace_id, environment)
 
     return api_request(
-        endpoint='/workspaces/'
+        endpoint="/workspaces/"
         + workspace_id
-        + '/environments/'
+        + "/environments/"
         + environment_id,
-        method='delete',
+        method="delete",
     )
 
 
@@ -225,7 +225,7 @@ def get_environment_definition(
     workspace: str, environment: str
 ) -> Union[Dict[str, Any], None]:
     """
-    Retrieves the definition of a environment by its name or ID from the specified workspace.
+    Retrieves the definition of an environment by its name or ID from the specified workspace.
 
     Args:
         workspace (str): The workspace name or ID.
@@ -245,12 +245,12 @@ def get_environment_definition(
     environment_id = resolve_environment(workspace_id, environment)
 
     return api_request(
-        endpoint='/workspaces/'
+        endpoint="/workspaces/"
         + workspace_id
-        + '/environments/'
+        + "/environments/"
         + environment_id
-        + '/getDefinition',
-        method='post',
+        + "/getDefinition",
+        method="post",
         support_lro=True,
     )
 
@@ -287,19 +287,19 @@ def update_environment_definition(
 
     environment_id = resolve_environment(workspace_id, environment)
 
-    payload = {'definition': environment_definition}
+    payload = {"definition": environment_definition}
 
-    parms = {'updateMetadata': True}
+    parms = {"updateMetadata": True}
 
     return api_request(
-        endpoint='/workspaces/'
+        endpoint="/workspaces/"
         + workspace_id
-        + '/environments/'
+        + "/environments/"
         + environment_id
-        + '/updateDefinition',
+        + "/updateDefinition",
         payload=payload,
         params=parms,
-        method='post',
+        method="post",
         support_lro=True,
     )
 
@@ -339,24 +339,24 @@ def create_environment(
     workspace_id = resolve_workspace(workspace)
 
     payload = {
-        'displayName': display_name,
-        'definition': environment_definition,
+        "displayName": display_name,
+        "definition": environment_definition,
     }
 
     if description:
-        payload['description'] = description
+        payload["description"] = description
 
     if folder:
         folder_id = resolve_folder(workspace_id, folder)
         if folder_id:
-            payload['folderId'] = folder_id
+            payload["folderId"] = folder_id
 
     if environment_definition:
-        payload['definition'] = environment_definition
+        payload["definition"] = environment_definition
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/environments',
-        method='post',
+        endpoint="/workspaces/" + workspace_id + "/environments",
+        method="post",
         payload=payload,
         support_lro=True,
     )
@@ -390,15 +390,15 @@ def publish_environment(
 
     environment_id = resolve_environment(workspace_id, environment)
 
-    params = {'beta': False}
+    params = {"beta": False}
 
     return api_request(
-        endpoint='/workspaces/'
+        endpoint="/workspaces/"
         + workspace_id
-        + '/environments/'
+        + "/environments/"
         + environment_id
-        + '/staging/publish',
-        method='post',
+        + "/staging/publish",
+        method="post",
         params=params,
     )
 
@@ -428,12 +428,12 @@ def get_environment_spark_compute(
     environment_id = resolve_environment(workspace_id, environment)
 
     return api_request(
-        endpoint='/workspaces/'
+        endpoint="/workspaces/"
         + workspace_id
-        + '/environments/'
+        + "/environments/"
         + environment_id
-        + '/staging/sparkcompute',
-        params={'beta': False},
+        + "/staging/sparkcompute",
+        params={"beta": False},
     )
 
 
@@ -444,14 +444,14 @@ def update_environment_spark_compute(
     *,
     pool: str = None,
     driver_cores: Literal[4, 8] = None,
-    driver_memory: Literal['28g', '56g'] = None,
+    driver_memory: Literal["28g", "56g"] = None,
     executor_cores: Literal[4, 8] = None,
-    executor_memory: Literal['28g', '56g'] = None,
+    executor_memory: Literal["28g", "56g"] = None,
     dynamic_executor_allocation_enabled: bool = None,
     min_executors: int = None,
     max_executors: int = None,
     spark_properties: List[Dict[str, str]] = None,
-    runtime_version: Literal['1.2', '1.3', '2.0'] = None,
+    runtime_version: Literal["1.2", "1.3", "2.0"] = None,
 ) -> Union[Dict[str, Any], None]:
     """
     Update environment staging spark compute.
@@ -496,48 +496,48 @@ def update_environment_spark_compute(
         _pool = get_workspace_custom_pool(workspace_id, pool, df=False)
         if not _pool:
             return None
-        pool_name = _pool['name']
-        pool_id = _pool['id']
+        pool_name = _pool["name"]
+        pool_id = _pool["id"]
     else:
-        pool_name = 'Starter Pool'
-        pool_id = '00000000-0000-0000-0000-000000000000'
+        pool_name = "Starter Pool"
+        pool_id = "00000000-0000-0000-0000-000000000000"
 
     payload = {
-        'instancePool': {'name': pool_name, 'type': 'Workspace', 'id': pool_id}
+        "instancePool": {"name": pool_name, "type": "Workspace", "id": pool_id}
     }
 
     if driver_cores is not None:
-        payload['driverCores'] = driver_cores
+        payload["driverCores"] = driver_cores
 
     if driver_memory is not None:
-        payload['driverMemory'] = driver_memory
+        payload["driverMemory"] = driver_memory
 
     if executor_cores is not None:
-        payload['executorCores'] = executor_cores
+        payload["executorCores"] = executor_cores
 
     if executor_memory is not None:
-        payload['executorMemory'] = executor_memory
+        payload["executorMemory"] = executor_memory
 
     if dynamic_executor_allocation_enabled is not None:
-        payload['dynamicExecutorAllocation'] = {
-            'enabled': dynamic_executor_allocation_enabled,
-            'minExecutors': min_executors,
-            'maxExecutors': max_executors,
+        payload["dynamicExecutorAllocation"] = {
+            "enabled": dynamic_executor_allocation_enabled,
+            "minExecutors": min_executors,
+            "maxExecutors": max_executors,
         }
 
     if spark_properties is not None:
-        payload['sparkProperties'] = spark_properties
+        payload["sparkProperties"] = spark_properties
     if runtime_version is not None:
-        payload['runtimeVersion'] = runtime_version
+        payload["runtimeVersion"] = runtime_version
 
     return api_request(
-        endpoint='/workspaces/'
+        endpoint="/workspaces/"
         + workspace_id
-        + '/environments/'
+        + "/environments/"
         + environment_id
-        + '/staging/sparkcompute',
-        params={'beta': False},
-        method='patch',
+        + "/staging/sparkcompute",
+        params={"beta": False},
+        method="patch",
         payload=payload,
     )
 
@@ -567,11 +567,11 @@ def export_environment_external_libraries(
     environment_id = resolve_environment(workspace_id, environment)
 
     return api_request(
-        endpoint='/workspaces/'
+        endpoint="/workspaces/"
         + workspace_id
-        + '/environments/'
+        + "/environments/"
         + environment_id
-        + '/libraries/exportExternalLibraries',
+        + "/libraries/exportExternalLibraries",
         return_raw=True,
     ).text
 
@@ -600,10 +600,10 @@ def import_environment_external_libraries(
     environment_id = resolve_environment(workspace_id, environment)
 
     return api_request(
-        endpoint='/workspaces/'
+        endpoint="/workspaces/"
         + workspace_id
-        + '/environments/'
+        + "/environments/"
         + environment_id
-        + '/staging/libraries/importExternalLibraries',
-        method='post',
+        + "/staging/libraries/importExternalLibraries",
+        method="post",
     )

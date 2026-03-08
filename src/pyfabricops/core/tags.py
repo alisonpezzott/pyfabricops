@@ -34,7 +34,7 @@ def list_tags(
         ```
     """
     resp = api_request(
-        '/admin/tags',
+        "/admin/tags",
         support_pagination=True,
     )
     return resp
@@ -48,12 +48,12 @@ def get_tag_id(tag_name: str) -> Union[str, None]:
         tag_name (str): The name of the tag.
 
     Returns:
-        (str | None):The ID of the tag if found, otherwise None.
+        (str | None): The ID of the tag if found, otherwise None.
     """
     tags = list_tags(df=False)
     for _tag in tags:
-        if _tag['displayName'] == tag_name:
-            return _tag['id']
+        if _tag["displayName"] == tag_name:
+            return _tag["id"]
     logger.warning(f"Tag '{tag_name}' not found.")
     return None
 
@@ -66,7 +66,7 @@ def resolve_tag(tag: str) -> Union[str, None]:
         tag (str): The name or ID of the tag.
 
     Returns:
-        (str | None):The ID of the tag if found, otherwise None.
+        (str | None): The ID of the tag if found, otherwise None.
     """
     if is_valid_uuid(tag):
         return tag
@@ -81,17 +81,15 @@ def bulk_create_tags(
     df: Optional[bool] = True,
 ) -> Union[DataFrame, Dict[str, Any], None]:
     """
-    Create a new domain in the tenant.
+    Bulk create new tags in the tenant.
 
     Args:
-        display_name (str): The name of the domain to create.
-        description (str): The description of the domain to create.
-        parent_domain (str): The name or ID of the parent domain.
+        payload (dict): The tags creation payload.
         df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, Dict[str, Any], None]): The created domain details if successful, otherwise None.
+        (Union[DataFrame, Dict[str, Any], None]): The created tags details if successful, otherwise None.
 
     Refs:
         https://learn.microsoft.com/en-us/rest/api/fabric/admin/tags/bulk-create-tags
@@ -136,9 +134,9 @@ def bulk_create_tags(
         ```
     """
     return api_request(
-        '/admin/tags/bulkCreateTags',
+        "/admin/tags/bulkCreateTags",
         payload=payload,
-        method='post',
+        method="post",
     )
 
 
@@ -161,8 +159,8 @@ def delete_tag(tag: str) -> None:
         https://learn.microsoft.com/en-us/rest/api/fabric/admin/tags/delete-tag
     """
     return api_request(
-        '/admin/domains/' + resolve_tag(tag),
-        method='delete',
+        "/admin/domains/" + resolve_tag(tag),
+        method="delete",
     )
 
 
@@ -193,10 +191,10 @@ def update_tag(
         )
         ```
     """
-    payload = {'displayName': display_name}
+    payload = {"displayName": display_name}
 
     return api_request(
-        '/admin/domains/' + resolve_tag(tag),
+        "/admin/domains/" + resolve_tag(tag),
         payload=payload,
-        method='patch',
+        method="patch",
     )

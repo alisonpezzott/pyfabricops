@@ -36,7 +36,7 @@ def list_items(
     """
     workspace_id = resolve_workspace(workspace)
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/items',
+        endpoint="/workspaces/" + workspace_id + "/items",
         support_pagination=True,
     )
 
@@ -64,8 +64,8 @@ def get_item_id(workspace: str, item: str) -> str | None:
     )
 
     for _item in items:
-        if _item['displayName'] + '.' + _item['type'] == item:
-            return _item['id']
+        if _item["displayName"] + "." + _item["type"] == item:
+            return _item["id"]
     logger.warning(f"Item '{item}' not found in workspace '{workspace}'.")
     return None
 
@@ -75,7 +75,7 @@ def resolve_item(
     item: str,
 ) -> Union[str, None]:
     """
-    Resolves a item name to its ID.
+    Resolves an item name to its ID.
 
     Args:
         workspace (str): The ID of the workspace.
@@ -126,7 +126,7 @@ def get_item(
     item_id = resolve_item(workspace_id, item)
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/items/' + item_id,
+        endpoint="/workspaces/" + workspace_id + "/items/" + item_id,
     )
 
 
@@ -166,21 +166,21 @@ def update_item(
     payload = {}
 
     if display_name:
-        payload['displayName'] = display_name
+        payload["displayName"] = display_name
 
     if description:
-        payload['description'] = description
+        payload["description"] = description
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/items/' + item_id,
-        method='patch',
+        endpoint="/workspaces/" + workspace_id + "/items/" + item_id,
+        method="patch",
         payload=payload,
     )
 
 
 def delete_item(workspace: str, item: str) -> None:
     """
-    Delete a item from the specified workspace.
+    Delete an item from the specified workspace.
 
     Args:
         workspace (str): The name or ID of the workspace to delete.
@@ -203,8 +203,8 @@ def delete_item(workspace: str, item: str) -> None:
     item_id = resolve_item(workspace_id, item)
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/items/' + item_id,
-        method='delete',
+        endpoint="/workspaces/" + workspace_id + "/items/" + item_id,
+        method="delete",
     )
 
 
@@ -212,7 +212,7 @@ def get_item_definition(
     workspace: str, item: str
 ) -> Union[Dict[str, Any], None]:
     """
-    Retrieves the definition of a item by its name or ID from the specified workspace.
+    Retrieves the definition of an item by its name or ID from the specified workspace.
 
     Args:
         workspace (str): The workspace name or ID.
@@ -232,12 +232,12 @@ def get_item_definition(
     item_id = resolve_item(workspace_id, item)
 
     return api_request(
-        endpoint='/workspaces/'
+        endpoint="/workspaces/"
         + workspace_id
-        + '/items/'
+        + "/items/"
         + item_id
-        + '/getDefinition',
-        method='post',
+        + "/getDefinition",
+        method="post",
         support_lro=True,
     )
 
@@ -274,17 +274,17 @@ def update_item_definition(
 
     item_id = resolve_item(workspace_id, item)
 
-    payload = {'definition': item_definition}
+    payload = {"definition": item_definition}
 
-    params = {'updateMetadata': True}
+    params = {"updateMetadata": True}
 
     return api_request(
-        endpoint='/workspaces/'
+        endpoint="/workspaces/"
         + workspace_id
-        + '/items/'
+        + "/items/"
         + item_id
-        + '/updateDefinition',
-        method='post',
+        + "/updateDefinition",
+        method="post",
         payload=payload,
         params=params,
         support_lro=True,
@@ -325,19 +325,19 @@ def create_item(
     """
     workspace_id = resolve_workspace(workspace)
 
-    payload = {'displayName': display_name, 'definition': item_definition}
+    payload = {"displayName": display_name, "definition": item_definition}
 
     if description:
-        payload['description'] = description
+        payload["description"] = description
 
     if folder:
         folder_id = resolve_folder(workspace_id, folder)
         if folder_id:
-            payload['folderId'] = folder_id
+            payload["folderId"] = folder_id
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/items',
-        method='post',
+        endpoint="/workspaces/" + workspace_id + "/items",
+        method="post",
         payload=payload,
         support_lro=True,
     )
@@ -365,6 +365,6 @@ def delete_item(workspace: str, item: str) -> None:
     item_id = resolve_item(workspace_id, item)
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/items/' + item_id,
-        method='delete',
+        endpoint="/workspaces/" + workspace_id + "/items/" + item_id,
+        method="delete",
     )

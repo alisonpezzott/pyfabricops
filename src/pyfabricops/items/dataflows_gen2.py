@@ -32,7 +32,7 @@ def list_dataflows_gen2(
     workspace_id = resolve_workspace(workspace)
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/dataflows',
+        endpoint="/workspaces/" + workspace_id + "/dataflows",
         support_pagination=True,
     )
 
@@ -55,8 +55,8 @@ def get_dataflow_gen2_id(
     )
 
     for _dataflow in dataflows:
-        if _dataflow['displayName'] == dataflow_gen2_name:
-            return _dataflow['id']
+        if _dataflow["displayName"] == dataflow_gen2_name:
+            return _dataflow["id"]
     logger.warning(
         f"Dataflow '{dataflow_gen2_name}' not found in workspace '{workspace}'."
     )
@@ -119,7 +119,7 @@ def get_dataflow_gen2(
     dataflow_id = resolve_dataflow_gen2(workspace_id, dataflow)
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/dataflows/' + dataflow_id,
+        endpoint="/workspaces/" + workspace_id + "/dataflows/" + dataflow_id,
     )
 
 
@@ -159,14 +159,14 @@ def update_dataflow_gen2(
     payload = {}
 
     if display_name:
-        payload['displayName'] = display_name
+        payload["displayName"] = display_name
 
     if description:
-        payload['description'] = description
+        payload["description"] = description
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/dataflows/' + dataflow_id,
-        method='patch',
+        endpoint="/workspaces/" + workspace_id + "/dataflows/" + dataflow_id,
+        method="patch",
         payload=payload,
     )
 
@@ -196,8 +196,8 @@ def delete_dataflow_gen2(workspace: str, dataflow: str) -> None:
     dataflow_id = resolve_dataflow_gen2(workspace_id, dataflow)
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/dataflows/' + dataflow_id,
-        method='delete',
+        endpoint="/workspaces/" + workspace_id + "/dataflows/" + dataflow_id,
+        method="delete",
     )
 
 
@@ -226,12 +226,12 @@ def get_dataflow_gen2_definition(
     dataflow_id = resolve_dataflow_gen2(workspace_id, dataflow)
 
     return api_request(
-        endpoint='/workspaces/'
+        endpoint="/workspaces/"
         + workspace_id
-        + '/dataflows/'
+        + "/dataflows/"
         + dataflow_id
-        + '/getDefinition',
-        method='post',
+        + "/getDefinition",
+        method="post",
         support_lro=True,
     )
 
@@ -267,17 +267,17 @@ def update_dataflow_gen2_definition(
 
     dataflow_id = resolve_dataflow_gen2(workspace_id, dataflow)
 
-    payload = {'definition': item_definition}
+    payload = {"definition": item_definition}
 
-    params = {'updateMetadata': True}
+    params = {"updateMetadata": True}
 
     return api_request(
-        endpoint='/workspaces/'
+        endpoint="/workspaces/"
         + workspace_id
-        + '/dataflows/'
+        + "/dataflows/"
         + dataflow_id
-        + '/updateDefinition',
-        method='patch',
+        + "/updateDefinition",
+        method="patch",
         payload=payload,
         params=params,
         support_lro=True,
@@ -317,19 +317,19 @@ def create_dataflow_gen2(
     """
     workspace_id = resolve_workspace(workspace)
 
-    payload = {'displayName': display_name, 'definition': item_definition}
+    payload = {"displayName": display_name, "definition": item_definition}
 
     if description:
-        payload['description'] = description
+        payload["description"] = description
 
     if folder:
         folder_id = resolve_folder(workspace_id, folder)
         if folder_id:
-            payload['folderId'] = folder_id
+            payload["folderId"] = folder_id
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/dataflows',
-        method='post',
+        endpoint="/workspaces/" + workspace_id + "/dataflows",
+        method="post",
         payload=payload,
         support_lro=True,
     )

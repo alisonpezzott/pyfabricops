@@ -21,7 +21,6 @@ logger = get_logger(__name__)
 
 
 class _AuthenticatedEncryption:
-
     Aes256CbcPkcs7 = 0
     HMACSHA256 = 0
 
@@ -41,14 +40,14 @@ class _AuthenticatedEncryption:
 
         if len(key_enc) < 32:
             raise ValueError(
-                'Encryption Key must be at least 256 bits (32 bytes)'
+                "Encryption Key must be at least 256 bits (32 bytes)"
             )
 
         if len(key_mac) < 32:
-            raise ValueError('Mac Key must be at least 256 bits (32 bytes)')
+            raise ValueError("Mac Key must be at least 256 bits (32 bytes)")
 
         if not message:
-            raise TypeError('Credentials cannot be null')
+            raise TypeError("Credentials cannot be null")
 
         # Initialization vector
         iv = os.urandom(16)
@@ -85,9 +84,9 @@ class _AuthenticatedEncryption:
         tag_data_offset = len(iv) + tag_data_offset
 
         # Copy cipher text vector in tag_data
-        tag_data[
-            tag_data_offset : len(cipher_text) + tag_data_offset
-        ] = cipher_text[0 : len(cipher_text)]
+        tag_data[tag_data_offset : len(cipher_text) + tag_data_offset] = (
+            cipher_text[0 : len(cipher_text)]
+        )
         tag_data_offset = len(cipher_text) + tag_data_offset
 
         # Pass random generated key and hash algorithm to calculate authentication code
@@ -133,7 +132,6 @@ class _AuthenticatedEncryption:
 
 
 class _AsymmetricHigherKeyEncryptionHelper:
-
     KEY_LENGTHS_PREFIX = 2
     HMAC_KEY_SIZE_BYTES = 64
     AES_KEY_SIZE_BYTES = 32
@@ -181,8 +179,8 @@ class _AsymmetricHigherKeyEncryptionHelper:
         ]
 
         # Convert exponent and modulus byte arrays to integers
-        exponent = int.from_bytes(exponent_bytes, 'big')
-        modulus = int.from_bytes(modulus_bytes, 'big')
+        exponent = int.from_bytes(exponent_bytes, "big")
+        modulus = int.from_bytes(modulus_bytes, "big")
 
         # Generate public key based on modulus and exponent returned by the API
         public_key = rsa.RSAPublicNumbers(exponent, modulus).public_key(
@@ -227,21 +225,21 @@ def _get_encrypt_gateway_credentials(
 
     if not gateway_resp:
         raise ValueError(
-            'Gateway not found. Please check the gateway ID or name.'
+            "Gateway not found. Please check the gateway ID or name."
         )
 
     # Decode exponent and modulus from base64 to integers
-    e = base64.b64decode(gateway_resp['exponent'])
-    n = base64.b64decode(gateway_resp['modulus'])
+    e = base64.b64decode(gateway_resp["exponent"])
+    n = base64.b64decode(gateway_resp["modulus"])
 
     # Serialize credentials to the compact JSON form
     credentials = {
-        'credentialData': [
-            {'name': 'username', 'value': username},
-            {'name': 'password', 'value': password},
+        "credentialData": [
+            {"name": "username", "value": username},
+            {"name": "password", "value": password},
         ]
     }
-    plaintext = json.dumps(credentials, separators=(',', ':')).encode('utf-8')
+    plaintext = json.dumps(credentials, separators=(",", ":")).encode("utf-8")
 
     # Encrypt the plaintext using RSA-OAEP
     # Create an instance of the _AsymmetricHigherKeyEncryptionHelper

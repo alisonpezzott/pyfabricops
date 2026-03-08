@@ -3,8 +3,8 @@ from ..utils.utils import get_logger
 logger = get_logger(__name__)
 
 ENV = {
-    'path': '.env',
-    'content': """FAB_CLIENT_ID=your_client_id_here
+    "path": ".env",
+    "content": """FAB_CLIENT_ID=your_client_id_here
 FAB_CLIENT_SECRET=your_client_secret_here
 FAB_TENANT_ID=your_tenant_id_here
 FAB_USERNAME=your_username_here
@@ -16,8 +16,8 @@ GH_TOKEN=your_github_token_here""",
 
 
 BRANCHES = {
-    'path': 'branches.json',
-    'content': """{
+    "path": "branches.json",
+    "content": """{
     "main": "-PRD",
     "master": "-PRD",
     "dev": "-DEV",
@@ -28,8 +28,8 @@ BRANCHES = {
 
 
 WORKSPACES_ROLES = {
-    'path': 'workspaces_roles.json',
-    'content': """[
+    "path": "workspaces_roles.json",
+    "content": """[
     {
         "user_uuid": "00000000-0000-0000-0000-0000000000000",
         "user_type": "User",
@@ -55,8 +55,8 @@ WORKSPACES_ROLES = {
 
 
 CONNECTIONS_ROLES = {
-    'path': 'connections_roles.json',
-    'content': """[
+    "path": "connections_roles.json",
+    "content": """[
         {
             "user_uuid": "00000000-0000-0000-0000-0000000000000",
             "user_type": "User",
@@ -82,8 +82,8 @@ CONNECTIONS_ROLES = {
 
 
 GITIGNORE = {
-    'path': '.gitignore',
-    'content': """**/.pbi/localSettings.json
+    "path": ".gitignore",
+    "content": """**/.pbi/localSettings.json
 **/.pbi/cache.abf
 **/__pycache__/**
 **/_stg/**
@@ -98,8 +98,8 @@ metadata/""",
 
 
 GITATTRIBUTES = {
-    'path': '.gitattributes',
-    'content': """src/**/config.json merge=union
+    "path": ".gitattributes",
+    "content": """src/**/config.json merge=union
 # This file is used to define attributes for paths in the repository.
 # The 'merge=union' attribute allows for union merging of JSON files in the 'src' directory.
 # This means that when merging changes, if there are conflicts, the resulting file will contain all unique elements from the conflicting files.
@@ -108,8 +108,8 @@ GITATTRIBUTES = {
 
 
 SRC = {
-    'path': 'src/README.md',
-    'content': """(# Source Directory
+    "path": "src/README.md",
+    "content": """(# Source Directory
   This directory contains the source code for the project. 
   It is structured to facilitate development and deployment of the application.""",
 }
@@ -133,9 +133,9 @@ def create_support_files():
 
     # Create directories and files
     for file_dict in files:
-        path = file_dict.get('path')
+        path = file_dict.get("path")
         if path:
-            os.makedirs(os.path.dirname(path) or '.', exist_ok=True)
-            with open(path, 'w', encoding='utf-8') as f:
-                f.write(file_dict['content'])
-            logger.success(f'Created {path}')
+            os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(file_dict["content"])
+            logger.success(f"Created {path}")

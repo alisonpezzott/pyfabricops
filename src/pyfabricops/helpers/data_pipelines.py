@@ -53,15 +53,15 @@ def get_data_pipeline_config(
 
     else:
         config = {}
-        config = config[item_data.get('displayName')] = {}
+        config = config[item_data.get("displayName")] = {}
 
         config = {
-            'id': item_data['id'],
-            'description': item_data.get('description', None),
-            'folder_id': ''
-            if item_data.get('folderId') is None
-            or pd.isna(item_data.get('folderId'))
-            else item_data['folderId'],
+            "id": item_data["id"],
+            "description": item_data.get("description", None),
+            "folder_id": ""
+            if item_data.get("folderId") is None
+            or pd.isna(item_data.get("folderId"))
+            else item_data["folderId"],
         }
 
         return config
@@ -87,15 +87,14 @@ def get_all_data_pipelines_config(
     config = {}
 
     for item in items:
+        item_data = get_data_pipeline(workspace, item["id"], df=False)
 
-        item_data = get_data_pipeline(workspace, item['id'], df=False)
-
-        config[item['displayName']] = {
-            'id': item['id'],
-            'description': item.get('description', None),
-            'folder_id': ''
-            if item.get('folderId') is None or pd.isna(item.get('folderId'))
-            else item['folderId'],
+        config[item["displayName"]] = {
+            "id": item["id"],
+            "description": item.get("description", None),
+            "folder_id": ""
+            if item.get("folderId") is None or pd.isna(item.get("folderId"))
+            else item["folderId"],
         }
 
     return config
@@ -121,30 +120,30 @@ def export_data_pipeline(
     item = get_data_pipeline(workspace_id, data_pipeline, df=False)
     try:
         folder_path = resolve_folder_from_id_to_path(
-            workspace_id, item['folderId']
+            workspace_id, item["folderId"]
         )
     except:
         logger.info(
-            f'{item["displayName"]}.DataPipeline is not inside a folder.'
+            f"{item['displayName']}.DataPipeline is not inside a folder."
         )
         folder_path = None
 
     if folder_path is None:
-        item_path = Path(path) / (item['displayName'] + '.DataPipeline')
+        item_path = Path(path) / (item["displayName"] + ".DataPipeline")
     else:
         item_path = (
-            Path(path) / folder_path / (item['displayName'] + '.DataPipeline')
+            Path(path) / folder_path / (item["displayName"] + ".DataPipeline")
         )
     os.makedirs(item_path, exist_ok=True)
 
-    definition = get_data_pipeline_definition(workspace_id, item['id'])
+    definition = get_data_pipeline_definition(workspace_id, item["id"])
     if definition is None:
         return None
 
     unpack_item_definition(definition, item_path)
 
     logger.success(
-        f'`{item["displayName"]}.DataPipeline` was exported to {item_path} successfully.'
+        f"`{item['displayName']}.DataPipeline` was exported to {item_path} successfully."
     )
     return None
 
@@ -171,31 +170,31 @@ def export_all_data_pipelines(
     for item in items:
         try:
             folder_path = resolve_folder_from_id_to_path(
-                workspace_id, item['folderId']
+                workspace_id, item["folderId"]
             )
         except:
             logger.info(
-                f'{item["displayName"]}.DataPipeline is not inside a folder.'
+                f"{item['displayName']}.DataPipeline is not inside a folder."
             )
             folder_path = None
 
         if folder_path is None:
-            item_path = Path(path) / (item['displayName'] + '.DataPipeline')
+            item_path = Path(path) / (item["displayName"] + ".DataPipeline")
         else:
             item_path = (
                 Path(path)
                 / folder_path
-                / (item['displayName'] + '.DataPipeline')
+                / (item["displayName"] + ".DataPipeline")
             )
         os.makedirs(item_path, exist_ok=True)
 
-        definition = get_data_pipeline_definition(workspace_id, item['id'])
+        definition = get_data_pipeline_definition(workspace_id, item["id"])
         if definition is None:
             return None
 
         unpack_item_definition(definition, item_path)
 
-    logger.success(f'All data_pipelines were exported to {path} successfully.')
+    logger.success(f"All data_pipelines were exported to {path} successfully.")
     return None
 
 
@@ -273,10 +272,9 @@ def deploy_all_data_pipelines(
     if workspace_id is None:
         return None
 
-    data_pipelines_paths = list_paths_of_type(path, 'DataPipeline')
+    data_pipelines_paths = list_paths_of_type(path, "DataPipeline")
 
     for path_ in data_pipelines_paths:
-
         display_name = extract_display_name_from_platform(path_)
         if display_name is None:
             return None
@@ -324,44 +322,44 @@ def extract_data_pipeline_variables(path: str) -> List[Dict[str, str]]:
         List[Dict[str, str]]: A list of dictionaries containing the extracted variables.
     """
 
-    path = Path(path) / 'pipeline-content.json'
+    path = Path(path) / "pipeline-content.json"
 
-    with open(path, 'r') as f:
+    with open(path, "r") as f:
         content = json.load(f)
 
-    activities = content['properties']['activities']
+    activities = content["properties"]["activities"]
 
     variables = []
 
     for activity_index, activity in enumerate(activities):
-        activity_name = activity['name']
+        activity_name = activity["name"]
 
-        subactivities = activity['typeProperties']['activities']
+        subactivities = activity["typeProperties"]["activities"]
         for subactivity_index, subactivity in enumerate(subactivities):
-            subactivity_name = subactivity['name']
-            properties = subactivity['typeProperties']
+            subactivity_name = subactivity["name"]
+            properties = subactivity["typeProperties"]
 
-            source = properties['source']['datasetSettings']
-            source_database = source['typeProperties']['database']
-            source_connection = source['externalReferences']['connection']
+            source = properties["source"]["datasetSettings"]
+            source_database = source["typeProperties"]["database"]
+            source_connection = source["externalReferences"]["connection"]
 
-            sink = properties['sink']['datasetSettings']['linkedService']
-            sink_name = sink['name']
-            sink_properties = sink['properties']['typeProperties']
-            sink_workspace_id = sink_properties['workspaceId']
-            sink_artifact_id = sink_properties['artifactId']
+            sink = properties["sink"]["datasetSettings"]["linkedService"]
+            sink_name = sink["name"]
+            sink_properties = sink["properties"]["typeProperties"]
+            sink_workspace_id = sink_properties["workspaceId"]
+            sink_artifact_id = sink_properties["artifactId"]
 
             variables.append(
                 {
-                    'activity_index': activity_index,
-                    'activity_name': activity_name,
-                    'subactivity_index': subactivity_index,
-                    'subactivity_name': subactivity_name,
-                    'source_database': source_database,
-                    'source_connection': source_connection,
-                    'sink_name': sink_name,
-                    'sink_workspace_id': sink_workspace_id,
-                    'sink_artifact_id': sink_artifact_id,
+                    "activity_index": activity_index,
+                    "activity_name": activity_name,
+                    "subactivity_index": subactivity_index,
+                    "subactivity_name": subactivity_name,
+                    "source_database": source_database,
+                    "source_connection": source_connection,
+                    "sink_name": sink_name,
+                    "sink_workspace_id": sink_workspace_id,
+                    "sink_artifact_id": sink_artifact_id,
                 }
             )
 
@@ -379,71 +377,63 @@ def replace_data_pipeline_variables_with_placeholders(
         variables (List[Dict[str, str]]): The list of variables to replace.
     """
 
-    path = Path(path) / 'pipeline-content.json'
+    path = Path(path) / "pipeline-content.json"
 
-    with open(path, 'r') as f:
+    with open(path, "r") as f:
         content = json.load(f)
 
     for variable in variables:
         # Use indexes to find correct variable - Does not assume unique names
         # This allows multiple activities/subactivities with the same name
-        activity_idx = variable['activity_index']
-        subactivity_idx = variable['subactivity_index']
+        activity_idx = variable["activity_index"]
+        subactivity_idx = variable["subactivity_index"]
 
         # Substitute just the values that need to be replaced with placeholders
         # Database
-        content['properties']['activities'][activity_idx]['typeProperties'][
-            'activities'
-        ][subactivity_idx]['typeProperties']['source']['datasetSettings'][
-            'typeProperties'
+        content["properties"]["activities"][activity_idx]["typeProperties"][
+            "activities"
+        ][subactivity_idx]["typeProperties"]["source"]["datasetSettings"][
+            "typeProperties"
         ][
-            'database'
+            "database"
         ] = f"#{{{variable['activity_name']}_{variable['subactivity_name']}_source_database}}#"
 
         # Connection
-        content['properties']['activities'][activity_idx]['typeProperties'][
-            'activities'
-        ][subactivity_idx]['typeProperties']['source']['datasetSettings'][
-            'externalReferences'
+        content["properties"]["activities"][activity_idx]["typeProperties"][
+            "activities"
+        ][subactivity_idx]["typeProperties"]["source"]["datasetSettings"][
+            "externalReferences"
         ][
-            'connection'
+            "connection"
         ] = f"#{{{variable['activity_name']}_{variable['subactivity_name']}_source_connection}}#"
 
         # Workspace ID
-        content['properties']['activities'][activity_idx]['typeProperties'][
-            'activities'
-        ][subactivity_idx]['typeProperties']['sink']['datasetSettings'][
-            'linkedService'
-        ][
-            'properties'
-        ][
-            'typeProperties'
-        ][
-            'workspaceId'
+        content["properties"]["activities"][activity_idx]["typeProperties"][
+            "activities"
+        ][subactivity_idx]["typeProperties"]["sink"]["datasetSettings"][
+            "linkedService"
+        ]["properties"]["typeProperties"][
+            "workspaceId"
         ] = f"#{{{variable['activity_name']}_{variable['subactivity_name']}_sink_workspace_id}}#"
 
         # Artifact ID
-        content['properties']['activities'][activity_idx]['typeProperties'][
-            'activities'
-        ][subactivity_idx]['typeProperties']['sink']['datasetSettings'][
-            'linkedService'
-        ][
-            'properties'
-        ][
-            'typeProperties'
-        ][
-            'artifactId'
+        content["properties"]["activities"][activity_idx]["typeProperties"][
+            "activities"
+        ][subactivity_idx]["typeProperties"]["sink"]["datasetSettings"][
+            "linkedService"
+        ]["properties"]["typeProperties"][
+            "artifactId"
         ] = f"#{{{variable['activity_name']}_{variable['subactivity_name']}_sink_artifact_id}}#"
 
     modified_content = json.dumps(content, indent=2)
 
     # Save the modified content back to the file
-    with open(path, 'w') as file:
+    with open(path, "w") as file:
         file.write(modified_content)
 
 
 def _create_data_pipeline_placeholder_mapping(
-    variables: List[Dict[str, str]]
+    variables: List[Dict[str, str]],
 ) -> dict:
     """
     Creates a mapping of placeholders to their real values based on the extracted variables.
@@ -451,22 +441,22 @@ def _create_data_pipeline_placeholder_mapping(
     placeholder_mapping = {}
 
     for variable in variables:
-        activity_name = variable['activity_name']
-        subactivity_name = variable['subactivity_name']
+        activity_name = variable["activity_name"]
+        subactivity_name = variable["subactivity_name"]
 
         # Create a unique placeholder for each variable
         placeholder_mapping[
-            f'{activity_name}_{subactivity_name}_source_database'
-        ] = variable['source_database']
+            f"{activity_name}_{subactivity_name}_source_database"
+        ] = variable["source_database"]
         placeholder_mapping[
-            f'{activity_name}_{subactivity_name}_source_connection'
-        ] = variable['source_connection']
+            f"{activity_name}_{subactivity_name}_source_connection"
+        ] = variable["source_connection"]
         placeholder_mapping[
-            f'{activity_name}_{subactivity_name}_sink_workspace_id'
-        ] = variable['sink_workspace_id']
+            f"{activity_name}_{subactivity_name}_sink_workspace_id"
+        ] = variable["sink_workspace_id"]
         placeholder_mapping[
-            f'{activity_name}_{subactivity_name}_sink_artifact_id'
-        ] = variable['sink_artifact_id']
+            f"{activity_name}_{subactivity_name}_sink_artifact_id"
+        ] = variable["sink_artifact_id"]
 
     return placeholder_mapping
 
@@ -482,18 +472,18 @@ def replace_data_pipeline_placeholders_with_variables(
         variables (List[Dict[str, str]]): The list of variables to replace.
     """
 
-    path = Path(path) / 'pipeline-content.json'
+    path = Path(path) / "pipeline-content.json"
 
-    with open(path, 'r') as f:
+    with open(path, "r") as f:
         content_str = f.read()
 
     mappings = _create_data_pipeline_placeholder_mapping(variables)
 
     # Substitute each placeholder with the corresponding value
     for placeholder, value in mappings.items():
-        placeholder_pattern = f'#{{{placeholder}}}#'
+        placeholder_pattern = f"#{{{placeholder}}}#"
         content_str = content_str.replace(placeholder_pattern, value)
 
     # Save the modified content back to the file
-    with open(path, 'w') as file:
+    with open(path, "w") as file:
         file.write(content_str)

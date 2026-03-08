@@ -36,7 +36,7 @@ def list_notebooks(
         ```
     """
     return api_request(
-        endpoint='/workspaces/' + resolve_workspace(workspace) + '/notebooks',
+        endpoint="/workspaces/" + resolve_workspace(workspace) + "/notebooks",
         support_pagination=True,
     )
 
@@ -60,8 +60,8 @@ def get_notebook_id(workspace: str, notebook: str) -> Union[str, None]:
     """
     notebooks = list_notebooks(workspace, df=False)
     for nb in notebooks:
-        if nb['displayName'] == notebook or nb['id'] == notebook:
-            return nb['id']
+        if nb["displayName"] == notebook or nb["id"] == notebook:
+            return nb["id"]
     return None
 
 
@@ -75,7 +75,6 @@ def resolve_notebook(
     Args:
         workspace (str): The workspace name or ID.
         notebook (str): The name or ID of the notebook.
-        silent (bool): If True, suppresses warnings. Defaults to False.
 
     Returns:
         Optional[str]: The ID of the notebook if found, otherwise None.
@@ -122,7 +121,7 @@ def get_notebook(
     notebook_id = resolve_notebook(workspace_id, notebook)
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/notebooks/' + notebook_id,
+        endpoint="/workspaces/" + workspace_id + "/notebooks/" + notebook_id,
     )
 
 
@@ -162,14 +161,14 @@ def update_notebook(
     payload = {}
 
     if display_name:
-        payload['displayName'] = display_name
+        payload["displayName"] = display_name
 
     if description:
-        payload['description'] = description
+        payload["description"] = description
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/notebooks/' + notebook_id,
-        method='patch',
+        endpoint="/workspaces/" + workspace_id + "/notebooks/" + notebook_id,
+        method="patch",
         payload=payload,
     )
 
@@ -199,8 +198,8 @@ def delete_notebook(workspace: str, notebook: str) -> None:
     notebook_id = resolve_notebook(workspace_id, notebook)
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/notebooks/' + notebook_id,
-        method='delete',
+        endpoint="/workspaces/" + workspace_id + "/notebooks/" + notebook_id,
+        method="delete",
     )
 
 
@@ -228,12 +227,12 @@ def get_notebook_definition(
     notebook_id = resolve_notebook(workspace_id, notebook)
 
     return api_request(
-        endpoint='/workspaces/'
+        endpoint="/workspaces/"
         + workspace_id
-        + '/notebooks/'
+        + "/notebooks/"
         + notebook_id
-        + '/getDefinition',
-        method='post',
+        + "/getDefinition",
+        method="post",
         support_lro=True,
     )
 
@@ -253,7 +252,7 @@ def update_notebook_definition(
     Args:
         workspace (str): The workspace name or ID.
         notebook (str): The name or ID of the notebook to update.
-        path (str): The path to the notebook definition.
+        item_definition (str): The notebook definition.
 
     Returns:
         (dict or None): The updated notebook details if successful, otherwise None.
@@ -268,17 +267,17 @@ def update_notebook_definition(
 
     notebook_id = resolve_notebook(workspace_id, notebook)
 
-    payload = {'definition': item_definition}
+    payload = {"definition": item_definition}
 
-    params = {'updateMetadata': True}
+    params = {"updateMetadata": True}
 
     return api_request(
-        endpoint='/workspaces/'
+        endpoint="/workspaces/"
         + workspace_id
-        + '/notebooks/'
+        + "/notebooks/"
         + notebook_id
-        + '/updateDefinition',
-        method='post',
+        + "/updateDefinition",
+        method="post",
         payload=payload,
         params=params,
         support_lro=True,
@@ -303,32 +302,32 @@ def create_notebook(
         display_name (str): The display name of the notebook.
         description (str, optional): A description for the notebook.
         folder (str, optional): The folder to create the notebook in.
-        path (str): The path to the notebook definition file.
+        item_definition (str): The notebook definition.
 
     Returns:
         (dict): The created notebook details.
 
     Examples:
         ```python
-        create_notebook('MyProjectWorkspace', 'SalesDataModel', 'path/to/definition.json')
-        create_notebook('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000', 'path/to/definition.json')
+        create_notebook('MyProjectWorkspace', 'SalesDataNotebook', item_definition={...})
+        create_notebook('MyProjectWorkspace', 'SalesDataNotebook', item_definition={...}, description='My notebook')
         ```
     """
     workspace_id = resolve_workspace(workspace)
 
-    payload = {'displayName': display_name, 'definition': item_definition}
+    payload = {"displayName": display_name, "definition": item_definition}
 
     if description:
-        payload['description'] = description
+        payload["description"] = description
 
     if folder:
         folder_id = resolve_folder(workspace_id, folder)
         if folder_id:
-            payload['folderId'] = folder_id
+            payload["folderId"] = folder_id
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/notebooks',
-        method='post',
+        endpoint="/workspaces/" + workspace_id + "/notebooks",
+        method="post",
         payload=payload,
         support_lro=True,
     )

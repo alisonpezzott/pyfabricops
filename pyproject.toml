@@ -1,6 +1,6 @@
 [project]
 name = "pyfabricops"
-version = "0.3.15"
+version = "0.3.16"
 description = "A Python wrapper library for Microsoft Fabric and Power BI that provides a simple, consistent interface to the official Fabric REST APIs, with automatic fallback to Power BI REST APIs when required. Designed to run in Fabric notebooks, pure Python scripts, or as part of YAML-based CI/CD workflows."
 authors = [
     {name = "alisonpezzott",email = "alisonpezzott@gmail.com"}
@@ -52,8 +52,7 @@ packages = [{include = "pyfabricops", from = "src"}]
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.4.1"
 pytest-cov = "^6.2.1"
-blue = "^0.9.1"
-isort = "^6.0.1"
+ruff = ">=0.11.0"
 taskipy = "^1.14.1"
 ipykernel = "^6.29.5"
 twine = "^6.1.0"
@@ -71,16 +70,17 @@ build-backend = "poetry.core.masonry.api"
 python = "."
 addopts = "--doctest-modules"
 
-[tool.blue]
-line_length = 79
-quote_style = "single"
+[tool.ruff]
+line-length = 79
 
-[tool.isort]
-profile = "black"
-line_length = 79
+[tool.ruff.lint]
+select = ["I"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["pyfabricops"]
 
 [tool.taskipy.tasks]
-lint = "blue --check --diff . && isort --check --diff ."
+lint = "ruff format --check --diff . && ruff check ."
 docs = "poetry run mkdocs serve"
 pre_test = "task lint"
 test = "poetry run pytest -s -x --cov=pyfabricops -v"

@@ -4,6 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python versions](https://img.shields.io/pypi/pyversions/pyfabricops.svg)](https://pypi.org/project/pyfabricops/)
 [![Typing status](https://img.shields.io/badge/typing-PEP%20561-blue)](https://peps.python.org/pep-0561/)    
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Tests](https://github.com/alisonpezzott/pyfabricops/actions/workflows/test.yml/badge.svg)](https://github.com/alisonpezzott/pyfabricops/actions/workflows/test.yml)  
 
 > A Python wrapper library for Microsoft Fabric (and Power BI) operations, providing a simple interface to the official Fabric REST APIs. Falls back to Power BI REST APIs where needed. Designed to run in Python notebooks, pure Python scripts or integrated into YAML-based workflows for CI/CD.
@@ -192,7 +193,7 @@ The custom logging system implemented in `pyfabricops` provides a complete and f
 import pyfabricops as pf
 
 # Basic configuration
-pf.setup_logging(level='INFO', format_style='standard')
+pf.setup_logging(level="INFO", format_style="standard")
 
 # Debug mode for development
 pf.enable_debug_mode(include_external=False)

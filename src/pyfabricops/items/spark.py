@@ -35,7 +35,7 @@ def list_workspace_custom_pools(
     """
     workspace_id = resolve_workspace(workspace)
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/spark/pools',
+        endpoint="/workspaces/" + workspace_id + "/spark/pools",
         support_pagination=True,
     )
 
@@ -65,8 +65,8 @@ def get_workspace_custom_pool_id(
     )
 
     for _workspace_custom_pool in workspace_custom_pools:
-        if _workspace_custom_pool['name'] == workspace_custom_pool:
-            return _workspace_custom_pool['id']
+        if _workspace_custom_pool["name"] == workspace_custom_pool:
+            return _workspace_custom_pool["id"]
     logger.warning(
         f"Custom pool '{workspace_custom_pool}' not found in workspace '{workspace}'."
     )
@@ -133,9 +133,9 @@ def get_workspace_custom_pool(
     )
 
     return api_request(
-        endpoint='/workspaces/'
+        endpoint="/workspaces/"
         + workspace_id
-        + '/spark/pools/'
+        + "/spark/pools/"
         + workspace_custom_pool_id,
     )
 
@@ -151,12 +151,12 @@ def create_workspace_custom_pool(
     dynamic_executor_allocation_enabled: Optional[bool] = None,
     min_executors: Optional[int] = None,
     max_executors: Optional[int] = None,
-    node_family: Optional[str] = 'MemoryOptimized',
-    node_size: Literal['Small', 'Medium', 'Large'] = 'Small',
+    node_family: Optional[str] = "MemoryOptimized",
+    node_size: Literal["Small", "Medium", "Large"] = "Small",
     df: Optional[bool] = True,
 ) -> Union[DataFrame, Dict[str, Any], None]:
     """
-    Creates the properties of the specified workspace custom pool.
+    Creates a new workspace custom pool in the specified workspace.
 
     Args:
         workspace (str): The workspace name or ID.
@@ -196,32 +196,32 @@ def create_workspace_custom_pool(
 
     payload = {}
 
-    payload['name'] = display_name
+    payload["name"] = display_name
 
     if auto_scale_enabled is not None:
-        payload['autoScale'] = {}
-        payload['autoScale']['enabled'] = auto_scale_enabled
+        payload["autoScale"] = {}
+        payload["autoScale"]["enabled"] = auto_scale_enabled
     if min_node_count is not None:
-        payload['autoScale']['minNodeCount'] = min_node_count
+        payload["autoScale"]["minNodeCount"] = min_node_count
     if max_node_count is not None:
-        payload['autoScale']['maxNodeCount'] = max_node_count
+        payload["autoScale"]["maxNodeCount"] = max_node_count
     if dynamic_executor_allocation_enabled is not None:
-        payload['dynamicExecutorAllocation'] = {}
-        payload['dynamicExecutorAllocation'][
-            'enabled'
-        ] = dynamic_executor_allocation_enabled
+        payload["dynamicExecutorAllocation"] = {}
+        payload["dynamicExecutorAllocation"]["enabled"] = (
+            dynamic_executor_allocation_enabled
+        )
     if min_executors is not None:
-        payload['dynamicExecutorAllocation']['minExecutors'] = min_executors
+        payload["dynamicExecutorAllocation"]["minExecutors"] = min_executors
     if max_executors is not None:
-        payload['dynamicExecutorAllocation']['maxExecutors'] = max_executors
+        payload["dynamicExecutorAllocation"]["maxExecutors"] = max_executors
     if node_family:
-        payload['nodeFamily'] = node_family
+        payload["nodeFamily"] = node_family
     if node_size:
-        payload['nodeSize'] = node_size
+        payload["nodeSize"] = node_size
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/spark/pools',
-        method='post',
+        endpoint="/workspaces/" + workspace_id + "/spark/pools",
+        method="post",
         payload=payload,
     )
 
@@ -238,8 +238,8 @@ def update_workspace_custom_pool(
     dynamic_executor_allocation_enabled: Optional[bool] = None,
     min_executors: Optional[int] = None,
     max_executors: Optional[int] = None,
-    node_family: Optional[str] = 'MemoryOptimized',
-    node_size: Literal['Small', 'Medium', 'Large'] = 'Small',
+    node_family: Optional[str] = "MemoryOptimized",
+    node_size: Literal["Small", "Medium", "Large"] = "Small",
     df: Optional[bool] = True,
 ) -> Union[DataFrame, Dict[str, Any], None]:
     """
@@ -289,34 +289,34 @@ def update_workspace_custom_pool(
     payload = {}
 
     if display_name:
-        payload['name'] = display_name
+        payload["name"] = display_name
     if auto_scale_enabled is not None:
-        payload['autoScale'] = {}
-        payload['autoScale']['enabled'] = auto_scale_enabled
+        payload["autoScale"] = {}
+        payload["autoScale"]["enabled"] = auto_scale_enabled
     if min_node_count is not None:
-        payload['autoScale']['minNodeCount'] = min_node_count
+        payload["autoScale"]["minNodeCount"] = min_node_count
     if max_node_count is not None:
-        payload['autoScale']['maxNodeCount'] = max_node_count
+        payload["autoScale"]["maxNodeCount"] = max_node_count
     if dynamic_executor_allocation_enabled is not None:
-        payload['dynamicExecutorAllocation'] = {}
-        payload['dynamicExecutorAllocation'][
-            'enabled'
-        ] = dynamic_executor_allocation_enabled
+        payload["dynamicExecutorAllocation"] = {}
+        payload["dynamicExecutorAllocation"]["enabled"] = (
+            dynamic_executor_allocation_enabled
+        )
     if min_executors is not None:
-        payload['dynamicExecutorAllocation']['minExecutors'] = min_executors
+        payload["dynamicExecutorAllocation"]["minExecutors"] = min_executors
     if max_executors is not None:
-        payload['dynamicExecutorAllocation']['maxExecutors'] = max_executors
+        payload["dynamicExecutorAllocation"]["maxExecutors"] = max_executors
     if node_family:
-        payload['nodeFamily'] = node_family
+        payload["nodeFamily"] = node_family
     if node_size:
-        payload['nodeSize'] = node_size
+        payload["nodeSize"] = node_size
 
     return api_request(
-        endpoint='/workspaces/'
+        endpoint="/workspaces/"
         + workspace_id
-        + '/spark/pools/'
+        + "/spark/pools/"
         + workspace_custom_pool_id,
-        method='patch',
+        method="patch",
         payload=payload,
     )
 
@@ -350,11 +350,11 @@ def delete_workspace_custom_pool(
     )
 
     return api_request(
-        endpoint='/workspaces/'
+        endpoint="/workspaces/"
         + workspace_id
-        + '/spark/pools/'
+        + "/spark/pools/"
         + workspace_custom_pool_id,
-        method='delete',
+        method="delete",
     )
 
 
@@ -384,7 +384,7 @@ def get_workspace_spark_settings(
     workspace_id = resolve_workspace(workspace)
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/spark/settings'
+        endpoint="/workspaces/" + workspace_id + "/spark/settings"
     )
 
 
@@ -449,20 +449,20 @@ def update_workspace_spark_settings(
     payload = {}
 
     if automatic_log_enabled is not None:
-        payload['automaticLog'] = {'enabled': automatic_log_enabled}
+        payload["automaticLog"] = {"enabled": automatic_log_enabled}
 
     if (high_concurrency_notebook_interactive_run_enabled is not None) or (
         high_concurrency_notebook_pipeline_run_enabled is not None
     ):
-        payload['highConcurrency'] = {}
+        payload["highConcurrency"] = {}
         if high_concurrency_notebook_interactive_run_enabled is not None:
-            payload['highConcurrency'][
-                'notebookInteractiveRunEnabled'
-            ] = high_concurrency_notebook_interactive_run_enabled
+            payload["highConcurrency"]["notebookInteractiveRunEnabled"] = (
+                high_concurrency_notebook_interactive_run_enabled
+            )
         if high_concurrency_notebook_pipeline_run_enabled is not None:
-            payload['highConcurrency'][
-                'notebookPipelineRunEnabled'
-            ] = high_concurrency_notebook_pipeline_run_enabled
+            payload["highConcurrency"]["notebookPipelineRunEnabled"] = (
+                high_concurrency_notebook_pipeline_run_enabled
+            )
 
     if (
         (pool_customize_compute_enabled is not None)
@@ -472,56 +472,56 @@ def update_workspace_spark_settings(
         or (starter_pool_max_node_count is not None)
         or (starter_pool_max_executors is not None)
     ):
-        payload['pool'] = {}
+        payload["pool"] = {}
         if pool_customize_compute_enabled is not None:
-            payload['pool'][
-                'customizeComputeEnabled'
-            ] = pool_customize_compute_enabled
+            payload["pool"]["customizeComputeEnabled"] = (
+                pool_customize_compute_enabled
+            )
         if (
             (pool_default_name is not None)
             or (pool_default_id is not None)
             or (pool_default_type is not None)
         ):
-            payload['pool']['defaultPool'] = {}
+            payload["pool"]["defaultPool"] = {}
             if pool_default_name is not None:
-                payload['pool']['defaultPool']['name'] = pool_default_name
+                payload["pool"]["defaultPool"]["name"] = pool_default_name
             if pool_default_id is not None:
-                payload['pool']['defaultPool']['id'] = pool_default_id
+                payload["pool"]["defaultPool"]["id"] = pool_default_id
             if pool_default_type is not None:
-                payload['pool']['defaultPool']['type'] = pool_default_type
+                payload["pool"]["defaultPool"]["type"] = pool_default_type
         if (starter_pool_max_node_count is not None) or (
             starter_pool_max_executors is not None
         ):
-            payload['pool']['starterPool'] = {}
+            payload["pool"]["starterPool"] = {}
             if starter_pool_max_node_count is not None:
-                payload['pool']['starterPool'][
-                    'maxNodeCount'
-                ] = starter_pool_max_node_count
+                payload["pool"]["starterPool"]["maxNodeCount"] = (
+                    starter_pool_max_node_count
+                )
             if starter_pool_max_executors is not None:
-                payload['pool']['starterPool'][
-                    'maxExecutors'
-                ] = starter_pool_max_executors
+                payload["pool"]["starterPool"]["maxExecutors"] = (
+                    starter_pool_max_executors
+                )
     if environment_name is not None:
-        payload['environment'] = {'name': environment_name}
+        payload["environment"] = {"name": environment_name}
     if environment_runtime_version is not None:
-        payload['environment'] = {
-            'runtimeVersion': environment_runtime_version
+        payload["environment"] = {
+            "runtimeVersion": environment_runtime_version
         }
     if (job_conservative_job_admission_enabled is not None) or (
         job_session_timeout_in_minutes is not None
     ):
-        payload['job'] = {}
+        payload["job"] = {}
         if job_conservative_job_admission_enabled is not None:
-            payload['job'][
-                'conservativeJobAdmissionEnabled'
-            ] = job_conservative_job_admission_enabled
+            payload["job"]["conservativeJobAdmissionEnabled"] = (
+                job_conservative_job_admission_enabled
+            )
         if job_session_timeout_in_minutes is not None:
-            payload['job'][
-                'sessionTimeoutInMinutes'
-            ] = job_session_timeout_in_minutes
+            payload["job"]["sessionTimeoutInMinutes"] = (
+                job_session_timeout_in_minutes
+            )
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/spark/settings',
-        method='patch',
+        endpoint="/workspaces/" + workspace_id + "/spark/settings",
+        method="patch",
         payload=payload,
     )

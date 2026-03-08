@@ -25,7 +25,7 @@ def list_lakehouses(
 
     Args:
         workspace (str): The workspace name or ID.
-        ddf (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
+        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
     Returns:
@@ -37,7 +37,7 @@ def list_lakehouses(
         ```
     """
     return api_request(
-        endpoint='/workspaces/' + resolve_workspace(workspace) + '/lakehouses',
+        endpoint="/workspaces/" + resolve_workspace(workspace) + "/lakehouses",
         support_pagination=True,
     )
 
@@ -63,11 +63,11 @@ def get_lakehouse_id(workspace: str, lakehouse: str) -> Union[str, None]:
         return None
 
     for lakehouse_ in lakehouses:
-        if lakehouse_['displayName'] == lakehouse:
-            return lakehouse_['id']
+        if lakehouse_["displayName"] == lakehouse:
+            return lakehouse_["id"]
 
     logger.warning(
-        f'Lakehouse {lakehouse} not found in workspace {workspace}.'
+        f"Lakehouse {lakehouse} not found in workspace {workspace}."
     )
     return None
 
@@ -132,7 +132,7 @@ def get_lakehouse(
         return None
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/lakehouses/' + lakehouse_id,
+        endpoint="/workspaces/" + workspace_id + "/lakehouses/" + lakehouse_id,
     )
 
 
@@ -169,22 +169,22 @@ def create_lakehouse(
     """
     workspace_id = resolve_workspace(workspace)
 
-    payload = {'displayName': display_name}
+    payload = {"displayName": display_name}
 
     if description:
-        payload['description'] = description
+        payload["description"] = description
 
     if folder:
         folder_id = resolve_folder(workspace_id, folder)
         if folder_id:
-            payload['folderId'] = folder_id
+            payload["folderId"] = folder_id
 
     if enable_schemas:
-        payload['creationPayload'] = {'enableSchemas': True}
+        payload["creationPayload"] = {"enableSchemas": True}
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/lakehouses',
-        method='post',
+        endpoint="/workspaces/" + workspace_id + "/lakehouses",
+        method="post",
         payload=payload,
     )
 
@@ -224,14 +224,14 @@ def update_lakehouse(
     payload = {}
 
     if display_name:
-        payload['displayName'] = display_name
+        payload["displayName"] = display_name
 
     if description:
-        payload['description'] = description
+        payload["description"] = description
 
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/lakehouses/' + lakehouse_id,
-        method='patch',
+        endpoint="/workspaces/" + workspace_id + "/lakehouses/" + lakehouse_id,
+        method="patch",
         payload=payload,
     )
 
@@ -256,6 +256,6 @@ def delete_lakehouse(workspace: str, lakehouse: str) -> None:
     workspace_id = resolve_workspace(workspace)
     lakehouse_id = resolve_lakehouse(workspace_id, lakehouse)
     return api_request(
-        endpoint='/workspaces/' + workspace_id + '/lakehouses/' + lakehouse_id,
-        method='delete',
+        endpoint="/workspaces/" + workspace_id + "/lakehouses/" + lakehouse_id,
+        method="delete",
     )
