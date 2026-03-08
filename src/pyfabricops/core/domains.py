@@ -34,15 +34,15 @@ def list_domains(
         ```
     """
     resp = api_request(
-        '/admin/domains',
+        "/admin/domains",
         params={
-            'nonEmptyOnly': str(non_empty_only).lower(),
-            'preview': 'false',
+            "nonEmptyOnly": str(non_empty_only).lower(),
+            "preview": "false",
         },
         support_pagination=True,
         return_raw=True,
     )
-    return resp.json().get('domains', [])
+    return resp.json().get("domains", [])
 
 
 def get_domain_id(domain_name: str) -> Union[str, None]:
@@ -57,8 +57,8 @@ def get_domain_id(domain_name: str) -> Union[str, None]:
     """
     domains = list_domains(df=False)
     for _domain in domains:
-        if _domain['displayName'] == domain_name:
-            return _domain['id']
+        if _domain["displayName"] == domain_name:
+            return _domain["id"]
     logger.warning(f"domain '{domain_name}' not found.")
     return None
 
@@ -102,7 +102,7 @@ def get_domain(
         ```
     """
     return api_request(
-        '/admin/domains/' + resolve_domain(domain) + '?preview=false',
+        "/admin/domains/" + resolve_domain(domain) + "?preview=false",
     )
 
 
@@ -135,18 +135,18 @@ def create_domain(
         )
         ```
     """
-    payload = {'displayName': display_name}
+    payload = {"displayName": display_name}
 
     if description:
-        payload['description'] = description
+        payload["description"] = description
 
     if parent_domain:
-        payload['parentdomainId'] = resolve_domain(parent_domain)
+        payload["parentdomainId"] = resolve_domain(parent_domain)
 
     return api_request(
-        '/admin/domains',
+        "/admin/domains",
         payload=payload,
-        method='post',
+        method="post",
     )
 
 
@@ -166,8 +166,8 @@ def delete_domain(domain: str) -> None:
         ```
     """
     return api_request(
-        '/admin/domains/' + resolve_domain(domain),
-        method='delete',
+        "/admin/domains/" + resolve_domain(domain),
+        method="delete",
     )
 
 
@@ -203,14 +203,14 @@ def update_domain(
     payload = {}
 
     if display_name:
-        payload = {'displayName': display_name}
+        payload = {"displayName": display_name}
     if description:
-        payload['description'] = description
+        payload["description"] = description
 
     return api_request(
-        '/admin/domains/' + resolve_domain(domain),
+        "/admin/domains/" + resolve_domain(domain),
         payload=payload,
-        method='patch',
+        method="patch",
     )
 
 
@@ -236,7 +236,7 @@ def list_domain_workspaces(
         ```
     """
     resp = api_request(
-        '/admin/domains/' + resolve_domain(domain) + '/workspaces',
+        "/admin/domains/" + resolve_domain(domain) + "/workspaces",
         support_pagination=True,
     )
     return resp
@@ -264,7 +264,7 @@ def list_domain_workspaces(
         ```
     """
     resp = api_request(
-        '/admin/domains/' + resolve_domain(domain) + '/workspaces',
+        "/admin/domains/" + resolve_domain(domain) + "/workspaces",
         support_pagination=True,
     )
     return resp
@@ -292,7 +292,7 @@ def list_domain_role_assignments(
         ```
     """
     resp = api_request(
-        '/admin/domains/' + resolve_domain(domain) + '/roleAssignments',
+        "/admin/domains/" + resolve_domain(domain) + "/roleAssignments",
         support_pagination=True,
     )
     return resp
@@ -352,10 +352,10 @@ def domain_role_assignments_bulk_assign(
         ```
     """
     resp = api_request(
-        '/admin/domains/'
+        "/admin/domains/"
         + resolve_domain(domain)
-        + '/roleAssignments/bulkAssign',
-        method='post',
+        + "/roleAssignments/bulkAssign",
+        method="post",
         payload=payload,
     )
     return resp
@@ -415,10 +415,10 @@ def domain_role_assignments_bulk_unassign(
         ```
     """
     resp = api_request(
-        '/admin/domains/'
+        "/admin/domains/"
         + resolve_domain(domain)
-        + '/roleAssignments/bulkUnassign',
-        method='post',
+        + "/roleAssignments/bulkUnassign",
+        method="post",
         payload=payload,
     )
     return resp
@@ -427,7 +427,7 @@ def domain_role_assignments_bulk_unassign(
 @df
 def domain_sync_role_assignments_to_subdomain(
     domain: str,
-    role: Literal['Admin', 'Contributor'] = 'Admin',
+    role: Literal["Admin", "Contributor"] = "Admin",
     *,
     df: Optional[bool] = True,
 ) -> Union[DataFrame, List[Dict[str, Any]], None]:
@@ -451,12 +451,12 @@ def domain_sync_role_assignments_to_subdomain(
         domain_sync_role_assignments_to_subdomain('Financial', role='Admin')
         ```
     """
-    payload = {'role': role}
+    payload = {"role": role}
     resp = api_request(
-        '/admin/domains/'
+        "/admin/domains/"
         + resolve_domain(domain)
-        + '/roleAssignments/syncToSubdomains',
-        method='post',
+        + "/roleAssignments/syncToSubdomains",
+        method="post",
         payload=payload,
     )
     return resp
@@ -482,8 +482,8 @@ def unassign_all_domain_workspaces(domain: str) -> None:
         ```
     """
     return api_request(
-        '/admin/domains/' + resolve_domain(domain) + '/unassignAllWorkspaces',
-        method='post',
+        "/admin/domains/" + resolve_domain(domain) + "/unassignAllWorkspaces",
+        method="post",
     )
 
 
@@ -516,10 +516,10 @@ def assign_domain_workspaces_by_ids(
 
         ```
     """
-    payload = {'workspacesIds': workspaces}
+    payload = {"workspacesIds": workspaces}
     return api_request(
-        '/admin/domains/' + resolve_domain(domain) + '/assignWorkspaces',
-        method='post',
+        "/admin/domains/" + resolve_domain(domain) + "/assignWorkspaces",
+        method="post",
         payload=payload,
     )
 
@@ -553,10 +553,10 @@ def unassign_domain_workspaces_by_ids(
 
         ```
     """
-    payload = {'workspacesIds': workspaces}
+    payload = {"workspacesIds": workspaces}
     return api_request(
-        '/admin/domains/' + resolve_domain(domain) + '/unassignWorkspaces',
-        method='post',
+        "/admin/domains/" + resolve_domain(domain) + "/unassignWorkspaces",
+        method="post",
         payload=payload,
     )
 
@@ -591,12 +591,12 @@ def assign_domain_workspaces_by_capacities(
 
         ```
     """
-    payload = {'capacitiesIds': capacities}
+    payload = {"capacitiesIds": capacities}
     return api_request(
-        '/admin/domains/'
+        "/admin/domains/"
         + resolve_domain(domain)
-        + '/assignWorkspacesByCapacities',
-        method='post',
+        + "/assignWorkspacesByCapacities",
+        method="post",
         payload=payload,
         support_lro=True,
     )
@@ -631,12 +631,12 @@ def assign_domain_workspaces_by_principals(
 
         ```
     """
-    payload = {'principals': principals}
+    payload = {"principals": principals}
     return api_request(
-        '/admin/domains/'
+        "/admin/domains/"
         + resolve_domain(domain)
-        + '/assignWorkspacesByPrincipals',
-        method='post',
+        + "/assignWorkspacesByPrincipals",
+        method="post",
         payload=payload,
         support_lro=True,
     )

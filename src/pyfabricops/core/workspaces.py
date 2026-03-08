@@ -32,7 +32,7 @@ def list_workspaces(
         list_workspaces(df=False) # Returns as list
         ```
     """
-    return api_request('/workspaces', support_pagination=True)
+    return api_request("/workspaces", support_pagination=True)
 
 
 def get_workspace_id(workspace: str) -> Union[str, None]:
@@ -47,8 +47,8 @@ def get_workspace_id(workspace: str) -> Union[str, None]:
     """
     workspaces = list_workspaces(df=False)
     for _workspace in workspaces:
-        if _workspace['displayName'] == workspace:
-            return _workspace['id']
+        if _workspace["displayName"] == workspace:
+            return _workspace["id"]
 
     logger.warning(f"Workspace '{workspace}' not found.")
     return None
@@ -92,7 +92,7 @@ def get_workspace(
         get_workspace('MyProjectWorkspace', df=False) # Returns as list
         ```
     """
-    return api_request('/workspaces/' + resolve_workspace(workspace))
+    return api_request("/workspaces/" + resolve_workspace(workspace))
 
 
 @df
@@ -125,15 +125,15 @@ def create_workspace(
         )
         ```
     """
-    payload = {'displayName': display_name}
+    payload = {"displayName": display_name}
 
     if capacity:
-        payload['capacityId'] = resolve_capacity(capacity)
+        payload["capacityId"] = resolve_capacity(capacity)
 
     if description:
-        payload['description'] = description
+        payload["description"] = description
 
-    return api_request('/workspaces', payload=payload, method='post')
+    return api_request("/workspaces", payload=payload, method="post")
 
 
 @df
@@ -178,20 +178,20 @@ def update_workspace(
     """
     if not display_name and not description:
         logger.warning(
-            'No changes provided. Please specify at least one property to update.'
+            "No changes provided. Please specify at least one property to update."
         )
         return None
 
     payload = {}
     if display_name:
-        payload['displayName'] = display_name
+        payload["displayName"] = display_name
     if description:
-        payload['description'] = description
+        payload["description"] = description
 
     return api_request(
-        '/workspaces/' + resolve_workspace(workspace),
+        "/workspaces/" + resolve_workspace(workspace),
         payload=payload,
-        method='patch',
+        method="patch",
     )
 
 
@@ -219,8 +219,8 @@ def delete_workspace(workspace: str) -> None:
         return None
 
     return api_request(
-        '/workspaces/' + resolve_workspace(workspace),
-        method='delete',
+        "/workspaces/" + resolve_workspace(workspace),
+        method="delete",
     )
 
 
@@ -248,7 +248,7 @@ def list_workspace_role_assignments(
         ```
     """
     return api_request(
-        '/workspaces/' + resolve_workspace(workspace) + '/roleAssignments',
+        "/workspaces/" + resolve_workspace(workspace) + "/roleAssignments",
         support_pagination=True,
     )
 
@@ -281,9 +281,9 @@ def get_workspace_role_assignment(
         ```
     """
     return api_request(
-        '/workspaces/'
+        "/workspaces/"
         + resolve_workspace(workspace)
-        + '/roleAssignments/'
+        + "/roleAssignments/"
         + user_uuid
     )
 
@@ -293,9 +293,9 @@ def add_workspace_role_assignment(
     workspace: str,
     user_uuid: str,
     user_type: Literal[
-        'User', 'Group', 'ServicePrincipal', 'ServicePrincipalProfile'
-    ] = 'User',
-    role: Literal['Admin', 'Contributor', 'Member', 'Viewer'] = 'Admin',
+        "User", "Group", "ServicePrincipal", "ServicePrincipalProfile"
+    ] = "User",
+    role: Literal["Admin", "Contributor", "Member", "Viewer"] = "Admin",
     *,
     df: Optional[bool] = True,
 ) -> Union[DataFrame, Dict[str, Any], None]:
@@ -326,24 +326,24 @@ def add_workspace_role_assignment(
         ```
     """
     if user_type not in [
-        'User',
-        'Group',
-        'ServicePrincipal',
-        'ServicePrincipalProfile',
+        "User",
+        "Group",
+        "ServicePrincipal",
+        "ServicePrincipalProfile",
     ]:
         raise OptionNotAvailableError(
-            f'Invalid user type: {user_type}. Must be one of: User, Group, ServicePrincipal, ServicePrincipalProfile'
+            f"Invalid user type: {user_type}. Must be one of: User, Group, ServicePrincipal, ServicePrincipalProfile"
         )
-    if role not in ['Admin', 'Contributor', 'Member', 'Viewer']:
+    if role not in ["Admin", "Contributor", "Member", "Viewer"]:
         raise OptionNotAvailableError(
-            f'Invalid role: {role}. Must be one of: Admin, Contributor, Member, Viewer'
+            f"Invalid role: {role}. Must be one of: Admin, Contributor, Member, Viewer"
         )
-    payload = {'principal': {'id': user_uuid, 'type': user_type}, 'role': role}
+    payload = {"principal": {"id": user_uuid, "type": user_type}, "role": role}
 
     return api_request(
-        '/workspaces/' + resolve_workspace(workspace) + '/roleAssignments',
+        "/workspaces/" + resolve_workspace(workspace) + "/roleAssignments",
         payload=payload,
-        method='post',
+        method="post",
     )
 
 
@@ -351,7 +351,7 @@ def add_workspace_role_assignment(
 def update_workspace_role_assignment(
     workspace: str,
     user_uuid: str,
-    role: Literal['Admin', 'Contributor', 'Member', 'Viewer'] = 'Admin',
+    role: Literal["Admin", "Contributor", "Member", "Viewer"] = "Admin",
     *,
     df: Optional[bool] = True,
 ) -> Union[DataFrame, Dict[str, Any], None]:
@@ -380,19 +380,19 @@ def update_workspace_role_assignment(
             role='Contributor'
         )
     """
-    if role not in ['Admin', 'Contributor', 'Member', 'Viewer']:
+    if role not in ["Admin", "Contributor", "Member", "Viewer"]:
         raise OptionNotAvailableError(
-            f'Invalid role: {role}. Must be one of: Admin, Contributor, Member, Viewer'
+            f"Invalid role: {role}. Must be one of: Admin, Contributor, Member, Viewer"
         )
 
-    payload = {'role': role}
+    payload = {"role": role}
 
     workspace_id = resolve_workspace(workspace)
 
     return api_request(
-        '/workspaces/' + workspace_id + '/roleAssignments/' + user_uuid,
+        "/workspaces/" + workspace_id + "/roleAssignments/" + user_uuid,
         payload=payload,
-        method='patch',
+        method="patch",
     )
 
 
@@ -419,11 +419,11 @@ def delete_workspace_role_assignment(
     ```
     """
     return api_request(
-        '/workspaces/'
+        "/workspaces/"
         + resolve_workspace(workspace)
-        + '/roleAssignments/'
+        + "/roleAssignments/"
         + user_uuid,
-        method='delete',
+        method="delete",
     )
 
 
@@ -446,21 +446,21 @@ def assign_to_capacity(workspace: str, capacity: str) -> None:
         )
         ```
     """
-    payload = {'capacityId': resolve_capacity(capacity)}
+    payload = {"capacityId": resolve_capacity(capacity)}
     response = api_request(
-        '/workspaces/' + resolve_workspace(workspace) + '/assignToCapacity',
+        "/workspaces/" + resolve_workspace(workspace) + "/assignToCapacity",
         payload=payload,
-        method='post',
+        method="post",
         return_raw=True,
     )
     if response.status_code == 202:
         # Assuming the API returns a 202 status code for successful assignment
         logger.success(
-            f'Workspace {workspace} assigned to capacity {capacity} successfully.'
+            f"Workspace {workspace} assigned to capacity {capacity} successfully."
         )
         return None
     else:
-        logger.error(f'{response.status_code}: {response.error}')
+        logger.error(f"{response.status_code}: {response.error}")
         return None
 
 
@@ -480,17 +480,17 @@ def unassign_from_capacity(workspace: str) -> None:
         ```
     """
     response = api_request(
-        '/workspaces/'
+        "/workspaces/"
         + resolve_workspace(workspace)
-        + '/unassignFromCapacity',
-        method='post',
+        + "/unassignFromCapacity",
+        method="post",
         return_raw=True,
     )
     if response.status_code == 202:
         logger.success(
-            f'Workspace {workspace} unassigned from capacity successfully.'
+            f"Workspace {workspace} unassigned from capacity successfully."
         )
         return None
     else:
-        logger.error(f'{response.status_code}: {response.error}')
+        logger.error(f"{response.status_code}: {response.error}")
         return None

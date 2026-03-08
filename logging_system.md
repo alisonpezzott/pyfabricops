@@ -18,7 +18,7 @@ The custom logging system implemented in `pyfabricops` provides a complete and f
 import pyfabricops as pf
 
 # Basic configuration
-pf.setup_logging(level='INFO', format_style='standard')
+pf.setup_logging(level="INFO", format_style="standard")
 
 # Debug mode for development
 pf.enable_debug_mode(include_external=False)
@@ -34,8 +34,8 @@ pf.reset_logging()
 ```python
 # Save logs to file with automatic rotation
 pf.setup_logging(
-    level='DEBUG',
-    log_file='logs/pyfabricops.log',
+    level="DEBUG",
+    log_file="logs/pyfabricops.log",
     max_file_size=10*1024*1024,  # 10MB
     backup_count=5
 )
@@ -58,7 +58,7 @@ pf.setup_logging(
 import pyfabricops as pf
 
 # Default setup
-pf.setup_logging(level='INFO')
+pf.setup_logging(level="INFO")
 
 # Use library normally
 workspaces = pf.list_workspaces()
@@ -70,17 +70,17 @@ workspaces = pf.list_workspaces()
 pf.enable_debug_mode(include_external=True)
 
 # Execute functions - you'll see all API details
-definition = pf.get_semantic_model_definition('workspace', 'model')
+definition = pf.get_semantic_model_definition("workspace", "model")
 ```
 
 ### Production
 ```python
 # Minimal logging in production
 pf.setup_logging(
-    level='WARNING',
-    format_style='minimal',
+    level="WARNING",
+    format_style="minimal",
     include_colors=False,
-    log_file='/var/log/app/pyfabricops.log'
+    log_file="/var/log/app/pyfabricops.log"
 )
 ```
 

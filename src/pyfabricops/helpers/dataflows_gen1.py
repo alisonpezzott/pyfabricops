@@ -42,12 +42,12 @@ def get_dataflow_gen1_config(
 
     else:
         config = {}
-        config = config[item_data.get('name')] = {}
+        config = config[item_data.get("name")] = {}
 
         config = {
-            'id': item_data['objectId'],
-            'description': item_data.get('description', None),
-            'folder_id': '',
+            "id": item_data["objectId"],
+            "description": item_data.get("description", None),
+            "folder_id": "",
         }
 
         return config
@@ -73,10 +73,10 @@ def get_all_dataflows_gen1_config(
     config = {}
 
     for item in items:
-        config[item['name']] = {
-            'id': item['objectId'],
-            'description': item.get('description', None),
-            'folder_id': '',
+        config[item["name"]] = {
+            "id": item["objectId"],
+            "description": item.get("description", None),
+            "folder_id": "",
         }
 
     return config
@@ -110,8 +110,8 @@ def export_dataflow_gen1(
     if not dataflow_:
         return None
 
-    dataflow_id = dataflow_['objectId']
-    dataflow_name = dataflow_['name']
+    dataflow_id = dataflow_["objectId"]
+    dataflow_name = dataflow_["name"]
 
     definition_response = get_dataflow_gen1_definition(
         workspace=workspace_id,
@@ -121,15 +121,15 @@ def export_dataflow_gen1(
     if not definition_response:
         return None
 
-    dataflow_name = dataflow_['name']
-    dataflow_path = Path(path) / dataflow_name + '.Dataflow'
+    dataflow_name = dataflow_["name"]
+    dataflow_path = Path(path) / dataflow_name + ".Dataflow"
     os.makedirs(dataflow_path, exist_ok=True)
 
     # Save the model as model.json inside the item folder in single-line format (Power BI portal format)
-    model_json_path = dataflow_path / 'model.json'
+    model_json_path = dataflow_path / "model.json"
     write_single_line_json(definition_response, model_json_path)
 
-    logger.success(f'Exported dataflow {dataflow_name} to {dataflow_path}.')
+    logger.success(f"Exported dataflow {dataflow_name} to {dataflow_path}.")
     return None
 
 
@@ -161,7 +161,7 @@ def export_all_dataflows_gen1(
     else:
         for dataflow in dataflows:
             export_dataflow_gen1(
-                workspace=workspace, dataflow=dataflow['objectId'], path=path
+                workspace=workspace, dataflow=dataflow["objectId"], path=path
             )
         return None
 
@@ -185,29 +185,29 @@ def _serialize_dataflow_gen1_model(path: str) -> tuple[bytes, str]:
         ```
     """
     # Read and clean JSON using load_and_sanitize function
-    df_json = load_and_sanitize(Path(path) / 'model.json')
+    df_json = load_and_sanitize(Path(path) / "model.json")
 
-    json_str = json.dumps(df_json, ensure_ascii=False, separators=(',', ':'))
+    json_str = json.dumps(df_json, ensure_ascii=False, separators=(",", ":"))
 
     # Boundary setup
     boundary = uuid.uuid4().hex
-    LF = '\r\n'
+    LF = "\r\n"
 
     # Serialized Json Body
     body = (
-        f'--{boundary}{LF}'
+        f"--{boundary}{LF}"
         f'Content-Disposition: form-data; name="model.json"; filename="model.json"{LF}'
-        f'Content-Type: application/json{LF}{LF}'
-        f'{json_str}{LF}'
-        f'--{boundary}--{LF}'
+        f"Content-Type: application/json{LF}{LF}"
+        f"{json_str}{LF}"
+        f"--{boundary}--{LF}"
     )
 
     try:
-        body.encode('utf-8')
+        body.encode("utf-8")
     except UnicodeEncodeError as e:
-        logger.error(f'Encoding error: {e}')
+        logger.error(f"Encoding error: {e}")
         raise
-    return body.encode('utf-8'), boundary
+    return body.encode("utf-8"), boundary
 
 
 def deploy_dataflow_gen1(workspace: str, path: str) -> Union[bool, None]:
@@ -233,11 +233,11 @@ def deploy_dataflow_gen1(workspace: str, path: str) -> Union[bool, None]:
     # Read and clean JSON
     body, boundary = _serialize_dataflow_gen1_model(path)
 
-    content_type = f'multipart/form-data; boundary={boundary}'
+    content_type = f"multipart/form-data; boundary={boundary}"
 
     params = {
-        'datasetDisplayName': 'model.json',
-        'nameConflict': 'Abort',
+        "datasetDisplayName": "model.json",
+        "nameConflict": "Abort",
     }
 
     workspace_id = resolve_workspace(workspace)
@@ -245,11 +245,11 @@ def deploy_dataflow_gen1(workspace: str, path: str) -> Union[bool, None]:
         return None
 
     response = _base_api(
-        audience='powerbi',
-        endpoint=f'/groups/{workspace_id}/imports',
+        audience="powerbi",
+        endpoint=f"/groups/{workspace_id}/imports",
         content_type=content_type,
-        credential_type='user',
-        method='post',
+        credential_type="user",
+        method="post",
         data=body,
         params=params,
         return_raw=True,
@@ -257,10 +257,10 @@ def deploy_dataflow_gen1(workspace: str, path: str) -> Union[bool, None]:
     # Handle response
     if not response.status_code in (200, 202):
         logger.error(
-            f'Error deploying the dataflow: {response.status_code} - {response.json().get("error", {})}'
+            f"Error deploying the dataflow: {response.status_code} - {response.json().get('error', {})}"
         )
         return None
-    logger.success(f'Dataflow deployed successfully.')
+    logger.success(f"Dataflow deployed successfully.")
     return True
 
 
@@ -281,10 +281,9 @@ def deploy_all_dataflows_gen1(
     if workspace_id is None:
         return None
 
-    dataflows_gen2_paths = list_paths_of_type(path, 'Dataflow')
+    dataflows_gen2_paths = list_paths_of_type(path, "Dataflow")
 
     for path_ in dataflows_gen2_paths:
-
         deploy_dataflow_gen1(workspace_id, path_)
 
     logger.success(

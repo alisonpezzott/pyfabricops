@@ -53,15 +53,15 @@ def get_environment_config(
 
     else:
         config = {}
-        config = config[item_data.get('displayName')] = {}
+        config = config[item_data.get("displayName")] = {}
 
         config = {
-            'id': item_data['id'],
-            'description': item_data.get('description', None),
-            'folder_id': ''
-            if item_data.get('folderId') is None
-            or pd.isna(item_data.get('folderId'))
-            else item_data['folderId'],
+            "id": item_data["id"],
+            "description": item_data.get("description", None),
+            "folder_id": ""
+            if item_data.get("folderId") is None
+            or pd.isna(item_data.get("folderId"))
+            else item_data["folderId"],
         }
 
         return config
@@ -87,15 +87,14 @@ def get_all_environments_config(
     config = {}
 
     for item in items:
+        item_data = get_environment(workspace, item["id"], df=False)
 
-        item_data = get_environment(workspace, item['id'], df=False)
-
-        config[item['displayName']] = {
-            'id': item['id'],
-            'description': item.get('description', None),
-            'folder_id': ''
-            if item.get('folderId') is None or pd.isna(item.get('folderId'))
-            else item['folderId'],
+        config[item["displayName"]] = {
+            "id": item["id"],
+            "description": item.get("description", None),
+            "folder_id": ""
+            if item.get("folderId") is None or pd.isna(item.get("folderId"))
+            else item["folderId"],
         }
 
     return config
@@ -121,30 +120,30 @@ def export_environment(
     item = get_environment(workspace_id, environment, df=False)
     try:
         folder_path = resolve_folder_from_id_to_path(
-            workspace_id, item['folderId']
+            workspace_id, item["folderId"]
         )
     except:
         logger.info(
-            f'{item["displayName"]}.Environment is not inside a folder.'
+            f"{item['displayName']}.Environment is not inside a folder."
         )
         folder_path = None
 
     if folder_path is None:
-        item_path = Path(path) / (item['displayName'] + '.Environment')
+        item_path = Path(path) / (item["displayName"] + ".Environment")
     else:
         item_path = (
-            Path(path) / folder_path / (item['displayName'] + '.Environment')
+            Path(path) / folder_path / (item["displayName"] + ".Environment")
         )
     os.makedirs(item_path, exist_ok=True)
 
-    definition = get_environment_definition(workspace_id, item['id'])
+    definition = get_environment_definition(workspace_id, item["id"])
     if definition is None:
         return None
 
     unpack_item_definition(definition, item_path)
 
     logger.success(
-        f'`{item["displayName"]}.Environment` was exported to {item_path} successfully.'
+        f"`{item['displayName']}.Environment` was exported to {item_path} successfully."
     )
     return None
 
@@ -171,31 +170,31 @@ def export_all_environments(
     for item in items:
         try:
             folder_path = resolve_folder_from_id_to_path(
-                workspace_id, item['folderId']
+                workspace_id, item["folderId"]
             )
         except:
             logger.info(
-                f'{item["displayName"]}.Environment is not inside a folder.'
+                f"{item['displayName']}.Environment is not inside a folder."
             )
             folder_path = None
 
         if folder_path is None:
-            item_path = Path(path) / (item['displayName'] + '.Environment')
+            item_path = Path(path) / (item["displayName"] + ".Environment")
         else:
             item_path = (
                 Path(path)
                 / folder_path
-                / (item['displayName'] + '.Environment')
+                / (item["displayName"] + ".Environment")
             )
         os.makedirs(item_path, exist_ok=True)
 
-        definition = get_environment_definition(workspace_id, item['id'])
+        definition = get_environment_definition(workspace_id, item["id"])
         if definition is None:
             return None
 
         unpack_item_definition(definition, item_path)
 
-    logger.success(f'All environments were exported to {path} successfully.')
+    logger.success(f"All environments were exported to {path} successfully.")
     return None
 
 
@@ -273,10 +272,9 @@ def deploy_all_environments(
     if workspace_id is None:
         return None
 
-    environments_paths = list_paths_of_type(path, 'Environment')
+    environments_paths = list_paths_of_type(path, "Environment")
 
     for path_ in environments_paths:
-
         display_name = extract_display_name_from_platform(path_)
         if display_name is None:
             return None
@@ -324,12 +322,12 @@ def _create_environment_external_library_yaml(
         env_yaml += f"""
       - {library}=={version}"""
 
-    target_path = '../tmp/env/Libraries/PublicLibraries/environment.yaml'
+    target_path = "../tmp/env/Libraries/PublicLibraries/environment.yaml"
 
     os.makedirs(os.path.dirname(target_path), exist_ok=True)
-    with open(target_path, 'w', encoding='utf-8') as f:
+    with open(target_path, "w", encoding="utf-8") as f:
         f.write(env_yaml)
-    logger.debug(f'Environment external libraries were created successfully.')
+    logger.debug(f"Environment external libraries were created successfully.")
     return None
 
 
@@ -362,14 +360,14 @@ def add_environment_external_library_from_pypi(
         )
     ```
     """
-    target_path = '../tmp/env'
+    target_path = "../tmp/env"
 
     definition = get_environment_definition(
         workspace,
         environment,
     )
 
-    delete_path('../tmp')
+    delete_path("../tmp")
 
     unpack_item_definition(
         definition,
@@ -385,6 +383,6 @@ def add_environment_external_library_from_pypi(
     )
 
     logger.success(
-        f'External libraries were added to environment {environment} successfully.'
+        f"External libraries were added to environment {environment} successfully."
     )
     return None

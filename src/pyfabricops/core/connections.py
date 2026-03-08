@@ -33,7 +33,7 @@ def list_connections(
         list_connections()
         ```
     """
-    return api_request('/connections', support_pagination=True)
+    return api_request("/connections", support_pagination=True)
 
 
 def get_connection_id(connection: str) -> str | None:
@@ -49,8 +49,8 @@ def get_connection_id(connection: str) -> str | None:
     connections = list_connections(df=False)
 
     for _connection in connections:
-        if _connection['displayName'] == connection:
-            return _connection['id']
+        if _connection["displayName"] == connection:
+            return _connection["id"]
 
     logger.warning(f"Connection '{connection}' not found.")
     return None
@@ -94,7 +94,7 @@ def get_connection(
         get_connection('MyProjectConnection', df=False) # Returns as list
         ```
     """
-    return api_request('/connections/' + resolve_connection(connection))
+    return api_request("/connections/" + resolve_connection(connection))
 
 
 def delete_connection(connection: str) -> None:
@@ -113,7 +113,7 @@ def delete_connection(connection: str) -> None:
         ```
     """
     return api_request(
-        '/connections/' + resolve_connection(connection), method='delete'
+        "/connections/" + resolve_connection(connection), method="delete"
     )
 
 
@@ -140,7 +140,7 @@ def list_connection_role_assignments(
         ```
     """
     return api_request(
-        '/connections/' + resolve_connection(connection) + '/roleAssignments',
+        "/connections/" + resolve_connection(connection) + "/roleAssignments",
         support_pagination=True,
     )
 
@@ -150,9 +150,9 @@ def add_connection_role_assignment(
     connection: str,
     user_uuid: str,
     user_type: Literal[
-        'User', 'Group', 'ServicePrincipal', 'ServicePrincipalProfile'
-    ] = 'User',
-    role: Literal['Owner', 'User', 'UserWithReshare'] = 'User',
+        "User", "Group", "ServicePrincipal", "ServicePrincipalProfile"
+    ] = "User",
+    role: Literal["Owner", "User", "UserWithReshare"] = "User",
     *,
     df: Optional[bool] = True,
 ) -> Union[DataFrame, Dict[str, Any], None]:
@@ -180,13 +180,13 @@ def add_connection_role_assignment(
         ```
     """
     payload = {
-        'principal': {'id': user_uuid, 'type': user_type},
-        'role': role,
+        "principal": {"id": user_uuid, "type": user_type},
+        "role": role,
     }
 
     return api_request(
-        '/connections/' + resolve_connection(connection) + '/roleAssignments',
-        method='post',
+        "/connections/" + resolve_connection(connection) + "/roleAssignments",
+        method="post",
         payload=payload,
     )
 
@@ -216,9 +216,9 @@ def get_connection_role_assignment(
         ```
     """
     return api_request(
-        '/connections/'
+        "/connections/"
         + resolve_connection(connection)
-        + '/roleAssignments/'
+        + "/roleAssignments/"
         + user_uuid,
     )
 
@@ -227,7 +227,7 @@ def get_connection_role_assignment(
 def update_connection_role_assignment(
     connection: str,
     user_uuid: str,
-    role: Literal['Owner', 'User', 'UserWithReshare'] = 'User',
+    role: Literal["Owner", "User", "UserWithReshare"] = "User",
     *,
     df: Optional[bool] = False,
 ) -> Union[DataFrame, Dict[str, Any], None]:
@@ -254,13 +254,13 @@ def update_connection_role_assignment(
         )
         ```
     """
-    payload = {'role': role}
+    payload = {"role": role}
     return api_request(
-        '/connections/'
+        "/connections/"
         + resolve_connection(connection)
-        + '/roleAssignments/'
+        + "/roleAssignments/"
         + user_uuid,
-        method='patch',
+        method="patch",
         payload=payload,
     )
 
@@ -288,11 +288,11 @@ def delete_connection_role_assignment(
         ```
     """
     return api_request(
-        '/connections/'
+        "/connections/"
         + resolve_connection(connection)
-        + '/roleAssignments/'
+        + "/roleAssignments/"
         + user_uuid,
-        method='delete',
+        method="delete",
     )
 
 
@@ -336,31 +336,31 @@ def create_adlsgen2_connection_with_service_principal_credentials(
         ```
     """
     payload = {
-        'connectivityType': 'ShareableCloud',
-        'displayName': display_name,
-        'connectionDetails': {
-            'type': 'AzureDataLakeStorage',
-            'creationMethod': 'AzureDataLakeStorage',
-            'parameters': [
-                {'dataType': 'Text', 'name': 'server', 'value': adls_endpoint}
+        "connectivityType": "ShareableCloud",
+        "displayName": display_name,
+        "connectionDetails": {
+            "type": "AzureDataLakeStorage",
+            "creationMethod": "AzureDataLakeStorage",
+            "parameters": [
+                {"dataType": "Text", "name": "server", "value": adls_endpoint}
             ],
         },
-        'privacyLevel': 'Organizational',
-        'credentialDetails': {
-            'singleSignOnType': 'None',
-            'connectionEncryption': 'NotEncrypted',
-            'credentials': {
-                'credentialType': 'ServicePrincipal',
-                'tenantId': tenant_id,
-                'servicePrincipalClientId': client_id,
-                'servicePrincipalSecret': client_secret,
+        "privacyLevel": "Organizational",
+        "credentialDetails": {
+            "singleSignOnType": "None",
+            "connectionEncryption": "NotEncrypted",
+            "credentials": {
+                "credentialType": "ServicePrincipal",
+                "tenantId": tenant_id,
+                "servicePrincipalClientId": client_id,
+                "servicePrincipalSecret": client_secret,
             },
         },
     }
 
     return api_request(
-        '/connections',
-        method='post',
+        "/connections",
+        method="post",
         payload=payload,
     )
 
@@ -399,26 +399,26 @@ def create_github_source_control_connection(
         ```
     """
     payload = {
-        'connectivityType': 'ShareableCloud',
-        'displayName': display_name,
-        'connectionDetails': {
-            'type': 'GitHubSourceControl',
-            'creationMethod': 'GitHubSourceControl.Contents',
-            'parameters': [
-                {'dataType': 'Text', 'name': 'url', 'value': repository}
+        "connectivityType": "ShareableCloud",
+        "displayName": display_name,
+        "connectionDetails": {
+            "type": "GitHubSourceControl",
+            "creationMethod": "GitHubSourceControl.Contents",
+            "parameters": [
+                {"dataType": "Text", "name": "url", "value": repository}
             ],
         },
-        'privacyLevel': 'Organizational',
-        'credentialDetails': {
-            'singleSignOnType': 'None',
-            'connectionEncryption': 'NotEncrypted',
-            'credentials': {'credentialType': 'Key', 'key': github_token},
+        "privacyLevel": "Organizational",
+        "credentialDetails": {
+            "singleSignOnType": "None",
+            "connectionEncryption": "NotEncrypted",
+            "credentials": {"credentialType": "Key", "key": github_token},
         },
     }
 
     return api_request(
-        '/connections',
-        method='post',
+        "/connections",
+        method="post",
         payload=payload,
     )
 
@@ -430,8 +430,8 @@ def create_sql_cloud_connection(
     database: str,
     username: str,
     password: str,
-    privacy_level: Optional[str] = 'Organizational',
-    connection_encryption: Optional[str] = 'NotEncrypted',
+    privacy_level: Optional[str] = "Organizational",
+    connection_encryption: Optional[str] = "NotEncrypted",
     *,
     df: Optional[bool] = True,
 ) -> Union[DataFrame, Dict[str, Any], None]:
@@ -470,30 +470,30 @@ def create_sql_cloud_connection(
         ```
     """
     payload = {
-        'connectivityType': 'ShareableCloud',
-        'displayName': display_name,
-        'connectionDetails': {
-            'type': 'SQL',
-            'creationMethod': 'SQL',
-            'parameters': [
-                {'dataType': 'Text', 'name': 'server', 'value': server},
-                {'dataType': 'Text', 'name': 'database', 'value': database},
+        "connectivityType": "ShareableCloud",
+        "displayName": display_name,
+        "connectionDetails": {
+            "type": "SQL",
+            "creationMethod": "SQL",
+            "parameters": [
+                {"dataType": "Text", "name": "server", "value": server},
+                {"dataType": "Text", "name": "database", "value": database},
             ],
         },
-        'privacyLevel': privacy_level,
-        'credentialDetails': {
-            'singleSignOnType': 'None',
-            'connectionEncryption': connection_encryption,
-            'credentials': {
-                'credentialType': 'Basic',
-                'username': username,
-                'password': password,
+        "privacyLevel": privacy_level,
+        "credentialDetails": {
+            "singleSignOnType": "None",
+            "connectionEncryption": connection_encryption,
+            "credentials": {
+                "credentialType": "Basic",
+                "username": username,
+                "password": password,
             },
         },
     }
     return api_request(
-        '/connections',
-        method='post',
+        "/connections",
+        method="post",
         payload=payload,
     )
 
@@ -507,9 +507,9 @@ def create_sql_on_premises_connection(
     username: str,
     password: str,
     *,
-    credential_type: Optional[str] = 'Basic',
-    privacy_level: Optional[str] = 'Organizational',
-    connection_encryption: Optional[str] = 'NotEncrypted',
+    credential_type: Optional[str] = "Basic",
+    privacy_level: Optional[str] = "Organizational",
+    connection_encryption: Optional[str] = "NotEncrypted",
     skip_test_connection: Optional[bool] = False,
     df: Optional[bool] = True,
 ) -> Union[DataFrame, Dict[str, Any], None]:
@@ -557,36 +557,36 @@ def create_sql_on_premises_connection(
         gateway_id=gateway_id, username=username, password=password
     )
     payload = {
-        'connectivityType': 'OnPremisesGateway',
-        'gatewayId': gateway_id,
-        'displayName': display_name,
-        'connectionDetails': {
-            'type': 'SQL',
-            'creationMethod': 'SQL',
-            'parameters': [
-                {'dataType': 'Text', 'name': 'server', 'value': server},
-                {'dataType': 'Text', 'name': 'database', 'value': database},
+        "connectivityType": "OnPremisesGateway",
+        "gatewayId": gateway_id,
+        "displayName": display_name,
+        "connectionDetails": {
+            "type": "SQL",
+            "creationMethod": "SQL",
+            "parameters": [
+                {"dataType": "Text", "name": "server", "value": server},
+                {"dataType": "Text", "name": "database", "value": database},
             ],
         },
-        'privacyLevel': privacy_level,
-        'credentialDetails': {
-            'singleSignOnType': 'None',
-            'connectionEncryption': connection_encryption,
-            'skipTestConnection': skip_test_connection,
-            'credentials': {
-                'credentialType': credential_type,
-                'values': [
+        "privacyLevel": privacy_level,
+        "credentialDetails": {
+            "singleSignOnType": "None",
+            "connectionEncryption": connection_encryption,
+            "skipTestConnection": skip_test_connection,
+            "credentials": {
+                "credentialType": credential_type,
+                "values": [
                     {
-                        'gatewayId': gateway_id,
-                        'encryptedCredentials': encrypted_credentials,
+                        "gatewayId": gateway_id,
+                        "encryptedCredentials": encrypted_credentials,
                     }
                 ],
             },
         },
     }
     return api_request(
-        '/connections',
-        method='post',
+        "/connections",
+        method="post",
         payload=payload,
     )
 
@@ -597,14 +597,14 @@ def bind_semantic_model_connection(
     connection_type: str,
     connection_path: str,
     connectivity_type: Literal[
-        'ShareableCloud',
-        'PersonalCloud',
-        'OnPremisesGateway',
-        'OnPremisesGatewayPersonal',
-        'VirtualNetworkGateway',
-        'Automatic',
-        'None',
-    ] = 'ShareableCloud',
+        "ShareableCloud",
+        "PersonalCloud",
+        "OnPremisesGateway",
+        "OnPremisesGatewayPersonal",
+        "VirtualNetworkGateway",
+        "Automatic",
+        "None",
+    ] = "ShareableCloud",
     connection: str = None,
 ) -> None:
     """
@@ -637,26 +637,26 @@ def bind_semantic_model_connection(
     workspace_id = resolve_workspace(workspace)
     semantic_model_id = resolve_semantic_model(workspace_id, semantic_model)
     payload = {
-        'connectionBinding': {
-            'connectivityType': connectivity_type,
-            'connectionDetails': {
-                'type': connection_type,
-                'path': connection_path,
+        "connectionBinding": {
+            "connectivityType": connectivity_type,
+            "connectionDetails": {
+                "type": connection_type,
+                "path": connection_path,
             },
         }
     }
     if connection is not None:
         connection_id = resolve_connection(connection)
-        payload['connectionBinding']['id'] = connection_id
+        payload["connectionBinding"]["id"] = connection_id
 
     response = api_request(
-        endpoint=f'/workspaces/{workspace_id}/semanticModels/{semantic_model_id}/bindConnection',
-        method='post',
+        endpoint=f"/workspaces/{workspace_id}/semanticModels/{semantic_model_id}/bindConnection",
+        method="post",
         payload=payload,
     )
 
     if response == None:
-        if connectivity_type == 'None':
+        if connectivity_type == "None":
             logger.success(
                 f"Semantic model '{semantic_model}' in workspace '{workspace}' successfully unbinded from current connection."
             )
@@ -705,30 +705,30 @@ def create_azure_devops_connection_with_service_principal(
         ```
     """
     payload = {
-        'connectivityType': 'ShareableCloud',
-        'displayName': display_name,
-        'connectionDetails': {
-            'type': 'AzureDevOpsSourceControl',
-            'creationMethod': 'AzureDevOpsSourceControl.Contents',
-            'parameters': [
-                {'dataType': 'Text', 'name': 'url', 'value': repository_url}
+        "connectivityType": "ShareableCloud",
+        "displayName": display_name,
+        "connectionDetails": {
+            "type": "AzureDevOpsSourceControl",
+            "creationMethod": "AzureDevOpsSourceControl.Contents",
+            "parameters": [
+                {"dataType": "Text", "name": "url", "value": repository_url}
             ],
         },
-        'privacyLevel': 'Organizational',
-        'credentialDetails': {
-            'singleSignOnType': 'None',
-            'connectionEncryption': 'NotEncrypted',
-            'credentials': {
-                'credentialType': 'ServicePrincipal',
-                'tenantId': tenant_id,
-                'servicePrincipalClientId': client_id,
-                'servicePrincipalSecret': client_secret,
+        "privacyLevel": "Organizational",
+        "credentialDetails": {
+            "singleSignOnType": "None",
+            "connectionEncryption": "NotEncrypted",
+            "credentials": {
+                "credentialType": "ServicePrincipal",
+                "tenantId": tenant_id,
+                "servicePrincipalClientId": client_id,
+                "servicePrincipalSecret": client_secret,
             },
         },
     }
 
     return api_request(
-        '/connections',
-        method='post',
+        "/connections",
+        method="post",
         payload=payload,
     )

@@ -34,7 +34,7 @@ def list_folders(
         ```
     """
     return api_request(
-        '/workspaces/' + resolve_workspace(workspace) + '/folders',
+        "/workspaces/" + resolve_workspace(workspace) + "/folders",
         support_pagination=True,
     )
 
@@ -54,9 +54,9 @@ def get_folder_id(workspace: str, folder_name: str) -> Union[str, None]:
         df=False,
     )
     for _folder in folders:
-        if _folder['displayName'] == folder_name:
-            return _folder['id']
-    logger.warning(f'Folder {folder_name} not found in workspace {workspace}.')
+        if _folder["displayName"] == folder_name:
+            return _folder["id"]
+    logger.warning(f"Folder {folder_name} not found in workspace {workspace}.")
     return None
 
 
@@ -103,9 +103,9 @@ def get_folder(
     """
     workspace_id = resolve_workspace(workspace)
     return api_request(
-        '/workspaces/'
+        "/workspaces/"
         + workspace_id
-        + '/folders/'
+        + "/folders/"
         + resolve_folder(workspace_id, folder),
     )
 
@@ -142,15 +142,15 @@ def create_folder(
     """
     workspace_id = resolve_workspace(workspace)
 
-    payload = {'displayName': display_name}
+    payload = {"displayName": display_name}
 
     if parent_folder:
-        payload['parentFolderId'] = resolve_folder(workspace_id, parent_folder)
+        payload["parentFolderId"] = resolve_folder(workspace_id, parent_folder)
 
     return api_request(
-        '/workspaces/' + workspace_id + '/folders',
+        "/workspaces/" + workspace_id + "/folders",
         payload=payload,
-        method='post',
+        method="post",
     )
 
 
@@ -176,11 +176,11 @@ def delete_folder(workspace: str, folder: str) -> None:
     workspace_id = resolve_workspace(workspace)
 
     return api_request(
-        '/workspaces/'
+        "/workspaces/"
         + workspace_id
-        + '/folders/'
+        + "/folders/"
         + resolve_folder(workspace_id, folder),
-        method='delete',
+        method="delete",
     )
 
 
@@ -216,15 +216,15 @@ def update_folder(
     """
     workspace_id = resolve_workspace(workspace)
 
-    payload = {'displayName': display_name}
+    payload = {"displayName": display_name}
 
     return api_request(
-        '/workspaces/'
+        "/workspaces/"
         + workspace_id
-        + '/folders/'
+        + "/folders/"
         + resolve_folder(workspace_id, folder),
         payload=payload,
-        method='patch',
+        method="patch",
     )
 
 
@@ -265,15 +265,15 @@ def move_folder(
 
     if target_folder:
         payload = {
-            'targetFolderId': resolve_folder(workspace_id, target_folder)
+            "targetFolderId": resolve_folder(workspace_id, target_folder)
         }
 
     return api_request(
-        '/workspaces/'
+        "/workspaces/"
         + workspace_id
-        + '/folders/'
+        + "/folders/"
         + resolve_folder(workspace_id, folder)
-        + '/move',
+        + "/move",
         payload=payload,
-        method='post',
+        method="post",
     )

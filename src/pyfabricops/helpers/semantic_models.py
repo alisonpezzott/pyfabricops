@@ -58,15 +58,15 @@ def get_semantic_model_config(
 
     else:
         config = {}
-        config = config[item_data.get('displayName')] = {}
+        config = config[item_data.get("displayName")] = {}
 
         config = {
-            'id': item_data['id'],
-            'description': item_data.get('description', None),
-            'folder_id': ''
-            if item_data.get('folderId') is None
-            or pd.isna(item_data.get('folderId'))
-            else item_data['folderId'],
+            "id": item_data["id"],
+            "description": item_data.get("description", None),
+            "folder_id": ""
+            if item_data.get("folderId") is None
+            or pd.isna(item_data.get("folderId"))
+            else item_data["folderId"],
         }
 
         return config
@@ -92,15 +92,14 @@ def get_all_semantic_models_config(
     config = {}
 
     for item in items:
+        item_data = get_semantic_model(workspace, item["id"], df=False)
 
-        item_data = get_semantic_model(workspace, item['id'], df=False)
-
-        config[item['displayName']] = {
-            'id': item['id'],
-            'description': item.get('description', None),
-            'folder_id': ''
-            if item.get('folderId') is None or pd.isna(item.get('folderId'))
-            else item['folderId'],
+        config[item["displayName"]] = {
+            "id": item["id"],
+            "description": item.get("description", None),
+            "folder_id": ""
+            if item.get("folderId") is None or pd.isna(item.get("folderId"))
+            else item["folderId"],
         }
 
     return config
@@ -128,30 +127,30 @@ def list_valid_semantic_models(
         return None
 
     # Creating a excluded list of Staging, Lake and Warehouses default semantic models
-    exclude_list = ['staging']
+    exclude_list = ["staging"]
 
     lakehouses_df = list_valid_lakehouses(workspace_id)
     if lakehouses_df is not None:
-        lakehouses_list = lakehouses_df['displayName'].tolist()
+        lakehouses_list = lakehouses_df["displayName"].tolist()
         exclude_list.extend(lakehouses_list)
 
     warehouses_df = list_valid_warehouses(workspace_id)
     if warehouses_df is not None:
-        warehouses_list = warehouses_df['displayName'].tolist()
+        warehouses_list = warehouses_df["displayName"].tolist()
         exclude_list.extend(warehouses_list)
 
     # Create regex pattern to create multiple parts
     if exclude_list:
-        exclude_pattern = '|'.join(exclude_list)
+        exclude_pattern = "|".join(exclude_list)
         filtered_items = items[
-            ~items['displayName'].str.contains(
+            ~items["displayName"].str.contains(
                 exclude_pattern, case=False, na=False
             )
         ]
     else:
         filtered_items = items
 
-    return filtered_items.to_dict(orient='records')
+    return filtered_items.to_dict(orient="records")
 
 
 def export_semantic_model(
@@ -174,30 +173,30 @@ def export_semantic_model(
     item = get_semantic_model(workspace_id, semantic_model, df=False)
     try:
         folder_path = resolve_folder_from_id_to_path(
-            workspace_id, item['folderId']
+            workspace_id, item["folderId"]
         )
     except:
         logger.info(
-            f'{item["displayName"]}.SemanticModel is not inside a folder.'
+            f"{item['displayName']}.SemanticModel is not inside a folder."
         )
         folder_path = None
 
     if folder_path is None:
-        item_path = Path(path) / (item['displayName'] + '.SemanticModel')
+        item_path = Path(path) / (item["displayName"] + ".SemanticModel")
     else:
         item_path = (
-            Path(path) / folder_path / (item['displayName'] + '.SemanticModel')
+            Path(path) / folder_path / (item["displayName"] + ".SemanticModel")
         )
     os.makedirs(item_path, exist_ok=True)
 
-    definition = get_semantic_model_definition(workspace_id, item['id'])
+    definition = get_semantic_model_definition(workspace_id, item["id"])
     if definition is None:
         return None
 
     unpack_item_definition(definition, item_path)
 
     logger.success(
-        f'`{item["displayName"]}.SemanticModel` was exported to {item_path} successfully.'
+        f"`{item['displayName']}.SemanticModel` was exported to {item_path} successfully."
     )
     return None
 
@@ -224,38 +223,38 @@ def export_all_semantic_models(
     for item in items:
         try:
             folder_path = resolve_folder_from_id_to_path(
-                workspace_id, item['folderId']
+                workspace_id, item["folderId"]
             )
         except:
             logger.info(
-                f'{item["displayName"]}.SemanticModel is not inside a folder.'
+                f"{item['displayName']}.SemanticModel is not inside a folder."
             )
             folder_path = None
 
         if folder_path is None:
-            item_path = Path(path) / (item['displayName'] + '.SemanticModel')
+            item_path = Path(path) / (item["displayName"] + ".SemanticModel")
         else:
             item_path = (
                 Path(path)
                 / folder_path
-                / (item['displayName'] + '.SemanticModel')
+                / (item["displayName"] + ".SemanticModel")
             )
         os.makedirs(item_path, exist_ok=True)
 
-        definition = get_semantic_model_definition(workspace_id, item['id'])
+        definition = get_semantic_model_definition(workspace_id, item["id"])
         if definition is None:
             return None
 
         unpack_item_definition(definition, item_path)
 
     logger.success(
-        f'All semantic models were exported to {path} successfully.'
+        f"All semantic models were exported to {path} successfully."
     )
     return None
 
 
 def extract_tmdl_parameters_from_semantic_model(
-    path: Union[str, Path]
+    path: Union[str, Path],
 ) -> Dict[str, str]:
     """
     Extract TMDL parameters from a specified semantic model in the local directory.
@@ -263,7 +262,7 @@ def extract_tmdl_parameters_from_semantic_model(
     Args:
         path (Union[str, Path]): The semantic model path.
     """
-    expressions_path = Path(path) / 'definition' / 'expressions.tmdl'
+    expressions_path = Path(path) / "definition" / "expressions.tmdl"
     if not expressions_path.exists():
         return None
 
@@ -321,15 +320,15 @@ def bind_semantic_model_to_gateway(
         logger.error(f'Gateway "{gateway}" not found.')
         return None
 
-    payload = {'gatewayObjectId': gateway}
+    payload = {"gatewayObjectId": gateway}
     if datasource_ids:
-        payload['datasourceObjectIds'] = datasource_ids
+        payload["datasourceObjectIds"] = datasource_ids
 
     response = _base_api(
-        endpoint=f'/groups/{workspace}/datasets/{semantic_model_id}/Default.BindToGateway',
-        method='post',
+        endpoint=f"/groups/{workspace}/datasets/{semantic_model_id}/Default.BindToGateway",
+        method="post",
         payload=payload,
-        audience='powerbi',
+        audience="powerbi",
     )
 
     if response.status_code == 200:
@@ -349,23 +348,23 @@ def refresh_semantic_model(
     semantic_model: str,
     *,
     notify_option: Literal[
-        'MailOnCompletion', 'MailOnFailure', 'NoNotification'
-    ] = 'NoNotification',
+        "MailOnCompletion", "MailOnFailure", "NoNotification"
+    ] = "NoNotification",
     apply_refresh_policy: Union[bool, None] = None,
-    commit_mode: Literal['PartialBatch', 'Transactional'] = 'Transactional',
+    commit_mode: Literal["PartialBatch", "Transactional"] = "Transactional",
     effective_date: str = None,
     max_parallelism: int = 1,
     objects: list[dict[str, str]] = None,
     retry_count: int = 3,
-    timeout: str = '00:30:00',
+    timeout: str = "00:30:00",
     type: Literal[
-        'Automatic',
-        'Calculate',
-        'ClearValues',
-        'DataOnly',
-        'Defragment',
-        'Full',
-    ] = 'Full',
+        "Automatic",
+        "Calculate",
+        "ClearValues",
+        "DataOnly",
+        "Defragment",
+        "Full",
+    ] = "Full",
 ) -> None:
     """
     Refreshes the specified semantic model in the specified workspace.
@@ -423,35 +422,35 @@ def refresh_semantic_model(
         )
         return None
 
-    payload = {'notifyOption': notify_option}
+    payload = {"notifyOption": notify_option}
     if apply_refresh_policy is not None:
-        payload['applyRefreshPolicy'] = apply_refresh_policy
+        payload["applyRefreshPolicy"] = apply_refresh_policy
     if commit_mode:
-        payload['commitMode'] = commit_mode
+        payload["commitMode"] = commit_mode
     if effective_date:
-        payload['effectiveDate'] = effective_date
+        payload["effectiveDate"] = effective_date
     if max_parallelism:
-        payload['maxParallelism'] = max_parallelism
+        payload["maxParallelism"] = max_parallelism
     if objects:
-        payload['objects'] = objects
+        payload["objects"] = objects
     if retry_count:
-        payload['retryCount'] = retry_count
+        payload["retryCount"] = retry_count
     if timeout:
-        payload['timeout'] = timeout
+        payload["timeout"] = timeout
     if type:
-        payload['type'] = type
+        payload["type"] = type
 
     response = _base_api(
-        endpoint=f'/groups/{workspace_id}/datasets/{semantic_model_id}/refreshes',
-        method='post',
+        endpoint=f"/groups/{workspace_id}/datasets/{semantic_model_id}/refreshes",
+        method="post",
         payload=payload,
-        audience='powerbi',
+        audience="powerbi",
     )
 
     if response.status_code == 202:
-        logger.success('Refresh accepted successfully.')
+        logger.success("Refresh accepted successfully.")
     else:
-        logger.error(f'Refresh failed: {response.error}')
+        logger.error(f"Refresh failed: {response.error}")
 
 
 @df
@@ -488,11 +487,11 @@ def get_semantic_model_refreshes(
 
     params = {}
     if not top is None and top >= 1:
-        params = {'$top': top}
+        params = {"$top": top}
 
     response = api_request(
-        endpoint=f'/groups/{workspace_id}/datasets/{semantic_model_id}/refreshes',
-        audience='powerbi',
+        endpoint=f"/groups/{workspace_id}/datasets/{semantic_model_id}/refreshes",
+        audience="powerbi",
         support_pagination=True,
         params=params,
     )
@@ -532,8 +531,8 @@ def get_semantic_model_refresh_details(
         return None
 
     response = api_request(
-        endpoint=f'/groups/{workspace_id}/datasets/{semantic_model_id}/refreshes/{refresh_id}',
-        audience='powerbi',
+        endpoint=f"/groups/{workspace_id}/datasets/{semantic_model_id}/refreshes/{refresh_id}",
+        audience="powerbi",
     )
     return response
 
@@ -572,17 +571,17 @@ def execute_queries(
         return None
 
     payload = {
-        'queries': [{'query': query}],
-        'serializerSettings': {'includeNulls': include_nulls},
+        "queries": [{"query": query}],
+        "serializerSettings": {"includeNulls": include_nulls},
     }
 
     if impersonated_user_name:
-        payload['impersonatedUserName'] = impersonated_user_name
+        payload["impersonatedUserName"] = impersonated_user_name
 
     response = api_request(
-        endpoint=f'/groups/{workspace_id}/datasets/{semantic_model_id}/executeQueries',
-        method='POST',
-        audience='powerbi',
+        endpoint=f"/groups/{workspace_id}/datasets/{semantic_model_id}/executeQueries",
+        method="POST",
+        audience="powerbi",
         payload=payload,
     )
     return response
@@ -662,10 +661,9 @@ def deploy_all_semantic_models(
     if workspace_id is None:
         return None
 
-    semantic_models_paths = list_paths_of_type(path, 'SemanticModel')
+    semantic_models_paths = list_paths_of_type(path, "SemanticModel")
 
     for path_ in semantic_models_paths:
-
         display_name = extract_display_name_from_platform(path_)
         if display_name is None:
             return None
@@ -703,7 +701,7 @@ def deploy_all_semantic_models(
 
 
 def replace_semantic_model_parameters_with_placeholders(
-    path: Union[str, Path]
+    path: Union[str, Path],
 ) -> None:
     """
     Replace parameter values with placeholders in semantic model expressions.
@@ -713,24 +711,24 @@ def replace_semantic_model_parameters_with_placeholders(
         path (Union[str, Path]): The path to the semantic model.
     """
     # Read the current content of expressions.tmdl
-    expressions_path = Path(path) / 'definition' / 'expressions.tmdl'
+    expressions_path = Path(path) / "definition" / "expressions.tmdl"
 
     if not expressions_path.exists():
-        logger.warning(f'expressions.tmdl not found: {expressions_path}')
+        logger.warning(f"expressions.tmdl not found: {expressions_path}")
         return None
 
     try:
-        with open(expressions_path, 'r', encoding='utf-8') as f:
+        with open(expressions_path, "r", encoding="utf-8") as f:
             expressions = f.read()
     except Exception as e:
-        logger.error(f'Error reading expressions.tmdl: {e}')
+        logger.error(f"Error reading expressions.tmdl: {e}")
         return None
 
     semantic_model_parameters = extract_tmdl_parameters_from_semantic_model(
         path
     )
     if semantic_model_parameters is None:
-        logger.warning(f'No parameters found in semantic model: {path}')
+        logger.warning(f"No parameters found in semantic model: {path}")
         return None
 
     # Replace the values with placeholders
@@ -744,59 +742,59 @@ def replace_semantic_model_parameters_with_placeholders(
 
         # Pattern 1: Import model syntax - expression ParameterName = "Value"
         pattern1 = rf'(expression\s+{re.escape(parameter_name)}\s*=\s*")({re.escape(actual_value)})(")'
-        replacement1 = (
-            lambda m: f'{m.group(1)}#{{{parameter_name}}}#{m.group(3)}'
+        replacement1 = lambda m: (
+            f"{m.group(1)}#{{{parameter_name}}}#{m.group(3)}"
         )
 
         # Pattern 2: Direct Lake - Sql.Database("server", "database") - First parameter (server)
         pattern2 = (
             rf'(Sql\.Database\s*\(\s*")({re.escape(actual_value)})("\s*,)'
         )
-        replacement2 = (
-            lambda m: f'{m.group(1)}#{{{parameter_name}}}#{m.group(3)}'
+        replacement2 = lambda m: (
+            f"{m.group(1)}#{{{parameter_name}}}#{m.group(3)}"
         )
 
         # Pattern 3: Direct Lake - Sql.Database("server", "database") - Second parameter (database)
         pattern3 = rf'(Sql\.Database\s*\([^"]*"[^"]*"\s*,\s*")({re.escape(actual_value)})(")'
-        replacement3 = (
-            lambda m: f'{m.group(1)}#{{{parameter_name}}}#{m.group(3)}'
+        replacement3 = lambda m: (
+            f"{m.group(1)}#{{{parameter_name}}}#{m.group(3)}"
         )
 
         # Pattern 4: Generic parameter syntax - ParameterName = "Value" (without 'expression' keyword)
         pattern4 = rf'({re.escape(parameter_name)}\s*=\s*")({re.escape(actual_value)})(")'
-        replacement4 = (
-            lambda m: f'{m.group(1)}#{{{parameter_name}}}#{m.group(3)}'
+        replacement4 = lambda m: (
+            f"{m.group(1)}#{{{parameter_name}}}#{m.group(3)}"
         )
 
         # Pattern 5: Alternative syntax with single quotes
         pattern5 = rf"({re.escape(parameter_name)}\s*=\s*')({re.escape(actual_value)})(')"
-        replacement5 = (
-            lambda m: f'{m.group(1)}#{{{parameter_name}}}#{m.group(3)}'
+        replacement5 = lambda m: (
+            f"{m.group(1)}#{{{parameter_name}}}#{m.group(3)}"
         )
 
         # Pattern 6: Parameters starting with # (like #date, #datetime, etc.)
-        pattern6 = rf'(expression\s+{re.escape(parameter_name)}\s*=\s*)({re.escape(actual_value)})'
-        replacement6 = lambda m: f'{m.group(1)}#{{{parameter_name}}}#'
+        pattern6 = rf"(expression\s+{re.escape(parameter_name)}\s*=\s*)({re.escape(actual_value)})"
+        replacement6 = lambda m: f"{m.group(1)}#{{{parameter_name}}}#"
 
         # Try each pattern
         patterns = [
-            (pattern1, replacement1, 'Import model (expression)'),
+            (pattern1, replacement1, "Import model (expression)"),
             (
                 pattern2,
                 replacement2,
-                'Direct Lake (first parameter - server)',
+                "Direct Lake (first parameter - server)",
             ),
             (
                 pattern3,
                 replacement3,
-                'Direct Lake (second parameter - database)',
+                "Direct Lake (second parameter - database)",
             ),
-            (pattern4, replacement4, 'Generic parameter'),
-            (pattern5, replacement5, 'Single quotes'),
+            (pattern4, replacement4, "Generic parameter"),
+            (pattern5, replacement5, "Single quotes"),
             (
                 pattern6,
                 replacement6,
-                'Hash functions (#date, #datetime, etc.)',
+                "Hash functions (#date, #datetime, etc.)",
             ),
         ]
 
@@ -816,7 +814,7 @@ def replace_semantic_model_parameters_with_placeholders(
                 )
                 if old_content != expressions_with_placeholders:
                     logger.info(
-                        f'Replaced {parameter_name} using {description} pattern'
+                        f"Replaced {parameter_name} using {description} pattern"
                     )
                     replacements_made += 1
                     pattern_found = True
@@ -824,33 +822,33 @@ def replace_semantic_model_parameters_with_placeholders(
 
         if not pattern_found:
             logger.warning(
-                f'No matching pattern found for parameter: {parameter_name}'
+                f"No matching pattern found for parameter: {parameter_name}"
             )
             logger.debug(f'Looking for value: "{actual_value}"')
 
             # Log a snippet around potential matches for debugging
             if actual_value in expressions_with_placeholders:
                 logger.debug(
-                    f'Value found in file but no pattern matched. Context:'
+                    f"Value found in file but no pattern matched. Context:"
                 )
-                lines = expressions_with_placeholders.split('\n')
+                lines = expressions_with_placeholders.split("\n")
                 for i, line in enumerate(lines):
                     if actual_value in line:
                         start = max(0, i - 2)
                         end = min(len(lines), i + 3)
                         for j in range(start, end):
-                            prefix = '>>> ' if j == i else '    '
-                            logger.debug(f'{prefix}{j+1}: {lines[j]}')
+                            prefix = ">>> " if j == i else "    "
+                            logger.debug(f"{prefix}{j + 1}: {lines[j]}")
 
     # Write back the result to file
     try:
-        with open(expressions_path, 'w', encoding='utf-8') as f:
+        with open(expressions_path, "w", encoding="utf-8") as f:
             f.write(expressions_with_placeholders)
         logger.success(
-            f'Updated expressions.tmdl for: {path} ({replacements_made} replacements)'
+            f"Updated expressions.tmdl for: {path} ({replacements_made} replacements)"
         )
     except Exception as e:
-        logger.error(f'Error writing expressions.tmdl: {e}')
+        logger.error(f"Error writing expressions.tmdl: {e}")
     return None
 
 
@@ -866,17 +864,17 @@ def replace_semantic_model_placeholders_with_parameters(
         parameters (Dict[str, str]): A dictionary mapping parameter names to their values.
     """
     # Read the current content of expressions.tmdl
-    expressions_path = Path(path) / 'definition' / 'expressions.tmdl'
+    expressions_path = Path(path) / "definition" / "expressions.tmdl"
 
     if not os.path.exists(expressions_path):
-        logger.warning(f'expressions.tmdl not found: {expressions_path}')
+        logger.warning(f"expressions.tmdl not found: {expressions_path}")
         return None
 
     try:
-        with open(expressions_path, 'r', encoding='utf-8') as f:
+        with open(expressions_path, "r", encoding="utf-8") as f:
             expressions = f.read()
     except Exception as e:
-        logger.error(f'Error reading expressions.tmdl: {e}')
+        logger.error(f"Error reading expressions.tmdl: {e}")
         return None
 
     # Replace placeholders with actual values
@@ -889,53 +887,53 @@ def replace_semantic_model_placeholders_with_parameters(
         )
 
         # Create placeholder pattern: #{ParameterName}#
-        placeholder = f'#{{{parameter_name}}}#'
+        placeholder = f"#{{{parameter_name}}}#"
 
         # Pattern 1: Import model syntax - expression ParameterName = "#{ParameterName}#"
         pattern1 = rf'(expression\s+{re.escape(parameter_name)}\s*=\s*")({re.escape(placeholder)})(")'
-        replacement1 = lambda m: f'{m.group(1)}{actual_value}{m.group(3)}'
+        replacement1 = lambda m: f"{m.group(1)}{actual_value}{m.group(3)}"
 
         # Pattern 2: Direct Lake - Sql.Database("#{ServerEndpoint}#", ...) - First parameter
         pattern2 = (
             rf'(Sql\.Database\s*\(\s*")({re.escape(placeholder)})("\s*,)'
         )
-        replacement2 = lambda m: f'{m.group(1)}{actual_value}{m.group(3)}'
+        replacement2 = lambda m: f"{m.group(1)}{actual_value}{m.group(3)}"
 
         # Pattern 3: Direct Lake - Sql.Database(..., "#{DatabaseId}#") - Second parameter
         pattern3 = rf'(Sql\.Database\s*\([^"]*"[^"]*"\s*,\s*")({re.escape(placeholder)})(")'
-        replacement3 = lambda m: f'{m.group(1)}{actual_value}{m.group(3)}'
+        replacement3 = lambda m: f"{m.group(1)}{actual_value}{m.group(3)}"
 
         # Pattern 4: Generic parameter syntax - ParameterName = "#{ParameterName}#"
         pattern4 = rf'({re.escape(parameter_name)}\s*=\s*")({re.escape(placeholder)})(")'
-        replacement4 = lambda m: f'{m.group(1)}{actual_value}{m.group(3)}'
+        replacement4 = lambda m: f"{m.group(1)}{actual_value}{m.group(3)}"
 
         # Pattern 5: Alternative syntax with single quotes
         pattern5 = rf"({re.escape(parameter_name)}\s*=\s*')({re.escape(actual_value)})(')"
-        replacement5 = lambda m: f'{m.group(1)}{actual_value}{m.group(3)}'
+        replacement5 = lambda m: f"{m.group(1)}{actual_value}{m.group(3)}"
 
         # Pattern 6: Parameters starting with # (like #date, #datetime, etc.) - for placeholders
-        pattern6 = rf'(expression\s+{re.escape(parameter_name)}\s*=\s*)({re.escape(placeholder)})'
-        replacement6 = lambda m: f'{m.group(1)}{actual_value}'
+        pattern6 = rf"(expression\s+{re.escape(parameter_name)}\s*=\s*)({re.escape(placeholder)})"
+        replacement6 = lambda m: f"{m.group(1)}{actual_value}"
 
         # Try each pattern
         patterns = [
-            (pattern1, replacement1, 'Import model (expression)'),
+            (pattern1, replacement1, "Import model (expression)"),
             (
                 pattern2,
                 replacement2,
-                'Direct Lake (first parameter - server)',
+                "Direct Lake (first parameter - server)",
             ),
             (
                 pattern3,
                 replacement3,
-                'Direct Lake (second parameter - database)',
+                "Direct Lake (second parameter - database)",
             ),
-            (pattern4, replacement4, 'Generic parameter'),
-            (pattern5, replacement5, 'Single quotes'),
+            (pattern4, replacement4, "Generic parameter"),
+            (pattern5, replacement5, "Single quotes"),
             (
                 pattern6,
                 replacement6,
-                'Hash functions (#date, #datetime, etc.)',
+                "Hash functions (#date, #datetime, etc.)",
             ),
         ]
 
@@ -953,7 +951,7 @@ def replace_semantic_model_placeholders_with_parameters(
                 )
                 if old_content != expressions_with_values:
                     logger.info(
-                        f'Replaced placeholder {parameter_name} with value using {description} pattern'
+                        f"Replaced placeholder {parameter_name} with value using {description} pattern"
                     )
                     replacements_made += 1
                     pattern_found = True
@@ -961,32 +959,32 @@ def replace_semantic_model_placeholders_with_parameters(
 
         if not pattern_found:
             logger.warning(
-                f'No matching pattern found for placeholder: {parameter_name}'
+                f"No matching pattern found for placeholder: {parameter_name}"
             )
             logger.debug(f'Looking for placeholder: "{placeholder}"')
 
             # Log a snippet around potential matches for debugging
             if placeholder in expressions_with_values:
                 logger.debug(
-                    f'Placeholder found in file but no pattern matched. Context:'
+                    f"Placeholder found in file but no pattern matched. Context:"
                 )
-                lines = expressions_with_values.split('\n')
+                lines = expressions_with_values.split("\n")
                 for i, line in enumerate(lines):
                     if placeholder in line:
                         start = max(0, i - 2)
                         end = min(len(lines), i + 3)
                         for j in range(start, end):
-                            prefix = '>>> ' if j == i else '    '
-                            logger.debug(f'{prefix}{j+1}: {lines[j]}')
+                            prefix = ">>> " if j == i else "    "
+                            logger.debug(f"{prefix}{j + 1}: {lines[j]}")
 
     # Write back the result to file
     try:
-        with open(expressions_path, 'w', encoding='utf-8') as f:
+        with open(expressions_path, "w", encoding="utf-8") as f:
             f.write(expressions_with_values)
         logger.success(
-            f'Updated expressions.tmdl for: {path} ({replacements_made} replacements)'
+            f"Updated expressions.tmdl for: {path} ({replacements_made} replacements)"
         )
     except Exception as e:
-        logger.error(f'Error writing expressions.tmdl: {e}')
+        logger.error(f"Error writing expressions.tmdl: {e}")
 
     return None
