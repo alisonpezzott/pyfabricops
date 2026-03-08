@@ -102,12 +102,12 @@ def export_dataflow_gen1(
         ```
     """
     workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
+    if workspace_id is None:
         return None
 
     # Get the dataflow details
     dataflow_ = get_dataflow_gen1(workspace_id, dataflow)
-    if not dataflow_:
+    if dataflow_ is None:
         return None
 
     dataflow_id = dataflow_["objectId"]
@@ -118,7 +118,7 @@ def export_dataflow_gen1(
         dataflow=dataflow_id,
     )
 
-    if not definition_response:
+    if definition_response is None:
         return None
 
     dataflow_name = dataflow_["name"]
@@ -151,12 +151,12 @@ def export_all_dataflows_gen1(
         ```
     """
     workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
+    if workspace_id is None:
         return None
 
     dataflows = list_dataflows_gen1(workspace_id, df=False)
 
-    if not dataflows:
+    if dataflows is None:
         return None
     else:
         for dataflow in dataflows:
@@ -241,7 +241,7 @@ def deploy_dataflow_gen1(workspace: str, path: str) -> Union[bool, None]:
     }
 
     workspace_id = resolve_workspace(workspace)
-    if not workspace_id:
+    if workspace_id is None:
         return None
 
     response = _base_api(
