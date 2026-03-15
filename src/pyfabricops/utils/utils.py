@@ -15,7 +15,7 @@ from pandas import DataFrame
 
 from .exceptions import (
     ConfigurationError,
-    FileNotFoundError,
+    PyFabricOpsFileNotFoundError,
     ResourceNotFoundError,
 )
 from .logging import get_logger
@@ -81,7 +81,7 @@ def read_json(path: str) -> dict:
     try:
         with open(path, encoding="utf-8") as file:
             data = json.load(file)
-    except FileNotFoundError as e:
+    except (FileNotFoundError, PyFabricOpsFileNotFoundError) as e:
         logger.error(f"Error reading JSON file: {e}")
         return {}
     return data
@@ -321,7 +321,7 @@ def parse_tmdl_parameters(path: str) -> dict:
         dict: A dictionary containing the parsed parameters.
 
     Raises:
-        FileNotFoundError: If the specified file does not exist.
+        PyFabricOpsFileNotFoundError: If the specified file does not exist.
         ValueError: If the file content is not in the expected format.
 
     Examples:
@@ -331,7 +331,7 @@ def parse_tmdl_parameters(path: str) -> dict:
     """
     # Check if the file exists
     if not os.path.exists(path):
-        raise FileNotFoundError(f"File not found: {path}")
+        raise PyFabricOpsFileNotFoundError(f"File not found: {path}")
 
     try:
         with open(path, encoding="utf-8") as f:
@@ -401,7 +401,7 @@ def parse_definition_report(path: str) -> dict:
 
     Raises:
         ResourceNotFoundError: If the specified file does not exist or is not in the expected format.
-        FileNotFoundError: If the specified file does not exist.
+        PyFabricOpsFileNotFoundError: If the specified file does not exist.
         json.JSONDecodeError: If the file content is not valid JSON.
 
     Examples:
@@ -454,7 +454,7 @@ def find_and_replace(path: str, find_and_replace: dict) -> None:
         None
 
     Raises:
-        FileNotFoundError: If the specified path does not exist.
+        PyFabricOpsFileNotFoundError: If the specified path does not exist.
 
     Examples:
         ```python

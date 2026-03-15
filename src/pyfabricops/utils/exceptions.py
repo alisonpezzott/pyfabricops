@@ -40,7 +40,7 @@ class ConfigurationError(PyFabricOpsError):
     pass
 
 
-class FileNotFoundError(PyFabricOpsError):
+class PyFabricOpsFileNotFoundError(PyFabricOpsError):
     """Exception raised when a file is not found."""
 
     pass
