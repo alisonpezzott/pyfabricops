@@ -37,9 +37,7 @@ def list_dataflows_gen1(
     )
 
 
-def get_dataflow_gen1_id(
-    workspace: str, dataflow_name: str
-) -> str | None:
+def get_dataflow_gen1_id(workspace: str, dataflow_name: str) -> str | None:
     """
     Retrieves the ID of a Gen1 dataflow by its name.
 

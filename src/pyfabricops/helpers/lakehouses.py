@@ -329,4 +329,3 @@ def export_all_lakehouses(workspace: str, path: str | Path) -> None:
 
     logger.success(f"All lakehouses exported to {path} successfully.")
     return None
-

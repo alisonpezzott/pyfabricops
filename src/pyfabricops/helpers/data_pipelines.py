@@ -487,4 +487,3 @@ def replace_data_pipeline_placeholders_with_variables(
     # Save the modified content back to the file
     with open(path, "w") as file:
         file.write(content_str)
-

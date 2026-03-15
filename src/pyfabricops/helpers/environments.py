@@ -386,4 +386,3 @@ def add_environment_external_library_from_pypi(
         f"External libraries were added to environment {environment} successfully."
     )
     return None
-

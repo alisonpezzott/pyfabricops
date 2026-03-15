@@ -516,7 +516,7 @@ def load_and_sanitize(path: str) -> dict:
         with open(path, encoding="utf-8-sig") as f:
             data = json5.load(f)
         logger.info(f"Loaded JSON file with json5: {path}")
-    except (ImportError, json5.JSONError, FileNotFoundError):
+    except ImportError, json5.JSONError, FileNotFoundError:
         try:
             # Fallback to standard json
             with open(path, encoding="utf-8-sig") as f:
@@ -635,9 +635,7 @@ def dataframe_to_list(df: DataFrame) -> list[dict]:
     return df.to_dict(orient="records")
 
 
-def list_paths_of_type(
-    path: str | Path, type: str
-) -> list[str | Path]:
+def list_paths_of_type(path: str | Path, type: str) -> list[str | Path]:
     """
     Returns a list of paths given a type of the items
     """
@@ -693,4 +691,3 @@ def delete_path(path: str) -> None:
         os.remove(path)
     elif os.path.isdir(path):
         shutil.rmtree(path)
-

@@ -469,4 +469,3 @@ def replace_notebook_placeholders_with_parameters(
 
     with open(path, "w", encoding="utf-8") as f:
         f.write(content)
-

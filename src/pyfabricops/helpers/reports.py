@@ -36,9 +36,7 @@ from ..utils.utils import (
 logger = get_logger(__name__)
 
 
-def get_report_config(
-    workspace: str, report: str
-) -> dict[str, Any] | None:
+def get_report_config(workspace: str, report: str) -> dict[str, Any] | None:
     """
     Get a specific report config from a workspace.
 
@@ -461,9 +459,7 @@ def convert_report_definition_to_by_path(
         with open(definition_path, "w", encoding="utf-8") as f:
             json.dump(updated_definition, f, indent=2)
 
-        logger.success(
-            "Successfully converted report to use byPath reference"
-        )
+        logger.success("Successfully converted report to use byPath reference")
 
     except Exception as e:
         logger.error(f"Error writing updated definition.pbir: {e}")
@@ -532,4 +528,3 @@ def convert_report_definition_to_by_connection(
     # Write the updated report definition to the definition.pbir
     with open(f"{report_path}/definition.pbir", "w", encoding="utf-8") as f:
         f.write(report_definition_updated)
-

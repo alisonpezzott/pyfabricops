@@ -283,4 +283,3 @@ def deploy_all_items(
         f"All items were deployed to workspace {workspace} successfully."
     )
     return None
-

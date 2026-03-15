@@ -742,43 +742,39 @@ def replace_semantic_model_parameters_with_placeholders(
 
         # Pattern 1: Import model syntax - expression ParameterName = "Value"
         pattern1 = rf'(expression\s+{re.escape(parameter_name)}\s*=\s*")({re.escape(actual_value)})(")'
+
         def replacement1(m):
-            return (
-                    f"{m.group(1)}#{{{parameter_name}}}#{m.group(3)}"
-                )
+            return f"{m.group(1)}#{{{parameter_name}}}#{m.group(3)}"
 
         # Pattern 2: Direct Lake - Sql.Database("server", "database") - First parameter (server)
         pattern2 = (
             rf'(Sql\.Database\s*\(\s*")({re.escape(actual_value)})("\s*,)'
         )
+
         def replacement2(m):
-            return (
-                    f"{m.group(1)}#{{{parameter_name}}}#{m.group(3)}"
-                )
+            return f"{m.group(1)}#{{{parameter_name}}}#{m.group(3)}"
 
         # Pattern 3: Direct Lake - Sql.Database("server", "database") - Second parameter (database)
         pattern3 = rf'(Sql\.Database\s*\([^"]*"[^"]*"\s*,\s*")({re.escape(actual_value)})(")'
+
         def replacement3(m):
-            return (
-                    f"{m.group(1)}#{{{parameter_name}}}#{m.group(3)}"
-                )
+            return f"{m.group(1)}#{{{parameter_name}}}#{m.group(3)}"
 
         # Pattern 4: Generic parameter syntax - ParameterName = "Value" (without 'expression' keyword)
         pattern4 = rf'({re.escape(parameter_name)}\s*=\s*")({re.escape(actual_value)})(")'
+
         def replacement4(m):
-            return (
-                    f"{m.group(1)}#{{{parameter_name}}}#{m.group(3)}"
-                )
+            return f"{m.group(1)}#{{{parameter_name}}}#{m.group(3)}"
 
         # Pattern 5: Alternative syntax with single quotes
         pattern5 = rf"({re.escape(parameter_name)}\s*=\s*')({re.escape(actual_value)})(')"
+
         def replacement5(m):
-            return (
-                    f"{m.group(1)}#{{{parameter_name}}}#{m.group(3)}"
-                )
+            return f"{m.group(1)}#{{{parameter_name}}}#{m.group(3)}"
 
         # Pattern 6: Parameters starting with # (like #date, #datetime, etc.)
         pattern6 = rf"(expression\s+{re.escape(parameter_name)}\s*=\s*)({re.escape(actual_value)})"
+
         def replacement6(m):
             return f"{m.group(1)}#{{{parameter_name}}}#"
 
@@ -897,6 +893,7 @@ def replace_semantic_model_placeholders_with_parameters(
 
         # Pattern 1: Import model syntax - expression ParameterName = "#{ParameterName}#"
         pattern1 = rf'(expression\s+{re.escape(parameter_name)}\s*=\s*")({re.escape(placeholder)})(")'
+
         def replacement1(m):
             return f"{m.group(1)}{actual_value}{m.group(3)}"
 
@@ -904,26 +901,31 @@ def replace_semantic_model_placeholders_with_parameters(
         pattern2 = (
             rf'(Sql\.Database\s*\(\s*")({re.escape(placeholder)})("\s*,)'
         )
+
         def replacement2(m):
             return f"{m.group(1)}{actual_value}{m.group(3)}"
 
         # Pattern 3: Direct Lake - Sql.Database(..., "#{DatabaseId}#") - Second parameter
         pattern3 = rf'(Sql\.Database\s*\([^"]*"[^"]*"\s*,\s*")({re.escape(placeholder)})(")'
+
         def replacement3(m):
             return f"{m.group(1)}{actual_value}{m.group(3)}"
 
         # Pattern 4: Generic parameter syntax - ParameterName = "#{ParameterName}#"
         pattern4 = rf'({re.escape(parameter_name)}\s*=\s*")({re.escape(placeholder)})(")'
+
         def replacement4(m):
             return f"{m.group(1)}{actual_value}{m.group(3)}"
 
         # Pattern 5: Alternative syntax with single quotes
         pattern5 = rf"({re.escape(parameter_name)}\s*=\s*')({re.escape(actual_value)})(')"
+
         def replacement5(m):
             return f"{m.group(1)}{actual_value}{m.group(3)}"
 
         # Pattern 6: Parameters starting with # (like #date, #datetime, etc.) - for placeholders
         pattern6 = rf"(expression\s+{re.escape(parameter_name)}\s*=\s*)({re.escape(placeholder)})"
+
         def replacement6(m):
             return f"{m.group(1)}{actual_value}"
 
@@ -1000,4 +1002,3 @@ def replace_semantic_model_placeholders_with_parameters(
         logger.error(f"Error writing expressions.tmdl: {e}")
 
     return None
-

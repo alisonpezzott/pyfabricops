@@ -36,9 +36,7 @@ def list_semantic_models(
     )
 
 
-def get_semantic_model_id(
-    workspace: str, semantic_model: str
-) -> str | None:
+def get_semantic_model_id(workspace: str, semantic_model: str) -> str | None:
     """
     Retrieves the ID of a semantic model by its name from the specified workspace.
 
