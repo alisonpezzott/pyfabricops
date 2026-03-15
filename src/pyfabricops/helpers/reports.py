@@ -3,7 +3,7 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any
 
 import pandas as pd
 from pandas import DataFrame
@@ -38,7 +38,7 @@ logger = get_logger(__name__)
 
 def get_report_config(
     workspace: str, report: str
-) -> Union[Dict[str, Any], None]:
+) -> dict[str, Any] | None:
     """
     Get a specific report config from a workspace.
 
@@ -73,7 +73,7 @@ def get_report_config(
 
 def get_all_reports_config(
     workspace: str,
-) -> Union[Dict[str, Any], None]:
+) -> dict[str, Any] | None:
     """
     Get reports config from a workspace.
 
@@ -91,7 +91,7 @@ def get_all_reports_config(
     config = {}
 
     for item in items:
-        item_data = get_report(workspace, item["id"], df=False)
+        get_report(workspace, item["id"], df=False)
 
         config[item["displayName"]] = {
             "id": item["id"],
@@ -107,7 +107,7 @@ def get_all_reports_config(
 def export_report(
     workspace: str,
     report: str,
-    path: Union[str, Path],
+    path: str | Path,
 ) -> None:
     """
     Export a report to path.
@@ -126,7 +126,7 @@ def export_report(
         folder_path = resolve_folder_from_id_to_path(
             workspace_id, item["folderId"]
         )
-    except:
+    except Exception:
         logger.info(f"{item['displayName']}.Report is not inside a folder.")
         folder_path = None
 
@@ -152,7 +152,7 @@ def export_report(
 
 def export_all_reports(
     workspace: str,
-    path: Union[str, Path],
+    path: str | Path,
 ) -> None:
     """
     Export a report to path.
@@ -174,7 +174,7 @@ def export_all_reports(
             folder_path = resolve_folder_from_id_to_path(
                 workspace_id, item["folderId"]
             )
-        except:
+        except Exception:
             logger.info(
                 f"{item['displayName']}.Report is not inside a folder."
             )
@@ -198,7 +198,7 @@ def export_all_reports(
     return None
 
 
-def extract_report_definition_pbir(path: Union[str, Path]) -> Dict[str, str]:
+def extract_report_definition_pbir(path: str | Path) -> dict[str, str]:
     """
     Parse a Power BI report definition file to extract workspace and semantic model information.
 
@@ -256,10 +256,10 @@ def extract_report_definition_pbir(path: Union[str, Path]) -> Dict[str, str]:
 def deploy_report(
     workspace: str,
     path: str,
-    start_path: Optional[str] = None,
-    description: Optional[str] = None,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    start_path: str | None = None,
+    description: str | None = None,
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Deploy a report to workspace.
 
@@ -312,7 +312,7 @@ def deploy_report(
 def deploy_all_reports(
     workspace: str,
     path: str,
-    start_path: Optional[str] = None,
+    start_path: str | None = None,
 ) -> None:
     """
     Deploy all reports to workspace.
@@ -366,8 +366,8 @@ def deploy_all_reports(
 
 
 def convert_report_definition_to_by_path(
-    report_path: Union[str, Path],
-    workspace_path: Union[str, Path],
+    report_path: str | Path,
+    workspace_path: str | Path,
 ) -> None:
     """
     Convert report definition to use byPath reference.
@@ -384,7 +384,7 @@ def convert_report_definition_to_by_path(
         return None
 
     try:
-        with open(definition_path, "r", encoding="utf-8") as f:
+        with open(definition_path, encoding="utf-8") as f:
             report_definition = json.load(f)
     except Exception as e:
         logger.error(f"Error reading definition.pbir: {e}")
@@ -394,11 +394,11 @@ def convert_report_definition_to_by_path(
     dataset_reference = report_definition.get("datasetReference", {})
 
     if "byPath" in dataset_reference:
-        logger.info(f"Report already uses byPath reference.")
+        logger.info("Report already uses byPath reference.")
         return None
 
     if "byConnection" not in dataset_reference:
-        logger.warning(f"Report has no byConnection reference.")
+        logger.warning("Report has no byConnection reference.")
         return None
 
     # Extract semantic model name from connection string
@@ -410,7 +410,7 @@ def convert_report_definition_to_by_path(
     match = re.search(r"initial catalog=([^;]+)", connection_string)
     if not match:
         logger.warning(
-            f"Could not extract semantic model name from connection string."
+            "Could not extract semantic model name from connection string."
         )
         return None
 
@@ -462,7 +462,7 @@ def convert_report_definition_to_by_path(
             json.dump(updated_definition, f, indent=2)
 
         logger.success(
-            f"Successfully converted report to use byPath reference"
+            "Successfully converted report to use byPath reference"
         )
 
     except Exception as e:
@@ -483,8 +483,8 @@ REPORT_DEFINITION = """{
 
 
 def convert_report_definition_to_by_connection(
-    workspace_name: Union[str, Path],
-    report_path: Union[str, Path],
+    workspace_name: str | Path,
+    report_path: str | Path,
 ) -> None:
     """
     Convert report definition to use byConnection reference.
@@ -493,7 +493,7 @@ def convert_report_definition_to_by_connection(
         workspace_name: The name of the Power BI workspace.
         report_path: The file path to the report.
     """
-    with open(f"{report_path}/definition.pbir", "r") as f:
+    with open(f"{report_path}/definition.pbir") as f:
         report_definition = json.load(f)
 
     dataset_reference = report_definition["datasetReference"]
@@ -532,3 +532,4 @@ def convert_report_definition_to_by_connection(
     # Write the updated report definition to the definition.pbir
     with open(f"{report_path}/definition.pbir", "w", encoding="utf-8") as f:
         f.write(report_definition_updated)
+

@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from pandas import DataFrame
 
@@ -15,8 +15,8 @@ logger = get_logger(__name__)
 @df
 def list_variable_libraries(
     workspace: str,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    df: bool | None = True,
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Returns a list of variable libraries in a specified workspace.
 
@@ -38,7 +38,7 @@ def list_variable_libraries(
 
 def get_variable_library_id(
     workspace: str, variable_library_name: str
-) -> Union[str, None]:
+) -> str | None:
     """
     Retrieves the ID of a variable library by its name from the specified workspace.
 
@@ -66,7 +66,7 @@ def get_variable_library_id(
 def resolve_variable_library(
     workspace: str,
     variable_library: str,
-) -> Union[str, None]:
+) -> str | None:
     if is_valid_uuid(variable_library):
         return variable_library
     else:
@@ -75,8 +75,8 @@ def resolve_variable_library(
 
 @df
 def get_variable_library(
-    workspace: str, variable_library: str, *, df: Optional[bool] = True
-) -> Union[DataFrame, Dict[str, Any], None]:
+    workspace: str, variable_library: str, *, df: bool | None = True
+) -> DataFrame | dict[str, Any] | None:
     """
     Retrieves a variable_library by its name or ID from the specified workspace.
 
@@ -108,12 +108,12 @@ def get_variable_library(
 def create_variable_library(
     workspace: str,
     display_name: str,
-    item_definition: Dict[str, Any],
+    item_definition: dict[str, Any],
     *,
-    description: Optional[str] = None,
-    folder: Optional[str] = None,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    description: str | None = None,
+    folder: str | None = None,
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Creates a new variable library in the specified workspace.
 
@@ -165,10 +165,10 @@ def update_variable_library(
     workspace: str,
     variable_library: str,
     *,
-    display_name: Optional[str] = None,
-    description: Optional[str] = None,
-    df: Optional[bool] = False,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    display_name: str | None = None,
+    description: str | None = None,
+    df: bool | None = False,
+) -> DataFrame | dict[str, Any] | None:
     """
     Updates the properties of the specified variable_library.
 
@@ -244,7 +244,7 @@ def delete_variable_library(workspace: str, variable_library: str) -> None:
 
 def get_variable_library_definition(
     workspace: str, variable_library: str
-) -> Union[Dict[str, Any], None]:
+) -> dict[str, Any] | None:
     """
     Retrieves the definition of a variable library by its name or ID from the specified workspace.
 
@@ -282,10 +282,10 @@ def get_variable_library_definition(
 def update_variable_library_definition(
     workspace: str,
     variable_library: str,
-    item_definition: Dict[str, Any],
+    item_definition: dict[str, Any],
     *,
-    df: Optional[bool] = True,
-) -> Union[Dict[str, Any], None]:
+    df: bool | None = True,
+) -> dict[str, Any] | None:
     """
     Updates the definition of an existing variable_library in the specified workspace.
     If the variable_library does not exist, it returns None.
@@ -310,7 +310,7 @@ def update_variable_library_definition(
         ```
     """
     workspace_id = resolve_workspace(workspace)
-    variable_library_id = resolve_variable_library(workspace, variable_library)
+    resolve_variable_library(workspace, variable_library)
     params = {"updateMetadata": True}
     payload = {"definition": item_definition}
     return api_request(

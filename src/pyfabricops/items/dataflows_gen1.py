@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Literal
 
 from pandas import DataFrame
 
@@ -16,8 +16,8 @@ logger = get_logger(__name__)
 def list_dataflows_gen1(
     workspace: str,
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    df: bool | None = True,
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Returns a list of Gen1 dataflows in a specified workspace.
 
@@ -39,7 +39,7 @@ def list_dataflows_gen1(
 
 def get_dataflow_gen1_id(
     workspace: str, dataflow_name: str
-) -> Union[str, None]:
+) -> str | None:
     """
     Retrieves the ID of a Gen1 dataflow by its name.
 
@@ -62,7 +62,7 @@ def get_dataflow_gen1_id(
     return None
 
 
-def resolve_dataflow_gen1(workspace: str, dataflow: str) -> Union[str, None]:
+def resolve_dataflow_gen1(workspace: str, dataflow: str) -> str | None:
     """
     Resolves a dataflow name to its ID.
 
@@ -84,8 +84,8 @@ def get_dataflow_gen1(
     workspace: str,
     dataflow: str,
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Get a Power BI dataflow.
 
@@ -145,8 +145,8 @@ def get_dataflow_gen1_definition(workspace: str, dataflow: str) -> dict | None:
 
 @df
 def update_dataflow_gen1_definition(
-    workspace: str, dataflow: str, item_definition: Dict[str, Any]
-) -> Union[DataFrame, Dict[str, Any], None]:
+    workspace: str, dataflow: str, item_definition: dict[str, Any]
+) -> DataFrame | dict[str, Any] | None:
     """
     Updates the definition of an existing dataflow in the specified workspace.
     If the dataflow does not exist, it returns None.
@@ -190,12 +190,12 @@ def update_dataflow_gen1_definition(
 def create_dataflow_gen1(
     workspace: str,
     display_name: str,
-    item_definition: Dict[str, Any],
+    item_definition: dict[str, Any],
     *,
-    description: Optional[str] = None,
-    folder: Optional[str] = None,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    description: str | None = None,
+    folder: str | None = None,
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Creates a new dataflow in the specified workspace.
 
@@ -250,10 +250,10 @@ def update_dataflow_gen1(
     workspace: str,
     dataflow: str,
     *,
-    display_name: Optional[str] = None,
-    description: Optional[str] = None,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    display_name: str | None = None,
+    description: str | None = None,
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Updates the properties of the specified dataflow.
 
@@ -321,7 +321,7 @@ def delete_dataflow_gen1(workspace: str, dataflow: str) -> None:
     )
 
 
-def takeover_dataflow_gen1(workspace: str, dataflow: str) -> Union[bool, None]:
+def takeover_dataflow_gen1(workspace: str, dataflow: str) -> bool | None:
     """
     Take over a dataflow in a workspace
 
@@ -354,7 +354,7 @@ def refresh_dataflow_gen1(
     workspace: str,
     dataflow: str,
     *,
-    process_type: Optional[str] = "default",
+    process_type: str | None = "default",
     notify_option: Literal[
         "MailOnFailure", "NoNotification"
     ] = "NoNotification",
@@ -403,8 +403,8 @@ def get_dataflow_gen1_transactions(
     workspace: str,
     dataflow: str,
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    df: bool | None = True,
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Get transactions for a dataflow in a workspace.
 
@@ -443,8 +443,8 @@ def get_dataflows_gen1_datasources(
     workspace: str,
     dataflow: str,
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    df: bool | None = True,
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Get the data sources for a dataflow in a workspace.
 

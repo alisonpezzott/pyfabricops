@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from pandas import DataFrame
 
@@ -16,8 +16,8 @@ logger = get_logger(__name__)
 def list_notebooks(
     workspace: str,
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    df: bool | None = True,
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Lists all notebooks in the specified workspace.
 
@@ -41,7 +41,7 @@ def list_notebooks(
     )
 
 
-def get_notebook_id(workspace: str, notebook: str) -> Union[str, None]:
+def get_notebook_id(workspace: str, notebook: str) -> str | None:
     """
     Retrieves the ID of a notebook by its name or ID from the specified workspace.
 
@@ -68,7 +68,7 @@ def get_notebook_id(workspace: str, notebook: str) -> Union[str, None]:
 def resolve_notebook(
     workspace: str,
     notebook: str,
-) -> Union[str, None]:
+) -> str | None:
     """
     Resolves a notebook name or ID to its ID in the specified workspace.
 
@@ -96,8 +96,8 @@ def get_notebook(
     workspace: str,
     notebook: str,
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Retrieves a notebook by its name or ID from the specified workspace.
 
@@ -130,10 +130,10 @@ def update_notebook(
     workspace: str,
     notebook: str,
     *,
-    display_name: Optional[str] = None,
-    description: Optional[str] = None,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    display_name: str | None = None,
+    description: str | None = None,
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Updates the properties of the specified notebook.
 
@@ -205,7 +205,7 @@ def delete_notebook(workspace: str, notebook: str) -> None:
 
 def get_notebook_definition(
     workspace: str, notebook: str
-) -> Union[Dict[str, Any], None]:
+) -> dict[str, Any] | None:
     """
     Retrieves the definition of a notebook by its name or ID from the specified workspace.
 
@@ -243,8 +243,8 @@ def update_notebook_definition(
     notebook: str,
     item_definition: str,
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Updates the definition of an existing notebook in the specified workspace.
     If the notebook does not exist, it returns None.
@@ -290,10 +290,10 @@ def create_notebook(
     display_name: str,
     item_definition: str,
     *,
-    description: Optional[str] = None,
-    folder: Optional[str] = None,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    description: str | None = None,
+    folder: str | None = None,
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Creates a new notebook in the specified workspace.
 

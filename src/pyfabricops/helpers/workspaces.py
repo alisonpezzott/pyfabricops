@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any
 
 from ..core.workspaces import get_workspace, list_workspace_role_assignments
 from ..utils.exceptions import ResourceNotFoundError
@@ -6,7 +6,7 @@ from ..utils.exceptions import ResourceNotFoundError
 
 def get_workspace_config(
     workspace: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Retrieves the workspace details for a given workspace.
 

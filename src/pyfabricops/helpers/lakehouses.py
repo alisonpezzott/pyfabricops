@@ -1,8 +1,7 @@
 import json
 import os
-import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 import pandas as pd
 from pandas import DataFrame
@@ -21,8 +20,8 @@ logger = get_logger(__name__)
 
 def _generate_lakehouse_platform(
     display_name: str,
-    description: Optional[str] = "",
-) -> Dict[str, Any]:
+    description: str | None = "",
+) -> dict[str, Any]:
     """
     Generate the lakehouse .platform file
 
@@ -48,7 +47,7 @@ def _generate_lakehouse_platform(
 
 
 def _save_lakehouse_platform(
-    platform: Dict[str, Any],
+    platform: dict[str, Any],
     path: str,
 ) -> None:
     """
@@ -75,7 +74,7 @@ def _save_lakehouse_metadata_json(path: str) -> None:
 
 def get_lakehouse_config(
     workspace: str, lakehouse: str
-) -> Union[Dict[str, Any], None]:
+) -> dict[str, Any] | None:
     """
     Get a specific lakehouse config from a workspace.
 
@@ -114,7 +113,7 @@ def get_lakehouse_config(
         return config
 
 
-def get_all_lakehouses_config(workspace: str) -> Union[Dict[str, Any], None]:
+def get_all_lakehouses_config(workspace: str) -> dict[str, Any] | None:
     """
     Generate lakehouses config from a workspace.
 
@@ -154,8 +153,8 @@ def get_all_lakehouses_config(workspace: str) -> Union[Dict[str, Any], None]:
 @df
 def list_valid_lakehouses(
     workspace: str,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    df: bool | None = True,
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Generate a list of valid lakehouses from a workspace.
 
@@ -177,7 +176,7 @@ def list_valid_lakehouses(
 
 def generate_lakehouse_shortcuts_metadata(
     workspace: str, lakehouse: str
-) -> Union[Dict[str, Any], None]:
+) -> dict[str, Any] | None:
     """ """
     # Create shortcuts.metadata.json
     shortcuts_list = list_shortcuts(workspace, lakehouse, df=False)
@@ -230,7 +229,7 @@ def generate_lakehouse_shortcuts_metadata(
 
 
 def save_lakehouse_shortcuts_metadata(
-    shortcuts_metadata: Dict[str, Any], path: str
+    shortcuts_metadata: dict[str, Any], path: str
 ) -> None:
     """ """
     with open(Path(path) / "shortcuts.metadata.json", "w") as f:
@@ -240,7 +239,7 @@ def save_lakehouse_shortcuts_metadata(
 def export_lakehouse(
     workspace: str,
     lakehouse: str,
-    path: Union[str, Path],
+    path: str | Path,
 ) -> None:
     workspace_id = resolve_workspace(workspace)
     if workspace_id is None:
@@ -254,7 +253,7 @@ def export_lakehouse(
         folder_path = resolve_folder_from_id_to_path(
             workspace_id, item["folderId"]
         )
-    except:
+    except Exception:
         logger.info(f"{item['displayName']}.Lakehouse is not inside a folder.")
         folder_path = None
 
@@ -285,7 +284,7 @@ def export_lakehouse(
     return None
 
 
-def export_all_lakehouses(workspace: str, path: Union[str, Path]) -> None:
+def export_all_lakehouses(workspace: str, path: str | Path) -> None:
     workspace_id = resolve_workspace(workspace)
     if workspace_id is None:
         return None
@@ -299,7 +298,7 @@ def export_all_lakehouses(workspace: str, path: Union[str, Path]) -> None:
             folder_path = resolve_folder_from_id_to_path(
                 workspace_id, item["folderId"]
             )
-        except:
+        except Exception:
             logger.info(
                 f"{item['displayName']}.Lakehouse is not inside a folder."
             )
@@ -330,3 +329,4 @@ def export_all_lakehouses(workspace: str, path: Union[str, Path]) -> None:
 
     logger.success(f"All lakehouses exported to {path} successfully.")
     return None
+

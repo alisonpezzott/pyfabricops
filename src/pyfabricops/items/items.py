@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from pandas import DataFrame
 
@@ -14,8 +14,8 @@ logger = get_logger(__name__)
 
 @df
 def list_items(
-    workspace: str, *, df: Optional[bool] = True
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    workspace: str, *, df: bool | None = True
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Returns a list of items from the specified workspace.
     This API supports pagination.
@@ -73,7 +73,7 @@ def get_item_id(workspace: str, item: str) -> str | None:
 def resolve_item(
     workspace: str,
     item: str,
-) -> Union[str, None]:
+) -> str | None:
     """
     Resolves an item name to its ID.
 
@@ -101,8 +101,8 @@ def get_item(
     workspace: str,
     item: str,
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Retrieves a specific item from the workspace.
 
@@ -135,10 +135,10 @@ def update_item(
     workspace: str,
     item: str,
     *,
-    display_name: Optional[str] = None,
-    description: Optional[str] = None,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    display_name: str | None = None,
+    description: str | None = None,
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Updates the properties of the specified semantic model.
 
@@ -208,9 +208,7 @@ def delete_item(workspace: str, item: str) -> None:
     )
 
 
-def get_item_definition(
-    workspace: str, item: str
-) -> Union[Dict[str, Any], None]:
+def get_item_definition(workspace: str, item: str) -> dict[str, Any] | None:
     """
     Retrieves the definition of an item by its name or ID from the specified workspace.
 
@@ -246,9 +244,9 @@ def get_item_definition(
 def update_item_definition(
     workspace: str,
     item: str,
-    item_definition: Dict[str, Any],
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    item_definition: dict[str, Any],
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Updates the definition of an existing item in the specified workspace.
     If the item does not exist, it returns None.
@@ -295,12 +293,12 @@ def update_item_definition(
 def create_item(
     workspace: str,
     display_name: str,
-    item_definition: Dict[str, Any],
+    item_definition: dict[str, Any],
     *,
-    description: Optional[str] = None,
-    folder: Optional[str] = None,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    description: str | None = None,
+    folder: str | None = None,
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Creates a new item in the specified workspace.
 
@@ -340,31 +338,4 @@ def create_item(
         method="post",
         payload=payload,
         support_lro=True,
-    )
-
-
-def delete_item(workspace: str, item: str) -> None:
-    """
-    Deletes an existing item in the specified workspace.
-    If the item does not exist, it returns None.
-
-    Args:
-        workspace (str): The workspace name or ID.
-        item (str): The name or ID of the item to delete.
-
-    Returns:
-        (Union[DataFrame, Dict[str, Any], None]): The deleted item details if successful, otherwise None.
-
-    Examples:
-        ```python
-        delete_item('MyProjectWorkspace', 'SalesDataModel')
-        ```
-    """
-    workspace_id = resolve_workspace(workspace)
-
-    item_id = resolve_item(workspace_id, item)
-
-    return api_request(
-        endpoint="/workspaces/" + workspace_id + "/items/" + item_id,
-        method="delete",
     )

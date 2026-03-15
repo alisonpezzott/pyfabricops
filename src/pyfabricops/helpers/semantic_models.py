@@ -1,7 +1,7 @@
 import os
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Literal
 
 import pandas as pd
 from pandas import DataFrame
@@ -39,7 +39,7 @@ logger = get_logger(__name__)
 
 def get_semantic_model_config(
     workspace: str, semantic_model: str
-) -> Union[Dict[str, Any], None]:
+) -> dict[str, Any] | None:
     """
     Get a specific semantic model config from a workspace.
 
@@ -74,7 +74,7 @@ def get_semantic_model_config(
 
 def get_all_semantic_models_config(
     workspace: str,
-) -> Union[Dict[str, Any], None]:
+) -> dict[str, Any] | None:
     """
     Get semantic models config from a workspace.
 
@@ -92,7 +92,7 @@ def get_all_semantic_models_config(
     config = {}
 
     for item in items:
-        item_data = get_semantic_model(workspace, item["id"], df=False)
+        get_semantic_model(workspace, item["id"], df=False)
 
         config[item["displayName"]] = {
             "id": item["id"],
@@ -108,8 +108,8 @@ def get_all_semantic_models_config(
 @df
 def list_valid_semantic_models(
     workspace: str,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    df: bool | None = True,
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Generate a list of valid semantic_models of the workspace.
 
@@ -156,7 +156,7 @@ def list_valid_semantic_models(
 def export_semantic_model(
     workspace: str,
     semantic_model: str,
-    path: Union[str, Path],
+    path: str | Path,
 ) -> None:
     """
     Export a semantic model to path.
@@ -175,7 +175,7 @@ def export_semantic_model(
         folder_path = resolve_folder_from_id_to_path(
             workspace_id, item["folderId"]
         )
-    except:
+    except Exception:
         logger.info(
             f"{item['displayName']}.SemanticModel is not inside a folder."
         )
@@ -203,7 +203,7 @@ def export_semantic_model(
 
 def export_all_semantic_models(
     workspace: str,
-    path: Union[str, Path],
+    path: str | Path,
 ) -> None:
     """
     Export a semantic model to path.
@@ -225,7 +225,7 @@ def export_all_semantic_models(
             folder_path = resolve_folder_from_id_to_path(
                 workspace_id, item["folderId"]
             )
-        except:
+        except Exception:
             logger.info(
                 f"{item['displayName']}.SemanticModel is not inside a folder."
             )
@@ -254,8 +254,8 @@ def export_all_semantic_models(
 
 
 def extract_tmdl_parameters_from_semantic_model(
-    path: Union[str, Path],
-) -> Dict[str, str]:
+    path: str | Path,
+) -> dict[str, str]:
     """
     Extract TMDL parameters from a specified semantic model in the local directory.
 
@@ -350,7 +350,7 @@ def refresh_semantic_model(
     notify_option: Literal[
         "MailOnCompletion", "MailOnFailure", "NoNotification"
     ] = "NoNotification",
-    apply_refresh_policy: Union[bool, None] = None,
+    apply_refresh_policy: bool | None = None,
     commit_mode: Literal["PartialBatch", "Transactional"] = "Transactional",
     effective_date: str = None,
     max_parallelism: int = 1,
@@ -459,8 +459,8 @@ def get_semantic_model_refreshes(
     semantic_model: str,
     *,
     top: int = None,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    df: bool | None = True,
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Get the list of refresh operations for a semantic model.
 
@@ -486,7 +486,7 @@ def get_semantic_model_refreshes(
         return None
 
     params = {}
-    if not top is None and top >= 1:
+    if top is not None and top >= 1:
         params = {"$top": top}
 
     response = api_request(
@@ -504,8 +504,8 @@ def get_semantic_model_refresh_details(
     semantic_model: str,
     refresh_id: str,
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    df: bool | None = True,
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Get the details of a specific refresh operation for a semantic model.
 
@@ -543,9 +543,9 @@ def execute_queries(
     query: str,
     *,
     include_nulls: bool = True,
-    impersonated_user_name: Optional[str] = None,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    impersonated_user_name: str | None = None,
+    df: bool | None = True,
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Execute DAX queries against a semantic model.
 
@@ -591,10 +591,10 @@ def execute_queries(
 def deploy_semantic_model(
     workspace: str,
     path: str,
-    start_path: Optional[str] = None,
-    description: Optional[str] = None,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    start_path: str | None = None,
+    description: str | None = None,
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Deploy a semantic model to workspace.
 
@@ -647,7 +647,7 @@ def deploy_semantic_model(
 def deploy_all_semantic_models(
     workspace: str,
     path: str,
-    start_path: Optional[str] = None,
+    start_path: str | None = None,
 ) -> None:
     """
     Deploy all semantic models to workspace.
@@ -701,7 +701,7 @@ def deploy_all_semantic_models(
 
 
 def replace_semantic_model_parameters_with_placeholders(
-    path: Union[str, Path],
+    path: str | Path,
 ) -> None:
     """
     Replace parameter values with placeholders in semantic model expressions.
@@ -718,7 +718,7 @@ def replace_semantic_model_parameters_with_placeholders(
         return None
 
     try:
-        with open(expressions_path, "r", encoding="utf-8") as f:
+        with open(expressions_path, encoding="utf-8") as f:
             expressions = f.read()
     except Exception as e:
         logger.error(f"Error reading expressions.tmdl: {e}")
@@ -742,39 +742,45 @@ def replace_semantic_model_parameters_with_placeholders(
 
         # Pattern 1: Import model syntax - expression ParameterName = "Value"
         pattern1 = rf'(expression\s+{re.escape(parameter_name)}\s*=\s*")({re.escape(actual_value)})(")'
-        replacement1 = lambda m: (
-            f"{m.group(1)}#{{{parameter_name}}}#{m.group(3)}"
-        )
+        def replacement1(m):
+            return (
+                    f"{m.group(1)}#{{{parameter_name}}}#{m.group(3)}"
+                )
 
         # Pattern 2: Direct Lake - Sql.Database("server", "database") - First parameter (server)
         pattern2 = (
             rf'(Sql\.Database\s*\(\s*")({re.escape(actual_value)})("\s*,)'
         )
-        replacement2 = lambda m: (
-            f"{m.group(1)}#{{{parameter_name}}}#{m.group(3)}"
-        )
+        def replacement2(m):
+            return (
+                    f"{m.group(1)}#{{{parameter_name}}}#{m.group(3)}"
+                )
 
         # Pattern 3: Direct Lake - Sql.Database("server", "database") - Second parameter (database)
         pattern3 = rf'(Sql\.Database\s*\([^"]*"[^"]*"\s*,\s*")({re.escape(actual_value)})(")'
-        replacement3 = lambda m: (
-            f"{m.group(1)}#{{{parameter_name}}}#{m.group(3)}"
-        )
+        def replacement3(m):
+            return (
+                    f"{m.group(1)}#{{{parameter_name}}}#{m.group(3)}"
+                )
 
         # Pattern 4: Generic parameter syntax - ParameterName = "Value" (without 'expression' keyword)
         pattern4 = rf'({re.escape(parameter_name)}\s*=\s*")({re.escape(actual_value)})(")'
-        replacement4 = lambda m: (
-            f"{m.group(1)}#{{{parameter_name}}}#{m.group(3)}"
-        )
+        def replacement4(m):
+            return (
+                    f"{m.group(1)}#{{{parameter_name}}}#{m.group(3)}"
+                )
 
         # Pattern 5: Alternative syntax with single quotes
         pattern5 = rf"({re.escape(parameter_name)}\s*=\s*')({re.escape(actual_value)})(')"
-        replacement5 = lambda m: (
-            f"{m.group(1)}#{{{parameter_name}}}#{m.group(3)}"
-        )
+        def replacement5(m):
+            return (
+                    f"{m.group(1)}#{{{parameter_name}}}#{m.group(3)}"
+                )
 
         # Pattern 6: Parameters starting with # (like #date, #datetime, etc.)
         pattern6 = rf"(expression\s+{re.escape(parameter_name)}\s*=\s*)({re.escape(actual_value)})"
-        replacement6 = lambda m: f"{m.group(1)}#{{{parameter_name}}}#"
+        def replacement6(m):
+            return f"{m.group(1)}#{{{parameter_name}}}#"
 
         # Try each pattern
         patterns = [
@@ -829,7 +835,7 @@ def replace_semantic_model_parameters_with_placeholders(
             # Log a snippet around potential matches for debugging
             if actual_value in expressions_with_placeholders:
                 logger.debug(
-                    f"Value found in file but no pattern matched. Context:"
+                    "Value found in file but no pattern matched. Context:"
                 )
                 lines = expressions_with_placeholders.split("\n")
                 for i, line in enumerate(lines):
@@ -853,7 +859,7 @@ def replace_semantic_model_parameters_with_placeholders(
 
 
 def replace_semantic_model_placeholders_with_parameters(
-    path: Union[str, Path], parameters: Dict[str, str]
+    path: str | Path, parameters: dict[str, str]
 ) -> None:
     """
     Replace placeholders with actual parameter values in semantic model expressions.
@@ -871,7 +877,7 @@ def replace_semantic_model_placeholders_with_parameters(
         return None
 
     try:
-        with open(expressions_path, "r", encoding="utf-8") as f:
+        with open(expressions_path, encoding="utf-8") as f:
             expressions = f.read()
     except Exception as e:
         logger.error(f"Error reading expressions.tmdl: {e}")
@@ -891,29 +897,35 @@ def replace_semantic_model_placeholders_with_parameters(
 
         # Pattern 1: Import model syntax - expression ParameterName = "#{ParameterName}#"
         pattern1 = rf'(expression\s+{re.escape(parameter_name)}\s*=\s*")({re.escape(placeholder)})(")'
-        replacement1 = lambda m: f"{m.group(1)}{actual_value}{m.group(3)}"
+        def replacement1(m):
+            return f"{m.group(1)}{actual_value}{m.group(3)}"
 
         # Pattern 2: Direct Lake - Sql.Database("#{ServerEndpoint}#", ...) - First parameter
         pattern2 = (
             rf'(Sql\.Database\s*\(\s*")({re.escape(placeholder)})("\s*,)'
         )
-        replacement2 = lambda m: f"{m.group(1)}{actual_value}{m.group(3)}"
+        def replacement2(m):
+            return f"{m.group(1)}{actual_value}{m.group(3)}"
 
         # Pattern 3: Direct Lake - Sql.Database(..., "#{DatabaseId}#") - Second parameter
         pattern3 = rf'(Sql\.Database\s*\([^"]*"[^"]*"\s*,\s*")({re.escape(placeholder)})(")'
-        replacement3 = lambda m: f"{m.group(1)}{actual_value}{m.group(3)}"
+        def replacement3(m):
+            return f"{m.group(1)}{actual_value}{m.group(3)}"
 
         # Pattern 4: Generic parameter syntax - ParameterName = "#{ParameterName}#"
         pattern4 = rf'({re.escape(parameter_name)}\s*=\s*")({re.escape(placeholder)})(")'
-        replacement4 = lambda m: f"{m.group(1)}{actual_value}{m.group(3)}"
+        def replacement4(m):
+            return f"{m.group(1)}{actual_value}{m.group(3)}"
 
         # Pattern 5: Alternative syntax with single quotes
         pattern5 = rf"({re.escape(parameter_name)}\s*=\s*')({re.escape(actual_value)})(')"
-        replacement5 = lambda m: f"{m.group(1)}{actual_value}{m.group(3)}"
+        def replacement5(m):
+            return f"{m.group(1)}{actual_value}{m.group(3)}"
 
         # Pattern 6: Parameters starting with # (like #date, #datetime, etc.) - for placeholders
         pattern6 = rf"(expression\s+{re.escape(parameter_name)}\s*=\s*)({re.escape(placeholder)})"
-        replacement6 = lambda m: f"{m.group(1)}{actual_value}"
+        def replacement6(m):
+            return f"{m.group(1)}{actual_value}"
 
         # Try each pattern
         patterns = [
@@ -966,7 +978,7 @@ def replace_semantic_model_placeholders_with_parameters(
             # Log a snippet around potential matches for debugging
             if placeholder in expressions_with_values:
                 logger.debug(
-                    f"Placeholder found in file but no pattern matched. Context:"
+                    "Placeholder found in file but no pattern matched. Context:"
                 )
                 lines = expressions_with_values.split("\n")
                 for i, line in enumerate(lines):
@@ -988,3 +1000,4 @@ def replace_semantic_model_placeholders_with_parameters(
         logger.error(f"Error writing expressions.tmdl: {e}")
 
     return None
+

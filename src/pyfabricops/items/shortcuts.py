@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Literal
 
 from pandas import DataFrame
 
@@ -58,8 +58,8 @@ def list_shortcuts(
     workspace: str,
     lakehouse: str,
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    df: bool | None = True,
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Lists all shortcuts in the specified workspace and lakehouse
 
@@ -99,8 +99,8 @@ def get_shortcut(
     shortcut_path: str,
     shortcut_name: str,
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Retrieves a specific shortcut in the specified workspace.
 
@@ -190,19 +190,19 @@ def create_shortcut(
         "s3Compatible",
     ] = "oneLake",
     *,
-    target_connection_id: Optional[str] = None,
-    target_location: Optional[str] = None,
-    target_subpath: Optional[str] = None,
-    target_delta_lake_folder: Optional[str] = None,
-    target_environment_domain: Optional[str] = None,
-    target_table_name: Optional[str] = None,
-    target_item_id: Optional[str] = None,
-    target_path: Optional[str] = None,
-    target_workspace_id: Optional[str] = None,
-    target_bucket: Optional[str] = None,
-    custom_target_payload: Optional[dict] = None,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    target_connection_id: str | None = None,
+    target_location: str | None = None,
+    target_subpath: str | None = None,
+    target_delta_lake_folder: str | None = None,
+    target_environment_domain: str | None = None,
+    target_table_name: str | None = None,
+    target_item_id: str | None = None,
+    target_path: str | None = None,
+    target_workspace_id: str | None = None,
+    target_bucket: str | None = None,
+    custom_target_payload: dict | None = None,
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Creates a new shortcut in the specified lakehouse.
 
