@@ -208,7 +208,7 @@ def extract_report_definition_pbir(path: str | Path) -> dict[str, str]:
 
     Raises:
         ResourceNotFoundError: If the specified file does not exist or is not in the expected format.
-        FileNotFoundError: If the specified file does not exist.
+        PyFabricOpsFileNotFoundError: If the specified file does not exist.
         json.JSONDecodeError: If the file content is not valid JSON.
 
     Examples:

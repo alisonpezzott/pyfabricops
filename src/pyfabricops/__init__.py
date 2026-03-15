@@ -388,10 +388,10 @@ from .utils.decorators import df
 from .utils.exceptions import (
     AuthenticationError,
     ConfigurationError,
-    FileNotFoundError,
     InvalidParameterError,
     OptionNotAvailableError,
     PyFabricOpsError,
+    PyFabricOpsFileNotFoundError,
     RequestError,
     ResourceNotFoundError,
 )
@@ -433,7 +433,7 @@ __all__ = [
     "ApiResult",
     "AuthenticationError",
     "ConfigurationError",
-    "FileNotFoundError",
+    "PyFabricOpsFileNotFoundError",
     "InvalidParameterError",
     "OptionNotAvailableError",
     "PyFabricOpsError",
