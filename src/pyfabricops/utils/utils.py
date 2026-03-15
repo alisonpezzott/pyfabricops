@@ -516,7 +516,7 @@ def load_and_sanitize(path: str) -> dict:
         with open(path, encoding="utf-8-sig") as f:
             data = json5.load(f)
         logger.info(f"Loaded JSON file with json5: {path}")
-    except ImportError, json5.JSONError, FileNotFoundError:
+    except (ImportError, json5.JSONError, FileNotFoundError):
         try:
             # Fallback to standard json
             with open(path, encoding="utf-8-sig") as f:
