@@ -17,9 +17,8 @@ import logging
 import logging.handlers
 import os
 import sys
-from datetime import datetime
 from pathlib import Path
-from typing import Literal, Optional, Union
+from typing import Literal
 
 __all__ = [
     "PyFabricOpsFormatter",
@@ -206,12 +205,12 @@ class PyFabricOpsFilter(logging.Filter):
 
 
 def setup_logging(
-    level: Union[str, int] = logging.INFO,
+    level: str | int = logging.INFO,
     format_style: Literal["standard", "minimal", "detailed"] = "standard",
     include_colors: bool = True,
     include_module: bool = True,
     include_symbols: bool = True,
-    log_file: Optional[Union[str, Path]] = None,
+    log_file: str | Path | None = None,
     include_external: bool = False,
     max_file_size: int = 10 * 1024 * 1024,  # 10MB
     backup_count: int = 5,

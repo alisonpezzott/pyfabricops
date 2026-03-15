@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from pandas import DataFrame
 
@@ -12,8 +12,8 @@ logger = get_logger(__name__)
 
 @df
 def list_gateways(
-    df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    df: bool | None = True,
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Lists all available gateways.
 
@@ -32,7 +32,7 @@ def list_gateways(
     return api_request("/gateways", support_pagination=True)
 
 
-def get_gateway_id(gateway_name: str) -> Union[str, None]:
+def get_gateway_id(gateway_name: str) -> str | None:
     """
     Retrieves the ID of a gateway by its name.
 
@@ -50,7 +50,7 @@ def get_gateway_id(gateway_name: str) -> Union[str, None]:
     return None
 
 
-def resolve_gateway(gateway: str) -> Union[str, None]:
+def resolve_gateway(gateway: str) -> str | None:
     """
     Resolves a gateway name to its ID.
 
@@ -70,8 +70,8 @@ def resolve_gateway(gateway: str) -> Union[str, None]:
 def get_gateway(
     gateway: str,
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Retrieves the details of a gateway by its ID.
 

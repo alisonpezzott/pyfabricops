@@ -429,6 +429,7 @@ from .utils.utils import (
 )
 
 __all__ = [
+    "__version__",
     "ApiResult",
     "AuthenticationError",
     "ConfigurationError",

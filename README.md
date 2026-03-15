@@ -23,12 +23,22 @@ Access: [https://pyfabricops.readthedocs.io/en/latest/](https://pyfabricops.read
 
 ## ✅ Requirements  
 
-- Requires Python >= 3.10 <=3.12.10  
+- Requires Python >=3.10,<3.15  
 
 ## ⚒️ Installation
 
 ```bash
 pip install -U pyfabricops
+```
+
+## 🛠️ Development setup
+
+```bash
+# Install uv
+pip install uv
+
+# Sync dev dependencies (creates .venv automatically)
+uv sync --group dev
 ```
 
 ## ⚙️ Usage
@@ -211,9 +221,10 @@ For complete logging configuration options, refer to the [logging_system.md](log
 ## ❤️Contributing
 1. Fork this repository
 2. Create a new branch (feat/my-feature)
-3. Run `poetry install` to set up the development environment
-4. Run `poetry run task test` to run tests
-5. Submit a pull request to branch `develop` 🚀  
+3. Run `uv sync --group dev` to set up the development environment
+4. Run `uv run ruff format --check --diff . && uv run ruff check .`
+5. Run `uv run pytest -s -x --cov=pyfabricops -v` to run tests
+6. Submit a pull request to branch `develop` 🚀  
 
 ## 🚀 Publishing
 
@@ -232,13 +243,9 @@ To publish a new version to PyPI:
 ### Testing with TestPyPI
 
 ```bash
-# Configure TestPyPI
-poetry config repositories.testpypi https://test.pypi.org/legacy/
-poetry config pypi-token.testpypi <your-testpypi-token>
-
 # Build and publish to TestPyPI
-poetry build
-poetry publish -r testpypi
+uv build
+uv publish --publish-url https://test.pypi.org/legacy/ --token <your-testpypi-token>
 
 # Install from TestPyPI
 pip install --index-url https://test.pypi.org/simple/ pyfabricops

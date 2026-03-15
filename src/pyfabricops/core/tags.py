@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any
 
 from pandas import DataFrame
 
@@ -13,8 +13,8 @@ logger = get_logger(__name__)
 @df
 def list_tags(
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    df: bool | None = True,
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Returns a list of all the tenant's tags.
 
@@ -40,7 +40,7 @@ def list_tags(
     return resp
 
 
-def get_tag_id(tag_name: str) -> Union[str, None]:
+def get_tag_id(tag_name: str) -> str | None:
     """
     Retrieves the ID of a tag by its name.
 
@@ -58,7 +58,7 @@ def get_tag_id(tag_name: str) -> Union[str, None]:
     return None
 
 
-def resolve_tag(tag: str) -> Union[str, None]:
+def resolve_tag(tag: str) -> str | None:
     """
     Resolves a tag name to its ID.
 
@@ -76,10 +76,10 @@ def resolve_tag(tag: str) -> Union[str, None]:
 
 @df
 def bulk_create_tags(
-    payload: Dict[str, Any],
+    payload: dict[str, Any],
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Bulk create new tags in the tenant.
 
@@ -169,8 +169,8 @@ def update_tag(
     tag: str,
     display_name: str = None,
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Updates the specified tag.
 

@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Literal
 
 from pandas import DataFrame
 
@@ -13,9 +13,9 @@ logger = get_logger(__name__)
 @df
 def list_domains(
     *,
-    non_empty_only: Optional[bool] = False,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    non_empty_only: bool | None = False,
+    df: bool | None = True,
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     List domains
 
@@ -45,7 +45,7 @@ def list_domains(
     return resp.json().get("domains", [])
 
 
-def get_domain_id(domain_name: str) -> Union[str, None]:
+def get_domain_id(domain_name: str) -> str | None:
     """
     Retrieves the ID of a domain by its name.
 
@@ -63,7 +63,7 @@ def get_domain_id(domain_name: str) -> Union[str, None]:
     return None
 
 
-def resolve_domain(domain: str) -> Union[str, None]:
+def resolve_domain(domain: str) -> str | None:
     """
     Resolves a domain name to its ID.
 
@@ -81,8 +81,8 @@ def resolve_domain(domain: str) -> Union[str, None]:
 
 @df
 def get_domain(
-    domain: str, *, df: Optional[bool] = True
-) -> Union[DataFrame, Dict[str, Any], None]:
+    domain: str, *, df: bool | None = True
+) -> DataFrame | dict[str, Any] | None:
     """
     Get a domain in a workspace.
 
@@ -112,8 +112,8 @@ def create_domain(
     *,
     description: str = None,
     parent_domain: str = None,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Create a new domain in the tenant.
 
@@ -177,8 +177,8 @@ def update_domain(
     *,
     display_name: str = None,
     description: str = None,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Update an existing domain.
 
@@ -218,37 +218,8 @@ def update_domain(
 def list_domain_workspaces(
     domain: str,
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
-    """
-    Returns a list of the workspaces assigned to the specified domain.
-
-    Args:
-        domain (str): The name or ID of the domain.
-        df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
-            If False, returns a list of dictionaries.
-
-    Returns:
-        (Union[DataFrame, List[Dict[str, Any]], None]): A list of domains in the workspace.
-
-    Examples:
-        ```python
-        list_domain_workspaces('Financial')
-        ```
-    """
-    resp = api_request(
-        "/admin/domains/" + resolve_domain(domain) + "/workspaces",
-        support_pagination=True,
-    )
-    return resp
-
-
-@df
-def list_domain_workspaces(
-    domain: str,
-    *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    df: bool | None = True,
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Returns a list of the workspaces assigned to the specified domain.
 
@@ -276,8 +247,8 @@ def list_domain_workspaces(
 def list_domain_role_assignments(
     domain: str,
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    df: bool | None = True,
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Returns a list of the role assignments assigned to the specified domain.
 
@@ -304,10 +275,10 @@ def list_domain_role_assignments(
 @df
 def domain_role_assignments_bulk_assign(
     domain: str,
-    payload: Dict[str, Any],
+    payload: dict[str, Any],
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    df: bool | None = True,
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Assign the specified admins or contributors to the domain.
 
@@ -367,10 +338,10 @@ def domain_role_assignments_bulk_assign(
 @df
 def domain_role_assignments_bulk_unassign(
     domain: str,
-    payload: Dict[str, Any],
+    payload: dict[str, Any],
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    df: bool | None = True,
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Unassign the specified admins or contributors from the domain.
 
@@ -432,8 +403,8 @@ def domain_sync_role_assignments_to_subdomain(
     domain: str,
     role: Literal["Admin", "Contributor"] = "Admin",
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    df: bool | None = True,
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Sync the role assignments from the specified domain to its subdomains.
 
@@ -491,7 +462,7 @@ def unassign_all_domain_workspaces(domain: str) -> None:
 
 
 def assign_domain_workspaces_by_ids(
-    domain: str, workspaces: List[str]
+    domain: str, workspaces: list[str]
 ) -> None:
     """
     Assign workspaces from the specified domain by workspace ID.
@@ -528,7 +499,7 @@ def assign_domain_workspaces_by_ids(
 
 
 def unassign_domain_workspaces_by_ids(
-    domain: str, workspaces: List[str]
+    domain: str, workspaces: list[str]
 ) -> None:
     """
     Unassign workspaces from the specified domain by workspace ID.
@@ -565,7 +536,7 @@ def unassign_domain_workspaces_by_ids(
 
 
 def assign_domain_workspaces_by_capacities(
-    domain: str, capacities: List[str]
+    domain: str, capacities: list[str]
 ) -> None:
     """
     Assign all workspaces that reside on the specified capacities to the specified domain.
@@ -606,7 +577,7 @@ def assign_domain_workspaces_by_capacities(
 
 
 def assign_domain_workspaces_by_principals(
-    domain: str, principals: List[Dict[str, Any]]
+    domain: str, principals: list[dict[str, Any]]
 ) -> None:
     """
     Assign workspaces to the specified domain, when one of the specified principals has admin permission in the workspace.

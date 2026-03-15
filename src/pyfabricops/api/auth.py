@@ -3,7 +3,7 @@ import os
 import tempfile
 import time
 from abc import ABC, abstractmethod
-from typing import Dict, Literal, Optional, Union
+from typing import Literal
 
 import requests
 from azure.identity import InteractiveBrowserCredential
@@ -41,7 +41,7 @@ class TokenCache:
         "GRAPH_NOTEBOOK": {"access_token": "", "expires_at": 0},
     }
 
-    def __init__(self, cache_file: Optional[str] = None):
+    def __init__(self, cache_file: str | None = None):
         self.cache_file = cache_file or os.path.join(
             tempfile.gettempdir(), "pf_token_cache.json"
         )
@@ -53,21 +53,21 @@ class TokenCache:
             with open(self.cache_file, "w") as f:
                 json.dump(self.CACHE_TEMPLATE, f)
 
-    def load_tokens(self) -> Dict:
+    def load_tokens(self) -> dict:
         """Load tokens from cache"""
         try:
-            with open(self.cache_file, "r") as f:
+            with open(self.cache_file) as f:
                 return json.load(f)
         except (FileNotFoundError, json.JSONDecodeError):
             self._init_cache()
             return self.CACHE_TEMPLATE.copy()
 
-    def save_tokens(self, tokens: Dict):
+    def save_tokens(self, tokens: dict):
         """Save tokens to cache"""
         with open(self.cache_file, "w") as f:
             json.dump(tokens, f, indent=4)
 
-    def get_token(self, token_key: str) -> Optional[Dict]:
+    def get_token(self, token_key: str) -> dict | None:
         """Get a specific token from cache"""
         tokens = self.load_tokens()
         return tokens.get(token_key)
@@ -106,7 +106,7 @@ class CredentialProvider(ABC):
     """Abstract class for different credential providers"""
 
     @abstractmethod
-    def get_credentials(self) -> Dict[str, str]:
+    def get_credentials(self) -> dict[str, str]:
         """Return the necessary credentials"""
         pass
 
@@ -114,7 +114,7 @@ class CredentialProvider(ABC):
 class EnvCredentialProvider(CredentialProvider):
     """Environment variable credential provider"""
 
-    def get_credentials(self) -> Dict[str, str]:
+    def get_credentials(self) -> dict[str, str]:
         load_dotenv()
         return {
             "fab_client_id": os.getenv("FAB_CLIENT_ID"),
@@ -134,13 +134,13 @@ class OAuthProvider:
 
     def get_token(
         self, audience: Literal["fabric", "powerbi", "graph"] = "fabric"
-    ) -> Dict:
+    ) -> dict:
         if audience not in ["fabric", "powerbi", "graph"]:
             raise OptionNotAvailableError(
                 f"Audience not available. Available: fabric, powerbi, graph. Got: {audience}"
             )
         if audience == "graph":
-            scope == GRAPH_SCOPE
+            scope = GRAPH_SCOPE
         elif audience == "powerbi":
             scope = POWERBI_SCOPE
         else:
@@ -191,7 +191,7 @@ class FabricNotebookProvider:
 
     def get_token(
         self, audience: Literal["fabric", "powerbi", "graph"] = "fabric"
-    ) -> Dict:
+    ) -> dict:
         """Get token from Fabric notebook context"""
         token_key = f"{audience.upper()}_NOTEBOOK"
 
@@ -250,8 +250,8 @@ class TokenManager:
         self,
         audience: Literal["fabric", "powerbi", "graph"],
         credential_type: Literal["spn", "user"],
-        credentials: Dict[str, str],
-    ) -> Dict:
+        credentials: dict[str, str],
+    ) -> dict:
         """Construct the payload for token request"""
         if audience == "graph":
             scope = GRAPH_SCOPE
@@ -280,7 +280,7 @@ class TokenManager:
         self,
         audience: Literal["fabric", "powerbi", "graph"],
         credential_type: Literal["spn", "user"],
-    ) -> Dict:
+    ) -> dict:
         """Makes an HTTP request to retrieve the token"""
         if self.auth_provider not in self._credential_providers:
             raise OptionNotAvailableError(
@@ -312,7 +312,7 @@ class TokenManager:
         self,
         audience: Literal["fabric", "powerbi", "graph"] = "fabric",
         credential_type: Literal["spn", "user"] = "spn",
-    ) -> Dict:
+    ) -> dict:
         """Get a valid token, using cache when possible"""
 
         # OAuth uses a different flow
@@ -416,6 +416,6 @@ def _get_token(
     audience: Literal["fabric", "powerbi", "graph"] = "fabric",
     auth_provider: Literal["env", "oauth", "fabric"] = "env",
     credential_type: Literal["spn", "user"] = "spn",
-) -> Union[dict, None]:
+) -> dict | None:
     """Get a token"""
     return _token_manager.get_token(audience, credential_type)

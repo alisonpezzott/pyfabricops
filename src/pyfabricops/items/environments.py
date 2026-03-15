@@ -1,7 +1,6 @@
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Literal
 
 from pandas import DataFrame
-from requests import get
 
 from ..api.api import api_request
 from ..core.folders import resolve_folder
@@ -16,8 +15,8 @@ logger = get_logger(__name__)
 
 @df
 def list_environments(
-    workspace: str, *, df: Optional[bool] = True
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    workspace: str, *, df: bool | None = True
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Returns a list of environments from the specified workspace.
     This API supports pagination.
@@ -77,7 +76,7 @@ def get_environment_id(workspace: str, environment: str) -> str | None:
 def resolve_environment(
     workspace: str,
     environment: str,
-) -> Union[str, None]:
+) -> str | None:
     """
     Resolves an environment name to its ID.
 
@@ -105,8 +104,8 @@ def get_environment(
     workspace: str,
     environment: str,
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Retrieves a specific environment from the workspace.
 
@@ -142,10 +141,10 @@ def update_environment(
     workspace: str,
     environment: str,
     *,
-    display_name: Optional[str] = None,
-    description: Optional[str] = None,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    display_name: str | None = None,
+    description: str | None = None,
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Updates the properties of the specified environment.
 
@@ -223,7 +222,7 @@ def delete_environment(workspace: str, environment: str) -> None:
 
 def get_environment_definition(
     workspace: str, environment: str
-) -> Union[Dict[str, Any], None]:
+) -> dict[str, Any] | None:
     """
     Retrieves the definition of an environment by its name or ID from the specified workspace.
 
@@ -259,9 +258,9 @@ def get_environment_definition(
 def update_environment_definition(
     workspace: str,
     environment: str,
-    environment_definition: Dict[str, Any],
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    environment_definition: dict[str, Any],
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Updates the definition of an existing environment in the specified workspace.
     If the environment does not exist, it returns None.
@@ -309,11 +308,11 @@ def create_environment(
     workspace: str,
     display_name: str,
     *,
-    environment_definition: Dict[str, Any] = None,
-    description: Optional[str] = None,
-    folder: Optional[str] = None,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    environment_definition: dict[str, Any] = None,
+    description: str | None = None,
+    folder: str | None = None,
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Creates a new environment in the specified workspace.
 
@@ -366,8 +365,8 @@ def create_environment(
 def publish_environment(
     workspace: str,
     environment: str,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Trigger an environment publish operation.
 
@@ -406,7 +405,7 @@ def publish_environment(
 @df
 def get_environment_spark_compute(
     workspace: str, environment: str
-) -> Union[Dict[str, Any], None]:
+) -> dict[str, Any] | None:
     """
     Get environment staging spark compute.
 
@@ -450,9 +449,9 @@ def update_environment_spark_compute(
     dynamic_executor_allocation_enabled: bool = None,
     min_executors: int = None,
     max_executors: int = None,
-    spark_properties: List[Dict[str, str]] = None,
+    spark_properties: list[dict[str, str]] = None,
     runtime_version: Literal["1.2", "1.3", "2.0"] = None,
-) -> Union[Dict[str, Any], None]:
+) -> dict[str, Any] | None:
     """
     Update environment staging spark compute.
 
@@ -545,7 +544,7 @@ def update_environment_spark_compute(
 def export_environment_external_libraries(
     workspace: str,
     environment: str,
-) -> Union[Dict[str, Any], None]:
+) -> dict[str, Any] | None:
     """
     Export environment external libraries.
 
@@ -579,7 +578,7 @@ def export_environment_external_libraries(
 def import_environment_external_libraries(
     workspace: str,
     environment: str,
-) -> Union[Dict[str, Any], None]:
+) -> dict[str, Any] | None:
     """
     Import external libraries from environment.yaml in the environment.
 

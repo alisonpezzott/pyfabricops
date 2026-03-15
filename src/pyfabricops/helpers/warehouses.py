@@ -1,7 +1,7 @@
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 import pandas as pd
 from pandas import DataFrame
@@ -18,7 +18,7 @@ logger = get_logger(__name__)
 
 def _save_warehouse_sqlproj(
     display_name: str,
-    path: Union[Path, str],
+    path: Path | str,
 ) -> None:
     """
     Create a dummy warehouse `.sqlproj` file
@@ -48,7 +48,7 @@ def _save_warehouse_sqlproj(
 
 
 def _save_warehouse_defaultsemanticmodel_txt(
-    path: Union[Path, str],
+    path: Path | str,
 ) -> None:
     """
     Create a `DefaultSemanticModel.txt` in `Warehouse` path.
@@ -62,7 +62,7 @@ def _save_warehouse_defaultsemanticmodel_txt(
 
 
 def _save_warehouse_xmla_json(
-    path: Union[Path, str],
+    path: Path | str,
 ) -> None:
     """
     Create a dummy `xmla.json` on `Warehouse` path.
@@ -104,8 +104,8 @@ def _save_warehouse_xmla_json(
 
 def _generate_warehouse_platform(
     display_name: str,
-    description: Optional[str] = "",
-) -> Dict[str, Any]:
+    description: str | None = "",
+) -> dict[str, Any]:
     """
     Generate the warehouse .platform file
 
@@ -131,7 +131,7 @@ def _generate_warehouse_platform(
 
 
 def _save_warehouse_platform(
-    platform: Dict[str, Any],
+    platform: dict[str, Any],
     path: str,
 ) -> None:
     """
@@ -147,7 +147,7 @@ def _save_warehouse_platform(
 
 def get_warehouse_config(
     workspace: str, warehouse: str
-) -> Union[Dict[str, Any], None]:
+) -> dict[str, Any] | None:
     """
     Get a specific warehouse config from a workspace.
 
@@ -181,7 +181,7 @@ def get_warehouse_config(
         return config
 
 
-def get_all_warehouses_config(workspace: str) -> Union[Dict[str, Any], None]:
+def get_all_warehouses_config(workspace: str) -> dict[str, Any] | None:
     """
     Generate warehouses config from a workspace.
 
@@ -216,8 +216,8 @@ def get_all_warehouses_config(workspace: str) -> Union[Dict[str, Any], None]:
 @df
 def list_valid_warehouses(
     workspace: str,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    df: bool | None = True,
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Generate a list of valid warehouses from a workspace.
 
@@ -240,7 +240,7 @@ def list_valid_warehouses(
 def export_warehouse(
     workspace: str,
     warehouse: str,
-    path: Union[str, Path],
+    path: str | Path,
 ) -> None:
     """
     Export a warehouse to path
@@ -259,7 +259,7 @@ def export_warehouse(
         folder_path = resolve_folder_from_id_to_path(
             workspace_id, item["folderId"]
         )
-    except:
+    except Exception:
         logger.info(f"{item['displayName']}.Warehouse is not inside a folder.")
         folder_path = None
 
@@ -288,7 +288,7 @@ def export_warehouse(
     return None
 
 
-def export_all_warehouses(workspace: str, path: Union[str, Path]) -> None:
+def export_all_warehouses(workspace: str, path: str | Path) -> None:
     """
     Exports all warehouses from the workspace to path.
 
@@ -309,7 +309,7 @@ def export_all_warehouses(workspace: str, path: Union[str, Path]) -> None:
             folder_path = resolve_folder_from_id_to_path(
                 workspace_id, item["folderId"]
             )
-        except:
+        except Exception:
             logger.info(
                 f"{item['displayName']}.Warehouse is not inside a folder."
             )
@@ -338,3 +338,4 @@ def export_all_warehouses(workspace: str, path: Union[str, Path]) -> None:
 
     logger.success(f"All warehouses exported to {path} successfully.")
     return None
+

@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from pandas import DataFrame
 
@@ -16,8 +16,8 @@ logger = get_logger(__name__)
 def list_dataflows_gen2(
     workspace: str,
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    df: bool | None = True,
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Lists all dataflows in a workspace.
 
@@ -39,7 +39,7 @@ def list_dataflows_gen2(
 
 def get_dataflow_gen2_id(
     workspace: str, dataflow_gen2_name: str
-) -> Union[str, None]:
+) -> str | None:
     """
     Retrieves the ID of a dataflow by its name.
 
@@ -66,7 +66,7 @@ def get_dataflow_gen2_id(
 def resolve_dataflow_gen2(
     workspace: str,
     dataflow: str,
-) -> Union[str, None]:
+) -> str | None:
     """
     Resolves a dataflow name to its ID.
 
@@ -94,8 +94,8 @@ def get_dataflow_gen2(
     workspace: str,
     dataflow: str,
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Gets a dataflow by its name or ID.
 
@@ -130,8 +130,8 @@ def update_dataflow_gen2(
     *,
     display_name: str = None,
     description: str = None,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Updates the properties of the specified dataflow.
 
@@ -203,7 +203,7 @@ def delete_dataflow_gen2(workspace: str, dataflow: str) -> None:
 
 def get_dataflow_gen2_definition(
     workspace: str, dataflow: str
-) -> Union[Dict[str, Any], None]:
+) -> dict[str, Any] | None:
     """
     Retrieves the definition of a dataflow by its name or ID from the specified workspace.
 
@@ -240,9 +240,9 @@ def get_dataflow_gen2_definition(
 def update_dataflow_gen2_definition(
     workspace: str,
     dataflow: str,
-    item_definition: Dict[str, Any],
-    df: Optional[bool] = True,
-) -> Union[Dict[str, Any], None]:
+    item_definition: dict[str, Any],
+    df: bool | None = True,
+) -> dict[str, Any] | None:
     """
     Updates the definition of an existing dataflow in the specified workspace.
     If the dataflow does not exist, it returns None.
@@ -288,12 +288,12 @@ def update_dataflow_gen2_definition(
 def create_dataflow_gen2(
     workspace: str,
     display_name: str,
-    item_definition: Dict[str, Any],
+    item_definition: dict[str, Any],
     *,
-    description: Optional[str] = None,
-    folder: Optional[str] = None,
-    df: Optional[bool] = True,
-) -> Union[dict, None]:
+    description: str | None = None,
+    folder: str | None = None,
+    df: bool | None = True,
+) -> dict | None:
     """
     Creates a new dataflow in the specified workspace.
 

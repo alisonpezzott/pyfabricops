@@ -9,7 +9,7 @@ def get_public_functions_and_classes(file_path):
     public_items = []
 
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             content = f.read()
 
         tree = ast.parse(content)

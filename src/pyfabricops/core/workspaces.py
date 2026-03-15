@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Literal
 
 from pandas import DataFrame
 
@@ -14,8 +14,8 @@ logger = get_logger(__name__)
 
 @df
 def list_workspaces(
-    df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    df: bool | None = True,
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Returns a list of workspaces.
 
@@ -35,7 +35,7 @@ def list_workspaces(
     return api_request("/workspaces", support_pagination=True)
 
 
-def get_workspace_id(workspace: str) -> Union[str, None]:
+def get_workspace_id(workspace: str) -> str | None:
     """
     Retrieves the ID of a workspace by its name.
 
@@ -54,7 +54,7 @@ def get_workspace_id(workspace: str) -> Union[str, None]:
     return None
 
 
-def resolve_workspace(workspace: str) -> Union[str, None]:
+def resolve_workspace(workspace: str) -> str | None:
     """
     Resolves a workspace name to its ID.
 
@@ -72,8 +72,8 @@ def resolve_workspace(workspace: str) -> Union[str, None]:
 
 @df
 def get_workspace(
-    workspace: str, df: Optional[bool] = True
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    workspace: str, df: bool | None = True
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Returns the specified workspace.
 
@@ -99,10 +99,10 @@ def get_workspace(
 def create_workspace(
     display_name: str,
     *,
-    capacity: Optional[str] = None,
-    description: Optional[str] = None,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    capacity: str | None = None,
+    description: str | None = None,
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Create a new workspace with the specified name, capacity and description.
 
@@ -140,10 +140,10 @@ def create_workspace(
 def update_workspace(
     workspace: str,
     *,
-    display_name: Optional[str] = None,
-    description: Optional[str] = None,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    display_name: str | None = None,
+    description: str | None = None,
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Updates the properties of a workspace.
 
@@ -228,8 +228,8 @@ def delete_workspace(workspace: str) -> None:
 def list_workspace_role_assignments(
     workspace: str,
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    df: bool | None = True,
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Lists all role assignments for a workspace.
 
@@ -258,8 +258,8 @@ def get_workspace_role_assignment(
     workspace: str,
     user_uuid: str,
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Retrieves the role of a user in a workspace.
 
@@ -297,8 +297,8 @@ def add_workspace_role_assignment(
     ] = "User",
     role: Literal["Admin", "Contributor", "Member", "Viewer"] = "Admin",
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Adds a permission to a workspace for a user.
 
@@ -353,8 +353,8 @@ def update_workspace_role_assignment(
     user_uuid: str,
     role: Literal["Admin", "Contributor", "Member", "Viewer"] = "Admin",
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Update a role in an existing workspace role assignment.
 

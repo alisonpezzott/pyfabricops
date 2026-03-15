@@ -1,5 +1,5 @@
 import time
-from typing import Any, Dict, List, Literal, NamedTuple, Optional, Union
+from typing import Any, Literal, NamedTuple
 from urllib.parse import urlencode
 
 import requests
@@ -20,19 +20,19 @@ class ApiResult(NamedTuple):
 
     success: bool
     status_code: int
-    data: Optional[Any] = None
-    headers: Optional[dict] = None
-    error: Optional[str] = None
-    request_kwargs: Optional[dict] = None
+    data: Any | None = None
+    headers: dict | None = None
+    error: str | None = None
+    request_kwargs: dict | None = None
 
 
 def _base_api(
     endpoint: str,
     *,
     content_type: str = "application/json",
-    payload: Optional[dict] = None,
-    data: Optional[dict] = None,
-    params: Optional[dict] = None,
+    payload: dict | None = None,
+    data: dict | None = None,
+    params: dict | None = None,
     audience: Literal["fabric", "powerbi", "graph"] = "fabric",
     credential_type: Literal["spn", "user"] = "spn",
     method: Literal["get", "post", "patch", "delete"] = "get",
@@ -379,17 +379,17 @@ def api_request(
     endpoint: str,
     *,
     content_type: str = "application/json",
-    payload: Optional[dict] = None,
-    data: Optional[dict] = None,
-    params: Optional[dict] = None,
+    payload: dict | None = None,
+    data: dict | None = None,
+    params: dict | None = None,
     audience: Literal["fabric", "powerbi", "graph"] = "fabric",
     credential_type: Literal["spn", "user"] = "spn",
     method: Literal["get", "post", "patch", "delete"] = "get",
-    support_pagination: Optional[bool] = False,
-    support_lro: Optional[bool] = False,
+    support_pagination: bool | None = False,
+    support_lro: bool | None = False,
     return_raw: bool = False,
     **kwargs,
-) -> Union[List[Dict[str, Any]], Dict[str, Any], None]:
+) -> list[dict[str, Any]] | dict[str, Any] | None:
     """
     Makes a request to the Microsoft Fabric or Power BI API.
     This function supports various HTTP methods and can handle both JSON payloads and form data.

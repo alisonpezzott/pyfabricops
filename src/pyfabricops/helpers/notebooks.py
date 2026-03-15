@@ -1,7 +1,7 @@
 import os
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 import pandas as pd
 from pandas import DataFrame
@@ -34,7 +34,7 @@ logger = get_logger(__name__)
 
 def get_notebook_config(
     workspace: str, notebook: str
-) -> Union[Dict[str, Any], None]:
+) -> dict[str, Any] | None:
     """
     Get a specific notebook config from a workspace.
 
@@ -69,7 +69,7 @@ def get_notebook_config(
 
 def get_all_notebooks_config(
     workspace: str,
-) -> Union[Dict[str, Any], None]:
+) -> dict[str, Any] | None:
     """
     Get notebooks config from a workspace.
 
@@ -87,7 +87,7 @@ def get_all_notebooks_config(
     config = {}
 
     for item in items:
-        item_data = get_notebook(workspace, item["id"], df=False)
+        get_notebook(workspace, item["id"], df=False)
 
         config[item["displayName"]] = {
             "id": item["id"],
@@ -103,7 +103,7 @@ def get_all_notebooks_config(
 def export_notebook(
     workspace: str,
     notebook: str,
-    path: Union[str, Path],
+    path: str | Path,
 ) -> None:
     """
     Export a notebook to path.
@@ -122,7 +122,7 @@ def export_notebook(
         folder_path = resolve_folder_from_id_to_path(
             workspace_id, item["folderId"]
         )
-    except:
+    except Exception:
         logger.info(f"{item['displayName']}.Notebook is not inside a folder.")
         folder_path = None
 
@@ -148,7 +148,7 @@ def export_notebook(
 
 def export_all_notebooks(
     workspace: str,
-    path: Union[str, Path],
+    path: str | Path,
 ) -> None:
     """
     Export a notebook to path.
@@ -170,7 +170,7 @@ def export_all_notebooks(
             folder_path = resolve_folder_from_id_to_path(
                 workspace_id, item["folderId"]
             )
-        except:
+        except Exception:
             logger.info(
                 f"{item['displayName']}.Notebook is not inside a folder."
             )
@@ -198,10 +198,10 @@ def export_all_notebooks(
 def deploy_notebook(
     workspace: str,
     path: str,
-    start_path: Optional[str] = None,
-    description: Optional[str] = None,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    start_path: str | None = None,
+    description: str | None = None,
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Deploy a notebook to workspace.
 
@@ -254,7 +254,7 @@ def deploy_notebook(
 def deploy_all_notebooks(
     workspace: str,
     path: str,
-    start_path: Optional[str] = None,
+    start_path: str | None = None,
 ) -> None:
     """
     Deploy all notebooks to workspace.
@@ -307,7 +307,7 @@ def deploy_all_notebooks(
     return None
 
 
-def extract_notebook_parameters(path: str) -> List[Dict[str, Any]]:
+def extract_notebook_parameters(path: str) -> list[dict[str, Any]]:
     """
     Extract parameters from a Fabric notebook-content.py file.
 
@@ -319,7 +319,7 @@ def extract_notebook_parameters(path: str) -> List[Dict[str, Any]]:
     """
     path = Path(path) / "notebook-content.py"
 
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         content = f.read()
 
     parameters = []
@@ -383,7 +383,7 @@ def extract_notebook_parameters(path: str) -> List[Dict[str, Any]]:
 
 
 def replace_notebook_parameters_with_placeholders(
-    path: str, parameters: List[Dict[str, Any]]
+    path: str, parameters: list[dict[str, Any]]
 ) -> None:
     """
     Replace parameters with placeholders in a Fabric notebook-content.py file.
@@ -396,7 +396,7 @@ def replace_notebook_parameters_with_placeholders(
 
     path = Path(path) / "notebook-content.py"
 
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         content = f.read()
 
     # Replace each parameter with a placeholder
@@ -432,7 +432,7 @@ def replace_notebook_parameters_with_placeholders(
 
 
 def replace_notebook_placeholders_with_parameters(
-    path: str, parameters: List[Dict[str, Any]]
+    path: str, parameters: list[dict[str, Any]]
 ) -> None:
     """
     Replace placeholders with actual parameters in a Fabric notebook-content.py file.
@@ -445,7 +445,7 @@ def replace_notebook_placeholders_with_parameters(
 
     path = Path(path) / "notebook-content.py"
 
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         content = f.read()
 
     # Replace placeholders with actual values
@@ -469,3 +469,4 @@ def replace_notebook_placeholders_with_parameters(
 
     with open(path, "w", encoding="utf-8") as f:
         f.write(content)
+

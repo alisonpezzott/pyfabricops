@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from pandas import DataFrame
 
@@ -15,8 +15,8 @@ logger = get_logger(__name__)
 @df
 def list_reports(
     workspace: str,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    df: bool | None = True,
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Returns a list of reports in a specified workspace.
 
@@ -34,7 +34,7 @@ def list_reports(
     )
 
 
-def get_report_id(workspace: str, report_name: str) -> Union[str, None]:
+def get_report_id(workspace: str, report_name: str) -> str | None:
     """
     Retrieves the ID of a report by its name from the specified workspace.
 
@@ -60,7 +60,7 @@ def get_report_id(workspace: str, report_name: str) -> Union[str, None]:
 def resolve_report(
     workspace: str,
     report: str,
-) -> Union[str, None]:
+) -> str | None:
     if is_valid_uuid(report):
         return report
     else:
@@ -69,8 +69,8 @@ def resolve_report(
 
 @df
 def get_report(
-    workspace: str, report: str, *, df: Optional[bool] = True
-) -> Union[DataFrame, Dict[str, Any], None]:
+    workspace: str, report: str, *, df: bool | None = True
+) -> DataFrame | dict[str, Any] | None:
     """
     Retrieves a report by its name or ID from the specified workspace.
 
@@ -99,12 +99,12 @@ def get_report(
 def create_report(
     workspace: str,
     display_name: str,
-    item_definition: Dict[str, Any],
+    item_definition: dict[str, Any],
     *,
-    description: Optional[str] = None,
-    folder: Optional[str] = None,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    description: str | None = None,
+    folder: str | None = None,
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Creates a new report in the specified workspace.
 
@@ -156,10 +156,10 @@ def update_report(
     workspace: str,
     report: str,
     *,
-    display_name: Optional[str] = None,
-    description: Optional[str] = None,
-    df: Optional[bool] = False,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    display_name: str | None = None,
+    description: str | None = None,
+    df: bool | None = False,
+) -> DataFrame | dict[str, Any] | None:
     """
     Updates the properties of the specified report.
 
@@ -229,7 +229,7 @@ def delete_report(workspace: str, report: str) -> None:
 
 def get_report_definition(
     workspace: str, report: str
-) -> Union[Dict[str, Any], None]:
+) -> dict[str, Any] | None:
     """
     Retrieves the definition of a report by its name or ID from the specified workspace.
 
@@ -267,10 +267,10 @@ def get_report_definition(
 def update_report_definition(
     workspace: str,
     report: str,
-    item_definition: Dict[str, Any],
+    item_definition: dict[str, Any],
     *,
-    df: Optional[bool] = True,
-) -> Union[Dict[str, Any], None]:
+    df: bool | None = True,
+) -> dict[str, Any] | None:
     """
     Updates the definition of an existing report in the specified workspace.
     If the report does not exist, it returns None.

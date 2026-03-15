@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Literal
 
 from pandas import DataFrame
 
@@ -13,8 +13,8 @@ logger = get_logger(__name__)
 
 @df
 def list_workspace_custom_pools(
-    workspace: str, *, df: Optional[bool] = True
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    workspace: str, *, df: bool | None = True
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Returns a list of custom pools from the specified workspace.
     This API supports pagination.
@@ -76,7 +76,7 @@ def get_workspace_custom_pool_id(
 def resolve_workspace_custom_pool(
     workspace: str,
     workspace_custom_pool: str,
-) -> Union[str, None]:
+) -> str | None:
     """
     Resolves a workspace custom pool name to its ID.
 
@@ -106,8 +106,8 @@ def get_workspace_custom_pool(
     workspace: str,
     workspace_custom_pool: str,
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Retrieves a specific custom pool from the workspace.
 
@@ -143,18 +143,18 @@ def get_workspace_custom_pool(
 @df
 def create_workspace_custom_pool(
     workspace: str,
-    display_name: Optional[str] = None,
+    display_name: str | None = None,
     *,
-    auto_scale_enabled: Optional[bool] = None,
-    min_node_count: Optional[int] = None,
-    max_node_count: Optional[int] = None,
-    dynamic_executor_allocation_enabled: Optional[bool] = None,
-    min_executors: Optional[int] = None,
-    max_executors: Optional[int] = None,
-    node_family: Optional[str] = "MemoryOptimized",
+    auto_scale_enabled: bool | None = None,
+    min_node_count: int | None = None,
+    max_node_count: int | None = None,
+    dynamic_executor_allocation_enabled: bool | None = None,
+    min_executors: int | None = None,
+    max_executors: int | None = None,
+    node_family: str | None = "MemoryOptimized",
     node_size: Literal["Small", "Medium", "Large"] = "Small",
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Creates a new workspace custom pool in the specified workspace.
 
@@ -231,17 +231,17 @@ def update_workspace_custom_pool(
     workspace: str,
     workspace_custom_pool: str,
     *,
-    display_name: Optional[str] = None,
-    auto_scale_enabled: Optional[bool] = None,
-    min_node_count: Optional[int] = None,
-    max_node_count: Optional[int] = None,
-    dynamic_executor_allocation_enabled: Optional[bool] = None,
-    min_executors: Optional[int] = None,
-    max_executors: Optional[int] = None,
-    node_family: Optional[str] = "MemoryOptimized",
+    display_name: str | None = None,
+    auto_scale_enabled: bool | None = None,
+    min_node_count: int | None = None,
+    max_node_count: int | None = None,
+    dynamic_executor_allocation_enabled: bool | None = None,
+    min_executors: int | None = None,
+    max_executors: int | None = None,
+    node_family: str | None = "MemoryOptimized",
     node_size: Literal["Small", "Medium", "Large"] = "Small",
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Updates the properties of the specified workspace custom pool.
 
@@ -362,7 +362,7 @@ def delete_workspace_custom_pool(
 def get_workspace_spark_settings(
     workspace: str,
     *,
-    df: Optional[bool] = True,
+    df: bool | None = True,
 ) -> str | None:
     """
     Get workspace Spark settings.
@@ -405,7 +405,7 @@ def update_workspace_spark_settings(
     environment_runtime_version: str = None,
     job_conservative_job_admission_enabled: bool = None,
     job_session_timeout_in_minutes: int = None,
-    df: Optional[bool] = True,
+    df: bool | None = True,
 ) -> str | None:
     """
     Update workspace Spark settings.
