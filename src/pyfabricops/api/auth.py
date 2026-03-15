@@ -58,7 +58,7 @@ class TokenCache:
         try:
             with open(self.cache_file) as f:
                 return json.load(f)
-        except FileNotFoundError, json.JSONDecodeError:
+        except (FileNotFoundError, json.JSONDecodeError):
             self._init_cache()
             return self.CACHE_TEMPLATE.copy()
 
