@@ -5,7 +5,6 @@
 
 import base64
 import json
-import logging
 import os
 
 from cryptography.hazmat.backends import default_backend

@@ -13,39 +13,27 @@ jobs:
     - uses: actions/checkout@v4
     
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
-        python-version: "3.11"
-    
-    - name: Install Poetry
-      uses: snok/install-poetry@v1
+        python-version: "3.13"
+
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v5
       with:
-        version: latest
-        virtualenvs-create: true
-        virtualenvs-in-project: true
-    
-    - name: Cache dependencies
-      uses: actions/cache@v3
-      with:
-        path: ~/.cache/pypoetry
-        key: ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-poetry-
-    
+        enable-cache: true
+
     - name: Install dependencies
-      run: poetry install --no-interaction
+      run: uv sync --group dev
     
     - name: Run tests
-      run: poetry run pytest
+      run: uv run pytest
     
     - name: Build package
-      run: poetry build
+      run: uv build
     
     - name: Check package
-      run: poetry run pip install twine && poetry run twine check dist/*
+      run: uv run twine check dist/*
     
     - name: Publish to PyPI
       if: github.event_name == 'release'
-      env:
-        POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_TOKEN }}
-      run: poetry publish
+      run: uv publish --token ${{ secrets.PYPI_TOKEN }}

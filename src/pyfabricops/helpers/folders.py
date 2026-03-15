@@ -1,7 +1,7 @@
 import os
-from functools import lru_cache
+from functools import cache
 from pathlib import Path
-from typing import Any, Dict, Union
+from typing import Any
 
 import pandas
 from pandas import DataFrame
@@ -34,7 +34,7 @@ def generate_folders_paths(
     )
 
     # Recursive function with cache to build the full path
-    @lru_cache(maxsize=None)
+    @cache
     def _build_full_path(folder_id: str) -> str:
         """
         Returns the full path for the folder `folder_id`,
@@ -80,7 +80,7 @@ def get_folders_paths(workspace: str) -> DataFrame:
     return generate_folders_paths(folders_df)
 
 
-def get_folders_config(workspace: str) -> Union[Dict[str, Any], None]:
+def get_folders_config(workspace: str) -> dict[str, Any] | None:
     """
     Get the folder configuration for a specific workspace.
 
@@ -97,7 +97,7 @@ def get_folders_config(workspace: str) -> Union[Dict[str, Any], None]:
     return folders.to_dict(orient="records")
 
 
-def export_folders(workspace: str, path: Union[str, Path]) -> None:
+def export_folders(workspace: str, path: str | Path) -> None:
     """
     Export all folders from a workspace to a specified path
     """
@@ -120,7 +120,7 @@ def export_folders(workspace: str, path: Union[str, Path]) -> None:
 
 def resolve_folder_from_id_to_path(
     workspace: str, folder_id: str
-) -> Union[str, None]:
+) -> str | None:
     """
     Return the folder path to the folder_id given for a specified worspace.
     """
@@ -141,7 +141,7 @@ def resolve_folder_from_id_to_path(
 
 def deploy_folders(
     workspace: str,
-    path: Union[str, Path],
+    path: str | Path,
 ):
     """
     Creates folders in Fabric workspace based on local folder structure
@@ -172,7 +172,7 @@ def deploy_folders(
 
     def _has_fabric_artifacts(path):
         """Check if folder or any subfolder contains Fabric artifacts"""
-        for root, dirs, files in os.walk(path):
+        for _root, dirs, _files in os.walk(path):
             for dir_name in dirs:
                 if any(
                     dir_name.endswith(artifact)
@@ -184,7 +184,7 @@ def deploy_folders(
     # First pass: identify folders with artifacts and their parent folders
     folders_with_artifacts = set()
 
-    for root, dirs, files in os.walk(path):
+    for root, dirs, _files in os.walk(path):
         for dir_name in dirs:
             full_path = os.path.join(root, dir_name)
 
@@ -209,7 +209,7 @@ def deploy_folders(
 
     # Second pass: build folder list only for folders with artifacts
     local_folders = []
-    for root, dirs, files in os.walk(path):
+    for root, dirs, _files in os.walk(path):
         for dir_name in dirs:
             full_path = os.path.join(root, dir_name)
             relative_path = os.path.relpath(full_path, path).replace("\\", "/")

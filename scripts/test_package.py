@@ -12,10 +12,8 @@ def test_import():
         print(
             f"✅ pyfabricops imported successfully, version: {pyfabricops.__version__}"
         )
-        return True
     except ImportError as e:
-        print(f"❌ Failed to import pyfabricops: {e}")
-        return False
+        raise AssertionError(f"❌ Failed to import pyfabricops: {e}") from e
 
 
 def test_basic_functions():
@@ -35,13 +33,9 @@ def test_basic_functions():
             if hasattr(pf, func_name):
                 print(f"✅ Function '{func_name}' is available")
             else:
-                print(f"❌ Function '{func_name}' is missing")
-                return False
-
-        return True
+                raise AssertionError(f"❌ Function '{func_name}' is missing")
     except Exception as e:
-        print(f"❌ Error testing functions: {e}")
-        return False
+        raise AssertionError(f"❌ Error testing functions: {e}") from e
 
 
 def main():
@@ -52,11 +46,19 @@ def main():
     success = True
 
     # Test import
-    success &= test_import()
+    try:
+        test_import()
+    except AssertionError as e:
+        print(e)
+        success = False
     print()
 
     # Test basic functions
-    success &= test_basic_functions()
+    try:
+        test_basic_functions()
+    except AssertionError as e:
+        print(e)
+        success = False
     print()
 
     if success:

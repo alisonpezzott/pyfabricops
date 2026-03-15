@@ -1,5 +1,4 @@
-from typing import Any, Dict, List, Literal, Optional, Union
-from venv import create
+from typing import Any, Literal
 
 from pandas import DataFrame
 
@@ -16,8 +15,8 @@ logger = get_logger(__name__)
 
 @df
 def list_deployment_pipelines(
-    df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    df: bool | None = True,
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     List deployment pipelines
 
@@ -39,7 +38,7 @@ def list_deployment_pipelines(
     )
 
 
-def get_deployment_pipeline_id(pipeline_name: str) -> Union[str, None]:
+def get_deployment_pipeline_id(pipeline_name: str) -> str | None:
     """
     Retrieves the ID of a deployment pipeline by its name.
 
@@ -58,7 +57,7 @@ def get_deployment_pipeline_id(pipeline_name: str) -> Union[str, None]:
     return None
 
 
-def resolve_deployment_pipeline(pipeline: str) -> Union[str, None]:
+def resolve_deployment_pipeline(pipeline: str) -> str | None:
     """
     Resolves a deployment pipeline to its ID.
 
@@ -76,8 +75,8 @@ def resolve_deployment_pipeline(pipeline: str) -> Union[str, None]:
 
 @df
 def get_deployment_pipeline(
-    pipeline: str, df: Optional[bool] = True
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    pipeline: str, df: bool | None = True
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Returns the specified deployment pipeline.
 
@@ -103,7 +102,7 @@ def get_deployment_pipeline(
 
 def resolve_deployment_pipeline_stage(
     pipeline: str, stage_name: str
-) -> Union[str, None]:
+) -> str | None:
     """
     Resolves a deployment pipeline stage to its ID.
 
@@ -131,11 +130,11 @@ def resolve_deployment_pipeline_stage(
 @df
 def create_deployment_pipeline(
     display_name: str,
-    stages: List[Dict[str, Any]],
+    stages: list[dict[str, Any]],
     *,
-    description: Optional[str] = None,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    description: str | None = None,
+    df: bool | None = True,
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Creates a new deployment pipeline.
 
@@ -192,8 +191,8 @@ def assign_workspace_to_stage(
     workspace: str,
     pipeline: str,
     stage: str,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    df: bool | None = True,
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Assigns a workspace to a deployment pipeline stage.
 
@@ -236,7 +235,7 @@ def assign_workspace_to_stage(
 def unassign_workspace_to_stage(
     pipeline: str,
     stage: str,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Unassigns a workspace from a deployment pipeline stage.
 
@@ -267,8 +266,8 @@ def add_deployment_pipeline_role_assignment(
     ] = "User",
     role: Literal["Admin", "Contributor", "Member", "Viewer"] = "Admin",
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Adds a permission to a deployment pipeline for a user.
 
@@ -323,8 +322,8 @@ def add_deployment_pipeline_role_assignment(
 def list_deployment_pipeline_role_assignments(
     pipeline: str,
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    df: bool | None = True,
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Lists all role assignments for a deployment pipeline.
 
@@ -356,11 +355,11 @@ def deploy_stage_content(
     source_stage: str,
     target_stage: str,
     *,
-    items: Optional[List[Dict[str, Any]]] = None,
-    note: Optional[str] = None,
-    options: Optional[Dict[str, Any]] = None,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    items: list[dict[str, Any]] | None = None,
+    note: str | None = None,
+    options: dict[str, Any] | None = None,
+    df: bool | None = True,
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Deploys content to a specified stage in a deployment pipeline.
 
@@ -444,8 +443,8 @@ def deploy_stage_content(
 def list_deployment_pipeline_operations(
     pipeline: str,
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    df: bool | None = True,
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Lists all operations for a deployment pipeline.
 
@@ -473,8 +472,8 @@ def get_deployment_pipeline_operation(
     pipeline: str,
     operation_id: str,
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Gets a specific operation for a deployment pipeline.
 
@@ -500,11 +499,11 @@ def get_deployment_pipeline_operation(
 @df
 def update_deployment_pipeline(
     pipeline: str,
-    display_name: Optional[str] = None,
-    description: Optional[str] = None,
+    display_name: str | None = None,
+    description: str | None = None,
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Updates a deployment pipeline's details.
 
@@ -547,10 +546,10 @@ def update_deployment_pipeline(
 def update_deployment_pipeline_stage(
     pipeline: str,
     stage: str,
-    display_name: Optional[str] = None,
-    description: Optional[str] = None,
-    is_public: Optional[bool] = None,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    display_name: str | None = None,
+    description: str | None = None,
+    is_public: bool | None = None,
+) -> DataFrame | dict[str, Any] | None:
     """
     Updates a deployment pipeline stage's details.
 

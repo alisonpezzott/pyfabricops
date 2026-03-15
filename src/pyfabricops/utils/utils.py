@@ -8,7 +8,6 @@ import shutil
 import subprocess
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
 
 import json5
 import pandas
@@ -80,7 +79,7 @@ def read_json(path: str) -> dict:
         ```
     """
     try:
-        with open(path, "r", encoding="utf-8") as file:
+        with open(path, encoding="utf-8") as file:
             data = json.load(file)
     except FileNotFoundError as e:
         logger.error(f"Error reading JSON file: {e}")
@@ -135,7 +134,7 @@ def get_current_branch(branch: str = None) -> str:
         get_current_branch()
         ```
     """
-    if not branch is None:
+    if branch is not None:
         return branch
     try:
         result = subprocess.run(
@@ -171,7 +170,7 @@ def get_workspace_suffix(branch: str, branches_path: str) -> str:
     """
     try:
         branches_dict = read_json(branches_path)
-    except:
+    except Exception:
         raise ResourceNotFoundError(f"Dict not found at {branches_path}")
 
     try:
@@ -209,7 +208,7 @@ def is_valid_uuid(input: str) -> bool:
 def pack_item_definition(
     path: str,
     exclude_paths: list = None,
-    exclude_patterns: list = ["*/.pbi/localSettings.json", "*/.pbi/cache.abf"],
+    exclude_patterns: list = None,
 ) -> dict[dict, str]:
     """
     Pack the definition files into a JSON structure.
@@ -230,12 +229,14 @@ def pack_item_definition(
         pack_item_definition('MainProject/workspace/path/to/Financials.SemanticModel')
         ```
     """
+    if exclude_patterns is None:
+        exclude_patterns = ["*/.pbi/localSettings.json", "*/.pbi/cache.abf"]
     parts = []
     exclude_paths = exclude_paths or []
     exclude_patterns = exclude_patterns or []
 
     # Walk through path recursively
-    for dirpath, dirnames, filenames in os.walk(path):
+    for dirpath, _dirnames, filenames in os.walk(path):
         for filename in filenames:
             full_path = os.path.join(dirpath, filename)
             # Compute path relative to input_path
@@ -333,7 +334,7 @@ def parse_tmdl_parameters(path: str) -> dict:
         raise FileNotFoundError(f"File not found: {path}")
 
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             expressions = f.read()
     except Exception as e:
         raise ValueError(f"Error reading file {path}: {str(e)}")
@@ -471,7 +472,7 @@ def find_and_replace(path: str, find_and_replace: dict) -> None:
             for file in files:
                 file_path = os.path.join(root, file)
                 with open(
-                    file_path, "r", encoding="utf-8", errors="replace"
+                    file_path, encoding="utf-8", errors="replace"
                 ) as file:
                     text = file.read()
 
@@ -512,13 +513,13 @@ def load_and_sanitize(path: str) -> dict:
         ```
     """
     try:
-        with open(path, "r", encoding="utf-8-sig") as f:
+        with open(path, encoding="utf-8-sig") as f:
             data = json5.load(f)
         logger.info(f"Loaded JSON file with json5: {path}")
-    except (ImportError, json5.JSONError, FileNotFoundError) as e:
+    except ImportError, json5.JSONError, FileNotFoundError:
         try:
             # Fallback to standard json
-            with open(path, "r", encoding="utf-8-sig") as f:
+            with open(path, encoding="utf-8-sig") as f:
                 data = json.load(f)
             logger.info(f"Loaded JSON file with standard json: {path}")
         except (json.JSONDecodeError, FileNotFoundError) as e:
@@ -634,9 +635,7 @@ def dataframe_to_list(df: DataFrame) -> list[dict]:
     return df.to_dict(orient="records")
 
 
-def list_paths_of_type(
-    path: Union[str, Path], type: str
-) -> List[Union[str, Path]]:
+def list_paths_of_type(path: str | Path, type: str) -> list[str | Path]:
     """
     Returns a list of paths given a type of the items
     """
@@ -645,8 +644,8 @@ def list_paths_of_type(
 
 
 def extract_middle_path(
-    path: str, start_path: Optional[str] = None
-) -> Union[str, None]:
+    path: str, start_path: str | None = None
+) -> str | None:
     """
     Extract the middle of a full path given a start.
     """
@@ -662,12 +661,12 @@ def extract_middle_path(
         try:
             middle_path = middle_path.split(start_path + "/")[1]
             return middle_path
-        except:
+        except Exception:
             return None
 
 
 def extract_display_name_from_platform(path: str) -> str:
-    with open(Path(path) / ".platform", "r", encoding="utf-8") as f:
+    with open(Path(path) / ".platform", encoding="utf-8") as f:
         platform_dict = json.load(f)
 
     return platform_dict.get("metadata").get("displayName")

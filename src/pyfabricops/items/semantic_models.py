@@ -1,8 +1,6 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from pandas import DataFrame
-
-from pyfabricops.core import workspaces
 
 from ..api.api import api_request
 from ..core.folders import resolve_folder
@@ -17,8 +15,8 @@ logger = get_logger(__name__)
 @df
 def list_semantic_models(
     workspace: str,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    df: bool | None = True,
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Returns a list of semantic models in a specified workspace.
 
@@ -38,9 +36,7 @@ def list_semantic_models(
     )
 
 
-def get_semantic_model_id(
-    workspace: str, semantic_model: str
-) -> Union[str, None]:
+def get_semantic_model_id(workspace: str, semantic_model: str) -> str | None:
     """
     Retrieves the ID of a semantic model by its name from the specified workspace.
 
@@ -70,7 +66,7 @@ def get_semantic_model_id(
 def resolve_semantic_model(
     workspace: str,
     semantic_model: str,
-) -> Union[str, None]:
+) -> str | None:
     if is_valid_uuid(semantic_model):
         return semantic_model
     else:
@@ -79,8 +75,8 @@ def resolve_semantic_model(
 
 @df
 def get_semantic_model(
-    workspace: str, semantic_model: str, *, df: Optional[bool] = True
-) -> Union[DataFrame, Dict[str, Any], None]:
+    workspace: str, semantic_model: str, *, df: bool | None = True
+) -> DataFrame | dict[str, Any] | None:
     """
     Retrieves a semantic model by its name or ID from the specified workspace.
 
@@ -112,12 +108,12 @@ def get_semantic_model(
 def create_semantic_model(
     workspace: str,
     display_name: str,
-    item_definition: Dict[str, Any],
+    item_definition: dict[str, Any],
     *,
-    description: Optional[str] = None,
-    folder: Optional[str] = None,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    description: str | None = None,
+    folder: str | None = None,
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Creates a new semantic model in the specified workspace.
 
@@ -169,10 +165,10 @@ def update_semantic_model(
     workspace: str,
     semantic_model: str,
     *,
-    display_name: Optional[str] = None,
-    description: Optional[str] = None,
-    df: Optional[bool] = False,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    display_name: str | None = None,
+    description: str | None = None,
+    df: bool | None = False,
+) -> DataFrame | dict[str, Any] | None:
     """
     Updates the properties of the specified semantic model.
 
@@ -248,7 +244,7 @@ def delete_semantic_model(workspace: str, semantic_model: str) -> None:
 
 def get_semantic_model_definition(
     workspace: str, semantic_model: str
-) -> Union[Dict[str, Any], None]:
+) -> dict[str, Any] | None:
     """
     Retrieves the definition of a semantic model by its name or ID from the specified workspace.
 
@@ -286,10 +282,10 @@ def get_semantic_model_definition(
 def update_semantic_model_definition(
     workspace: str,
     semantic_model: str,
-    item_definition: Dict[str, Any],
+    item_definition: dict[str, Any],
     *,
-    df: Optional[bool] = True,
-) -> Union[Dict[str, Any], None]:
+    df: bool | None = True,
+) -> dict[str, Any] | None:
     """
     Updates the definition of an existing semantic model in the specified workspace.
     If the semantic model does not exist, it returns None.

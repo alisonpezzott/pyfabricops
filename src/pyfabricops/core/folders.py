@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from pandas import DataFrame
 
@@ -15,8 +15,8 @@ logger = get_logger(__name__)
 def list_folders(
     workspace: str,
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    df: bool | None = True,
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     List folders in a workspace
 
@@ -39,7 +39,7 @@ def list_folders(
     )
 
 
-def get_folder_id(workspace: str, folder_name: str) -> Union[str, None]:
+def get_folder_id(workspace: str, folder_name: str) -> str | None:
     """
     Retrieves the ID of a folder by its name.
 
@@ -60,7 +60,7 @@ def get_folder_id(workspace: str, folder_name: str) -> Union[str, None]:
     return None
 
 
-def resolve_folder(workspace: str, folder: str) -> Union[str, None]:
+def resolve_folder(workspace: str, folder: str) -> str | None:
     """
     Resolves a folder name to its ID.
 
@@ -79,8 +79,8 @@ def resolve_folder(workspace: str, folder: str) -> Union[str, None]:
 
 @df
 def get_folder(
-    workspace: str, folder: str, *, df: Optional[bool] = True
-) -> Union[DataFrame, Dict[str, Any], None]:
+    workspace: str, folder: str, *, df: bool | None = True
+) -> DataFrame | dict[str, Any] | None:
     """
     Get a folder in a workspace.
 
@@ -116,8 +116,8 @@ def create_folder(
     display_name: str,
     *,
     parent_folder: str = None,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Create a new folder in the specified workspace.
 
@@ -190,8 +190,8 @@ def update_folder(
     folder: str,
     display_name: str,
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Update an existing folder in the specified workspace.
 
@@ -233,9 +233,9 @@ def move_folder(
     workspace: str,
     folder: str,
     *,
-    target_folder: Optional[str] = None,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    target_folder: str | None = None,
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Move an existing folder into another or root folder.
 

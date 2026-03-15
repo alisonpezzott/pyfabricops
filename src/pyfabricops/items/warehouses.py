@@ -1,5 +1,4 @@
-import time
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from pandas import DataFrame
 
@@ -17,8 +16,8 @@ logger = get_logger(__name__)
 def list_warehouses(
     workspace: str,
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    df: bool | None = True,
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Returns a list of warehouses from the specified workspace.
     This API supports pagination.
@@ -42,7 +41,7 @@ def list_warehouses(
     )
 
 
-def get_warehouse_id(workspace: str, warehouse: str) -> Union[str, None]:
+def get_warehouse_id(workspace: str, warehouse: str) -> str | None:
     """
     Retrieves the ID of a warehouse by its name from the specified workspace.
 
@@ -71,7 +70,7 @@ def get_warehouse_id(workspace: str, warehouse: str) -> Union[str, None]:
 def resolve_warehouse(
     workspace: str,
     warehouse: str,
-) -> Union[str, None]:
+) -> str | None:
     """
     Resolves a warehouse name to its ID.
 
@@ -98,8 +97,8 @@ def get_warehouse(
     workspace: str,
     warehouse: str,
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Retrieves a warehouse by its name or ID from the specified workspace.
 
@@ -137,11 +136,11 @@ def create_warehouse(
     workspace: str,
     display_name: str,
     *,
-    description: Optional[str] = None,
-    folder: Optional[str] = None,
-    enable_schemas: Optional[bool] = False,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    description: str | None = None,
+    folder: str | None = None,
+    enable_schemas: bool | None = False,
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Create a warehouse in the specified workspace.
 
@@ -191,10 +190,10 @@ def update_warehouse(
     workspace: str,
     warehouse: str,
     *,
-    display_name: Optional[str] = None,
-    description: Optional[str] = None,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    display_name: str | None = None,
+    description: str | None = None,
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Updates the properties of the specified warehouse.
 

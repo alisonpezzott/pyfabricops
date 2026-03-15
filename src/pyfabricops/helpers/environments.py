@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 import pandas as pd
 from pandas import DataFrame
@@ -34,7 +34,7 @@ logger = get_logger(__name__)
 
 def get_environment_config(
     workspace: str, environment: str
-) -> Union[Dict[str, Any], None]:
+) -> dict[str, Any] | None:
     """
     Get a specific environment config from a workspace.
 
@@ -69,7 +69,7 @@ def get_environment_config(
 
 def get_all_environments_config(
     workspace: str,
-) -> Union[Dict[str, Any], None]:
+) -> dict[str, Any] | None:
     """
     Get environments config from a workspace.
 
@@ -87,7 +87,7 @@ def get_all_environments_config(
     config = {}
 
     for item in items:
-        item_data = get_environment(workspace, item["id"], df=False)
+        get_environment(workspace, item["id"], df=False)
 
         config[item["displayName"]] = {
             "id": item["id"],
@@ -103,7 +103,7 @@ def get_all_environments_config(
 def export_environment(
     workspace: str,
     environment: str,
-    path: Union[str, Path],
+    path: str | Path,
 ) -> None:
     """
     Export an environment to path.
@@ -122,7 +122,7 @@ def export_environment(
         folder_path = resolve_folder_from_id_to_path(
             workspace_id, item["folderId"]
         )
-    except:
+    except Exception:
         logger.info(
             f"{item['displayName']}.Environment is not inside a folder."
         )
@@ -150,7 +150,7 @@ def export_environment(
 
 def export_all_environments(
     workspace: str,
-    path: Union[str, Path],
+    path: str | Path,
 ) -> None:
     """
     Export all environments to path.
@@ -172,7 +172,7 @@ def export_all_environments(
             folder_path = resolve_folder_from_id_to_path(
                 workspace_id, item["folderId"]
             )
-        except:
+        except Exception:
             logger.info(
                 f"{item['displayName']}.Environment is not inside a folder."
             )
@@ -202,10 +202,10 @@ def export_all_environments(
 def deploy_environment(
     workspace: str,
     path: str,
-    start_path: Optional[str] = None,
-    description: Optional[str] = None,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    start_path: str | None = None,
+    description: str | None = None,
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Deploy a environment to workspace.
 
@@ -258,7 +258,7 @@ def deploy_environment(
 def deploy_all_environments(
     workspace: str,
     path: str,
-    start_path: Optional[str] = None,
+    start_path: str | None = None,
 ) -> None:
     """
     Deploy all environments to workspace.
@@ -312,7 +312,7 @@ def deploy_all_environments(
 
 
 def _create_environment_external_library_yaml(
-    libraries: List[tuple[str, str]],
+    libraries: list[tuple[str, str]],
 ):
 
     env_yaml = """dependencies:
@@ -327,14 +327,14 @@ def _create_environment_external_library_yaml(
     os.makedirs(os.path.dirname(target_path), exist_ok=True)
     with open(target_path, "w", encoding="utf-8") as f:
         f.write(env_yaml)
-    logger.debug(f"Environment external libraries were created successfully.")
+    logger.debug("Environment external libraries were created successfully.")
     return None
 
 
 def add_environment_external_library_from_pypi(
     workspace: str,
     environment: str,
-    libraries: List[tuple[str, str]],
+    libraries: list[tuple[str, str]],
 ):
     """
     Add external libraries to an environment from PyPI.

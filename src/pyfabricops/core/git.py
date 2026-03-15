@@ -1,5 +1,5 @@
 import time
-from typing import Any, Dict, Literal, Optional, Union
+from typing import Any, Literal
 
 from pandas import DataFrame
 
@@ -102,8 +102,8 @@ def git_init(
         "PreferWorkspace", "PreferRemote", "None"
     ] = "PreferWorkspace",
     credential_type: Literal["spn", "user"] = "spn",
-    df: Optional[bool] = False,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    df: bool | None = False,
+) -> DataFrame | dict[str, Any] | None:
     """
     Initializes a Fabric workspace to use Git for version control.
 
@@ -152,8 +152,8 @@ def git_status(
     workspace: str,
     *,
     credential_type: Literal["spn", "user"] = "spn",
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Retrieve the Git status of the workspace.
 
@@ -323,8 +323,8 @@ def commit_to_git(
     comment: str = None,
     selective_payload: dict = None,
     credential_type: Literal["spn", "user"] = "spn",
-    df: Optional[bool] = False,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    df: bool | None = False,
+) -> DataFrame | dict[str, Any] | None:
     """
     Commits all changes from a Fabric/Power BI workspace to Git.
 
@@ -543,7 +543,7 @@ def update_my_git_connection(
         payload = payload_none
 
     return api_request(
-        endpoint=f"/workspaces/"
+        endpoint="/workspaces/"
         + resolve_workspace(workspace)
         + "/git/myGitCredentials",
         method="patch",

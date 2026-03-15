@@ -1,7 +1,7 @@
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 import pandas as pd
 from pandas import DataFrame
@@ -34,7 +34,7 @@ logger = get_logger(__name__)
 
 def get_data_pipeline_config(
     workspace: str, data_pipeline: str
-) -> Union[Dict[str, Any], None]:
+) -> dict[str, Any] | None:
     """
     Get a specific data_pipeline config from a workspace.
 
@@ -69,7 +69,7 @@ def get_data_pipeline_config(
 
 def get_all_data_pipelines_config(
     workspace: str,
-) -> Union[Dict[str, Any], None]:
+) -> dict[str, Any] | None:
     """
     Get data_pipelines config from a workspace.
 
@@ -87,7 +87,7 @@ def get_all_data_pipelines_config(
     config = {}
 
     for item in items:
-        item_data = get_data_pipeline(workspace, item["id"], df=False)
+        get_data_pipeline(workspace, item["id"], df=False)
 
         config[item["displayName"]] = {
             "id": item["id"],
@@ -103,7 +103,7 @@ def get_all_data_pipelines_config(
 def export_data_pipeline(
     workspace: str,
     data_pipeline: str,
-    path: Union[str, Path],
+    path: str | Path,
 ) -> None:
     """
     Export a data_pipeline to path.
@@ -122,7 +122,7 @@ def export_data_pipeline(
         folder_path = resolve_folder_from_id_to_path(
             workspace_id, item["folderId"]
         )
-    except:
+    except Exception:
         logger.info(
             f"{item['displayName']}.DataPipeline is not inside a folder."
         )
@@ -150,7 +150,7 @@ def export_data_pipeline(
 
 def export_all_data_pipelines(
     workspace: str,
-    path: Union[str, Path],
+    path: str | Path,
 ) -> None:
     """
     Export a data_pipeline to path.
@@ -172,7 +172,7 @@ def export_all_data_pipelines(
             folder_path = resolve_folder_from_id_to_path(
                 workspace_id, item["folderId"]
             )
-        except:
+        except Exception:
             logger.info(
                 f"{item['displayName']}.DataPipeline is not inside a folder."
             )
@@ -202,10 +202,10 @@ def export_all_data_pipelines(
 def deploy_data_pipeline(
     workspace: str,
     path: str,
-    start_path: Optional[str] = None,
-    description: Optional[str] = None,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    start_path: str | None = None,
+    description: str | None = None,
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Deploy a data_pipeline to workspace.
 
@@ -258,7 +258,7 @@ def deploy_data_pipeline(
 def deploy_all_data_pipelines(
     workspace: str,
     path: str,
-    start_path: Optional[str] = None,
+    start_path: str | None = None,
 ) -> None:
     """
     Deploy all data_pipelines to workspace.
@@ -311,7 +311,7 @@ def deploy_all_data_pipelines(
     return None
 
 
-def extract_data_pipeline_variables(path: str) -> List[Dict[str, str]]:
+def extract_data_pipeline_variables(path: str) -> list[dict[str, str]]:
     """
     Extract data pipeline variables from the `pipeline-content.json` file.
 
@@ -324,7 +324,7 @@ def extract_data_pipeline_variables(path: str) -> List[Dict[str, str]]:
 
     path = Path(path) / "pipeline-content.json"
 
-    with open(path, "r") as f:
+    with open(path) as f:
         content = json.load(f)
 
     activities = content["properties"]["activities"]
@@ -367,7 +367,7 @@ def extract_data_pipeline_variables(path: str) -> List[Dict[str, str]]:
 
 
 def replace_data_pipeline_variables_with_placeholders(
-    path: str, variables: List[Dict[str, str]]
+    path: str, variables: list[dict[str, str]]
 ) -> None:
     """
     Replace data pipeline variables with placeholders in the pipeline content JSON.
@@ -379,7 +379,7 @@ def replace_data_pipeline_variables_with_placeholders(
 
     path = Path(path) / "pipeline-content.json"
 
-    with open(path, "r") as f:
+    with open(path) as f:
         content = json.load(f)
 
     for variable in variables:
@@ -433,7 +433,7 @@ def replace_data_pipeline_variables_with_placeholders(
 
 
 def _create_data_pipeline_placeholder_mapping(
-    variables: List[Dict[str, str]],
+    variables: list[dict[str, str]],
 ) -> dict:
     """
     Creates a mapping of placeholders to their real values based on the extracted variables.
@@ -462,7 +462,7 @@ def _create_data_pipeline_placeholder_mapping(
 
 
 def replace_data_pipeline_placeholders_with_variables(
-    path: str, variables: List
+    path: str, variables: list
 ) -> None:
     """
     Replace data pipeline placeholders with their corresponding variable values.
@@ -474,7 +474,7 @@ def replace_data_pipeline_placeholders_with_variables(
 
     path = Path(path) / "pipeline-content.json"
 
-    with open(path, "r") as f:
+    with open(path) as f:
         content_str = f.read()
 
     mappings = _create_data_pipeline_placeholder_mapping(variables)

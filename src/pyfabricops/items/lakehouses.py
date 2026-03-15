@@ -1,5 +1,4 @@
-import time
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from pandas import DataFrame
 
@@ -17,8 +16,8 @@ logger = get_logger(__name__)
 def list_lakehouses(
     workspace: str,
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    df: bool | None = True,
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Returns a list of lakehouses from the specified workspace.
     This API supports pagination.
@@ -42,7 +41,7 @@ def list_lakehouses(
     )
 
 
-def get_lakehouse_id(workspace: str, lakehouse: str) -> Union[str, None]:
+def get_lakehouse_id(workspace: str, lakehouse: str) -> str | None:
     """
     Retrieves the ID of a lakehouse by its name from the specified workspace.
 
@@ -75,7 +74,7 @@ def get_lakehouse_id(workspace: str, lakehouse: str) -> Union[str, None]:
 def resolve_lakehouse(
     workspace: str,
     lakehouse: str,
-) -> Union[str, None]:
+) -> str | None:
     """
     Resolves a lakehouse name to its ID.
 
@@ -102,8 +101,8 @@ def get_lakehouse(
     workspace: str,
     lakehouse: str,
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Retrieves a lakehouse by its name or ID from the specified workspace.
 
@@ -141,11 +140,11 @@ def create_lakehouse(
     workspace: str,
     display_name: str,
     *,
-    description: Optional[str] = None,
-    folder: Optional[str] = None,
-    enable_schemas: Optional[bool] = False,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    description: str | None = None,
+    folder: str | None = None,
+    enable_schemas: bool | None = False,
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Create a lakehouse in the specified workspace.
 
@@ -194,10 +193,10 @@ def update_lakehouse(
     workspace: str,
     lakehouse: str,
     *,
-    display_name: Optional[str] = None,
-    description: Optional[str] = None,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    display_name: str | None = None,
+    description: str | None = None,
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Updates the properties of the specified lakehouse.
 

@@ -1,7 +1,7 @@
 import os
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 import pandas as pd
 from pandas import DataFrame
@@ -34,7 +34,7 @@ logger = get_logger(__name__)
 
 def get_dataflow_gen2_config(
     workspace: str, dataflow_gen2: str
-) -> Union[Dict[str, Any], None]:
+) -> dict[str, Any] | None:
     """
     Get a specific dataflow_gen2 config from a workspace.
 
@@ -69,7 +69,7 @@ def get_dataflow_gen2_config(
 
 def get_all_dataflows_gen2_config(
     workspace: str,
-) -> Union[Dict[str, Any], None]:
+) -> dict[str, Any] | None:
     """
     Get dataflows_gen2 config from a workspace.
 
@@ -87,7 +87,7 @@ def get_all_dataflows_gen2_config(
     config = {}
 
     for item in items:
-        item_data = get_dataflow_gen2(workspace, item["id"], df=False)
+        get_dataflow_gen2(workspace, item["id"], df=False)
 
         config[item["displayName"]] = {
             "id": item["id"],
@@ -103,7 +103,7 @@ def get_all_dataflows_gen2_config(
 def export_dataflow_gen2(
     workspace: str,
     dataflow_gen2: str,
-    path: Union[str, Path],
+    path: str | Path,
 ) -> None:
     """
     Export a dataflow_gen2 to path.
@@ -122,7 +122,7 @@ def export_dataflow_gen2(
         folder_path = resolve_folder_from_id_to_path(
             workspace_id, item["folderId"]
         )
-    except:
+    except Exception:
         logger.info(f"{item['displayName']}.Dataflow is not inside a folder.")
         folder_path = None
 
@@ -148,7 +148,7 @@ def export_dataflow_gen2(
 
 def export_all_dataflows_gen2(
     workspace: str,
-    path: Union[str, Path],
+    path: str | Path,
 ) -> None:
     """
     Export a dataflow_gen2 to path.
@@ -170,7 +170,7 @@ def export_all_dataflows_gen2(
             folder_path = resolve_folder_from_id_to_path(
                 workspace_id, item["folderId"]
             )
-        except:
+        except Exception:
             logger.info(
                 f"{item['displayName']}.Dataflow is not inside a folder."
             )
@@ -198,10 +198,10 @@ def export_all_dataflows_gen2(
 def deploy_dataflow_gen2(
     workspace: str,
     path: str,
-    start_path: Optional[str] = None,
-    description: Optional[str] = None,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    start_path: str | None = None,
+    description: str | None = None,
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Deploy a dataflow_gen2 to workspace.
 
@@ -254,7 +254,7 @@ def deploy_dataflow_gen2(
 def deploy_all_dataflows_gen2(
     workspace: str,
     path: str,
-    start_path: Optional[str] = None,
+    start_path: str | None = None,
 ) -> None:
     """
     Deploy all dataflows_gen2 to workspace.
@@ -305,7 +305,7 @@ def deploy_all_dataflows_gen2(
     return None
 
 
-def extract_dataflow_gen2_variables(path: str) -> List[Dict[str, Any]]:
+def extract_dataflow_gen2_variables(path: str) -> list[dict[str, Any]]:
     """
     Extract variables from a Dataflow Gen2 mashup.pq file, identifying each destination separately.
 
@@ -317,7 +317,7 @@ def extract_dataflow_gen2_variables(path: str) -> List[Dict[str, Any]]:
     """
     path = Path(path) / "mashup.pq"
 
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         content = f.read()
 
     variables = []
@@ -370,7 +370,7 @@ def extract_dataflow_gen2_variables(path: str) -> List[Dict[str, Any]]:
 
 
 def replace_dataflow_gen2_variables_with_placeholders(
-    path: str, variables: List[Dict[str, Any]]
+    path: str, variables: list[dict[str, Any]]
 ) -> None:
     """
     Replace variables with placeholders in a Dataflow Gen2 mashup.pq file.
@@ -387,7 +387,7 @@ def replace_dataflow_gen2_variables_with_placeholders(
 
     path = Path(path) / "mashup.pq"
 
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         content = f.read()
     # Replace each destination's variables with unique placeholders
     for var_dict in variables:
@@ -435,7 +435,7 @@ def replace_dataflow_gen2_variables_with_placeholders(
 
 
 def replace_dataflow_gen2_placeholders_with_parameters(
-    path: str, variables: List[Dict[str, Any]]
+    path: str, variables: list[dict[str, Any]]
 ) -> None:
     """
     Replace placeholders with actual parameters in a Dataflow Gen2 mashup.pq file.
@@ -451,7 +451,7 @@ def replace_dataflow_gen2_placeholders_with_parameters(
 
     path = Path(path) / "mashup.pq"
 
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         content = f.read()
 
     # Replace placeholders with actual values for each destination

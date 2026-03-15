@@ -1,6 +1,5 @@
 """Basic tests for pyfabricops package."""
 
-import logging
 import os
 import sys
 
@@ -42,7 +41,7 @@ def test_set_auth_provider():
 def test_list_workspaces_with_credentials():
     """Test list_workspaces when credentials are available."""
     pf.set_auth_provider("env")
-    workspaces = pf.list_workspaces()
+    workspaces = pf.list_workspaces(df=False)
     assert isinstance(workspaces, list)
 
 

@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from pandas import DataFrame
 
@@ -14,8 +14,8 @@ logger = get_logger(__name__)
 
 @df
 def list_data_pipelines(
-    workspace: str, *, df: Optional[bool] = True
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    workspace: str, *, df: bool | None = True
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Lists all data pipelines in the specified workspace.
 
@@ -41,7 +41,7 @@ def list_data_pipelines(
 
 def get_data_pipeline_id(
     workspace: str, data_pipeline_name: str
-) -> Union[str, None]:
+) -> str | None:
     """
     Retrieves the ID of a data pipeline by its name.
 
@@ -64,9 +64,7 @@ def get_data_pipeline_id(
     return None
 
 
-def resolve_data_pipeline(
-    workspace: str, data_pipeline: str
-) -> Union[str, None]:
+def resolve_data_pipeline(workspace: str, data_pipeline: str) -> str | None:
     """
     Resolves a data pipeline name to its ID.
 
@@ -86,7 +84,7 @@ def resolve_data_pipeline(
 @df
 def get_data_pipeline(
     workspace: str, data_pipeline: str
-) -> Union[DataFrame, Dict[str, Any], None]:
+) -> DataFrame | dict[str, Any] | None:
     """
     Retrieves the details of a data pipeline by its ID.
 
@@ -120,10 +118,10 @@ def update_data_pipeline(
     workspace: str,
     data_pipeline: str,
     *,
-    display_name: Optional[str] = None,
-    description: Optional[str] = None,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    display_name: str | None = None,
+    description: str | None = None,
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Updates the properties of the specified data pipeline.
 
@@ -227,8 +225,8 @@ def get_data_pipeline_definition(workspace: str, data_pipeline: str) -> dict:
 
 @df
 def update_data_pipeline_definition(
-    workspace: str, data_pipeline: str, item_definition: Dict[str, Any]
-) -> Union[DataFrame, Dict[str, Any], None]:
+    workspace: str, data_pipeline: str, item_definition: dict[str, Any]
+) -> DataFrame | dict[str, Any] | None:
     """
     Updates the definition of an existing data_pipeline in the specified workspace.
     If the data_pipeline does not exist, it returns None.
@@ -274,12 +272,12 @@ def update_data_pipeline_definition(
 def create_data_pipeline(
     workspace: str,
     display_name: str,
-    item_definition: Dict[str, Any],
+    item_definition: dict[str, Any],
     *,
-    description: Optional[str] = None,
-    folder: Optional[str] = None,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    description: str | None = None,
+    folder: str | None = None,
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Creates a new data_pipeline in the specified workspace.
 
@@ -325,34 +323,4 @@ def create_data_pipeline(
         endpoint="/workspaces/" + workspace_id + "/dataPipelines",
         method="post",
         payload=payload,
-    )
-
-
-def delete_data_pipeline(workspace: str, data_pipeline: str) -> None:
-    """
-    Deletes a data_pipeline from the specified workspace.
-
-    Args:
-        workspace (str): The name or ID of the workspace.
-        data_pipeline (str): The name or ID of the data_pipeline to delete.
-
-    Returns:
-        None: If the data_pipeline is successfully deleted.
-
-    Examples:
-        ```python
-        delete_data_pipeline('MyProjectWorkspace', 'SalesDataPipeline')
-        delete_data_pipeline('123e4567-e89b-12d3-a456-426614174000', 'SalesDataPipeline')
-        ```
-    """
-    workspace_id = resolve_workspace(workspace)
-
-    data_pipeline_id = resolve_data_pipeline(workspace_id, data_pipeline)
-
-    return api_request(
-        endpoint="/workspaces/"
-        + workspace_id
-        + "/dataPipelines/"
-        + data_pipeline_id,
-        method="delete",
     )

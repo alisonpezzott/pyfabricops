@@ -2,7 +2,7 @@ import json
 import os
 import uuid
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any
 
 from ..api.api import _base_api
 from ..core.workspaces import resolve_workspace
@@ -24,7 +24,7 @@ logger = get_logger(__name__)
 
 def get_dataflow_gen1_config(
     workspace: str, dataflow_gen1: str
-) -> Union[Dict[str, Any], None]:
+) -> dict[str, Any] | None:
     """
     Get a specific dataflow_gen1 config from a workspace.
 
@@ -56,7 +56,7 @@ def get_dataflow_gen1_config(
 
 def get_all_dataflows_gen1_config(
     workspace: str,
-) -> Union[Dict[str, Any], None]:
+) -> dict[str, Any] | None:
     """
     Get dataflows_gen1 config from a workspace.
 
@@ -214,7 +214,7 @@ def _serialize_dataflow_gen1_model(path: str) -> tuple[bytes, str]:
     return body.encode("utf-8"), boundary
 
 
-def deploy_dataflow_gen1(workspace: str, path: str) -> Union[bool, None]:
+def deploy_dataflow_gen1(workspace: str, path: str) -> bool | None:
     """
     Deploy a dataflow in a workspace from a model.json file
 
@@ -259,19 +259,19 @@ def deploy_dataflow_gen1(workspace: str, path: str) -> Union[bool, None]:
         return_raw=True,
     )
     # Handle response
-    if not response.status_code in (200, 202):
+    if response.status_code not in (200, 202):
         logger.error(
             f"Error deploying the dataflow: {response.status_code} - {response.json().get('error', {})}"
         )
         return None
-    logger.success(f"Dataflow deployed successfully.")
+    logger.success("Dataflow deployed successfully.")
     return True
 
 
 def deploy_all_dataflows_gen1(
     workspace: str,
     path: str,
-    start_path: Optional[str] = None,
+    start_path: str | None = None,
 ) -> None:
     """
     Deploy all dataflows_gen1 to workspace.

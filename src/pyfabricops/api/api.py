@@ -1,5 +1,5 @@
 import time
-from typing import Any, Dict, List, Literal, NamedTuple, Optional, Union
+from typing import Any, Literal, NamedTuple
 from urllib.parse import urlencode
 
 import requests
@@ -15,24 +15,43 @@ from .scopes import FABRIC_API, GRAPH_API, POWERBI_API
 logger = get_logger(__name__)
 
 
+def _sanitize_headers_for_log(headers: dict[str, str] | None) -> dict:
+    """Return a copy of headers with sensitive values redacted for logs."""
+    if not headers:
+        return {}
+
+    redacted = dict(headers)
+    for key in list(redacted.keys()):
+        if key.lower() == "authorization":
+            auth_value = redacted.get(key)
+            if isinstance(auth_value, str) and auth_value.startswith(
+                "Bearer "
+            ):
+                redacted[key] = "Bearer ***REDACTED***"
+            else:
+                redacted[key] = "***REDACTED***"
+
+    return redacted
+
+
 class ApiResult(NamedTuple):
     """A named tuple to encapsulate the result of an API request."""
 
     success: bool
     status_code: int
-    data: Optional[Any] = None
-    headers: Optional[dict] = None
-    error: Optional[str] = None
-    request_kwargs: Optional[dict] = None
+    data: Any | None = None
+    headers: dict | None = None
+    error: str | None = None
+    request_kwargs: dict | None = None
 
 
 def _base_api(
     endpoint: str,
     *,
     content_type: str = "application/json",
-    payload: Optional[dict] = None,
-    data: Optional[dict] = None,
-    params: Optional[dict] = None,
+    payload: dict | None = None,
+    data: dict | None = None,
+    params: dict | None = None,
     audience: Literal["fabric", "powerbi", "graph"] = "fabric",
     credential_type: Literal["spn", "user"] = "spn",
     method: Literal["get", "post", "patch", "delete"] = "get",
@@ -110,7 +129,7 @@ def _base_api(
 
     # Log the request for debugging
     logger.debug(f"Making {method.upper()} request to {url}")
-    logger.debug(f"Headers: {headers}")
+    logger.debug(f"Headers: {_sanitize_headers_for_log(headers)}")
     if payload and payload != {}:
         logger.debug(f"Payload: {payload}")
 
@@ -228,7 +247,9 @@ def _lro_handler(api_result: NamedTuple) -> ApiResult:
     logger.debug(f"Long-running operation detected at {location_header}")
 
     headers = api_result.request_kwargs.get("headers")
-    logger.debug(f"Headers for LRO request: {headers}")
+    logger.debug(
+        f"Headers for LRO request: {_sanitize_headers_for_log(headers)}"
+    )
 
     def _get_lro_result(result_url: str) -> ApiResult:
         """Get the final result from LRO."""
@@ -379,17 +400,17 @@ def api_request(
     endpoint: str,
     *,
     content_type: str = "application/json",
-    payload: Optional[dict] = None,
-    data: Optional[dict] = None,
-    params: Optional[dict] = None,
+    payload: dict | None = None,
+    data: dict | None = None,
+    params: dict | None = None,
     audience: Literal["fabric", "powerbi", "graph"] = "fabric",
     credential_type: Literal["spn", "user"] = "spn",
     method: Literal["get", "post", "patch", "delete"] = "get",
-    support_pagination: Optional[bool] = False,
-    support_lro: Optional[bool] = False,
+    support_pagination: bool | None = False,
+    support_lro: bool | None = False,
     return_raw: bool = False,
     **kwargs,
-) -> Union[List[Dict[str, Any]], Dict[str, Any], None]:
+) -> list[dict[str, Any]] | dict[str, Any] | None:
     """
     Makes a request to the Microsoft Fabric or Power BI API.
     This function supports various HTTP methods and can handle both JSON payloads and form data.

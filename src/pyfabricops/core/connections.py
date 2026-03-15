@@ -1,5 +1,4 @@
-import re
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Literal
 
 from pandas import DataFrame
 
@@ -16,8 +15,8 @@ logger = get_logger(__name__)
 
 @df
 def list_connections(
-    df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    df: bool | None = True,
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Returns the list of connections.
 
@@ -74,8 +73,8 @@ def resolve_connection(connection: str) -> str | None:
 
 @df
 def get_connection(
-    connection: str, df: Optional[bool] = True
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    connection: str, df: bool | None = True
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Returns the specified connection.
 
@@ -121,8 +120,8 @@ def delete_connection(connection: str) -> None:
 def list_connection_role_assignments(
     connection: str,
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, List[Dict[str, Any]], None]:
+    df: bool | None = True,
+) -> DataFrame | list[dict[str, Any]] | None:
     """
     Lists all role assignments for a connection.
 
@@ -154,8 +153,8 @@ def add_connection_role_assignment(
     ] = "User",
     role: Literal["Owner", "User", "UserWithReshare"] = "User",
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Adds a role to a connection.
 
@@ -193,8 +192,8 @@ def add_connection_role_assignment(
 
 @df
 def get_connection_role_assignment(
-    connection: str, user_uuid: str, *, df: Optional[bool] = True
-) -> Union[DataFrame, Dict[str, Any], None]:
+    connection: str, user_uuid: str, *, df: bool | None = True
+) -> DataFrame | dict[str, Any] | None:
     """
     Retrieves a role assignment for a connection.
 
@@ -229,8 +228,8 @@ def update_connection_role_assignment(
     user_uuid: str,
     role: Literal["Owner", "User", "UserWithReshare"] = "User",
     *,
-    df: Optional[bool] = False,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    df: bool | None = False,
+) -> DataFrame | dict[str, Any] | None:
     """
     Updates a role assignment for a connection.
 
@@ -304,8 +303,8 @@ def create_adlsgen2_connection_with_service_principal_credentials(
     client_secret: str,
     tenant_id: str,
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Creates a new ADLS Gen2 connection with service principal credentials.
 
@@ -371,8 +370,8 @@ def create_github_source_control_connection(
     repository: str,
     github_token: str,
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Creates a new GitHub source control connection.
 
@@ -430,11 +429,11 @@ def create_sql_cloud_connection(
     database: str,
     username: str,
     password: str,
-    privacy_level: Optional[str] = "Organizational",
-    connection_encryption: Optional[str] = "NotEncrypted",
+    privacy_level: str | None = "Organizational",
+    connection_encryption: str | None = "NotEncrypted",
     *,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Creates a new cloud connection using the Fabric API.
 
@@ -507,12 +506,12 @@ def create_sql_on_premises_connection(
     username: str,
     password: str,
     *,
-    credential_type: Optional[str] = "Basic",
-    privacy_level: Optional[str] = "Organizational",
-    connection_encryption: Optional[str] = "NotEncrypted",
-    skip_test_connection: Optional[bool] = False,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    credential_type: str | None = "Basic",
+    privacy_level: str | None = "Organizational",
+    connection_encryption: str | None = "NotEncrypted",
+    skip_test_connection: bool | None = False,
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Creates a new cloud connection using the Fabric API.
 
@@ -655,7 +654,7 @@ def bind_semantic_model_connection(
         payload=payload,
     )
 
-    if response == None:
+    if response is None:
         if connectivity_type == "None":
             logger.success(
                 f"Semantic model '{semantic_model}' in workspace '{workspace}' successfully unbinded from current connection."
@@ -675,8 +674,8 @@ def create_azure_devops_connection_with_service_principal(
     client_id: str,
     client_secret: str,
     tenant_id: str,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Creates a new Azure DevOps source control connection with service principal credentials.
 

@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any
 
 from pandas import DataFrame
 
@@ -74,7 +74,7 @@ def export_item(
             folder_path = resolve_folder_from_id_to_path(
                 workspace_id, folder_id
             )
-        except:
+        except Exception:
             logger.info(f"{item_name}.{item_type} is not inside a folder.")
             folder_path = None
 
@@ -139,7 +139,7 @@ def export_all_items(
                 folder_path = resolve_folder_from_id_to_path(
                     workspace_id, folder_id
                 )
-            except:
+            except Exception:
                 logger.info(
                     f"{item['displayName']}.{item_type} is not inside a folder."
                 )
@@ -163,10 +163,10 @@ def export_all_items(
 def deploy_item(
     workspace: str,
     path: str,
-    start_path: Optional[str] = None,
-    description: Optional[str] = None,
-    df: Optional[bool] = True,
-) -> Union[DataFrame, Dict[str, Any], None]:
+    start_path: str | None = None,
+    description: str | None = None,
+    df: bool | None = True,
+) -> DataFrame | dict[str, Any] | None:
     """
     Creates or updates a item in Fabric based on local folder structure.
     Automatically detects the folder_id based on where the item is located locally.
@@ -217,7 +217,7 @@ def deploy_item(
 def deploy_all_items(
     workspace: str,
     path: str,
-    start_path: Optional[str] = None,
+    start_path: str | None = None,
 ) -> None:
     """
     Deploy all items to workspace.
