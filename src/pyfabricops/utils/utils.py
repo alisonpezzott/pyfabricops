@@ -9,7 +9,10 @@ import subprocess
 import uuid
 from pathlib import Path
 
-import json5
+try:
+    import json5
+except ImportError:
+    json5 = None
 import pandas
 from pandas import DataFrame
 
@@ -513,10 +516,14 @@ def load_and_sanitize(path: str) -> dict:
         ```
     """
     try:
+        if json5 is None:
+            raise ImportError(
+                "json5 is not installed. Install it with: pip install pyfabricops[json5]"
+            )
         with open(path, encoding="utf-8-sig") as f:
             data = json5.load(f)
         logger.info(f"Loaded JSON file with json5: {path}")
-    except (ImportError, json5.JSONError, FileNotFoundError):
+    except (ImportError, ValueError, FileNotFoundError):
         try:
             # Fallback to standard json
             with open(path, encoding="utf-8-sig") as f:
