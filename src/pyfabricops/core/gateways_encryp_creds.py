@@ -7,11 +7,18 @@ import base64
 import json
 import os
 
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import hashes, hmac, padding
-from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.primitives.asymmetric.padding import MGF1, OAEP
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+try:
+    from cryptography.hazmat.backends import default_backend
+    from cryptography.hazmat.primitives import hashes, hmac, padding
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.hazmat.primitives.asymmetric.padding import MGF1, OAEP
+    from cryptography.hazmat.primitives.ciphers import (
+        Cipher,
+        algorithms,
+        modes,
+    )
+except ImportError:
+    default_backend = None  # cryptography not installed
 
 from ..utils.logging import get_logger
 from .gateways import get_gateway_public_key
@@ -218,7 +225,13 @@ def _get_encrypt_gateway_credentials(
         str: Base64-encoded encrypted credentials.
     Raises:
         ValueError: If the gateway is not found or credentials are invalid.
+        ImportError: If the cryptography package is not installed.
     """
+    if default_backend is None:
+        raise ImportError(
+            "The 'cryptography' package is required for gateway credential encryption. "
+            "Install it with: pip install pyfabricops[gateway]"
+        )
     # Load database credentials from environment
     gateway_resp = get_gateway_public_key(gateway_id)
 
