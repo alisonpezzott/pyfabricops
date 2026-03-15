@@ -75,7 +75,7 @@ addopts = "--doctest-modules"
 
 [tool.ruff]
 line-length = 79
-target-version = "py314"
+target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
