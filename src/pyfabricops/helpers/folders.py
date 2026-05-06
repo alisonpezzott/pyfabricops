@@ -268,7 +268,7 @@ def deploy_folders(
                 workspace, folder_name, parent_folder=parent_folder_id
             )
         elif parent_name:
-            create_folder(workspace, folder_name, parente_folder=parent_name)
+            create_folder(workspace, folder_name, parent_folder=parent_name)
         else:
             create_folder(workspace, folder_name)
 
@@ -296,8 +296,12 @@ def create_folders_from_path_string(workspace: str, path: str) -> str:
     parent_folder_id = None
 
     for folder in folders_tree:
-        # Get folder_id if folder exists
-        folder_id = resolve_folder(workspace_id, folder)
+        # Get folder_id if folder exists, scoped to the current parent to
+        # avoid resolving the wrong folder when duplicate names exist at
+        # different hierarchy levels.
+        folder_id = resolve_folder(
+            workspace_id, folder, parent_folder_id=parent_folder_id
+        )
         if folder_id is not None:
             logger.info(f"Folder {folder} already exists with ID {folder_id}.")
 
@@ -312,6 +316,9 @@ def create_folders_from_path_string(workspace: str, path: str) -> str:
             logger.success(
                 f"Folder {folder} created with ID {folder_id} successfully."
             )
+
+        # Track the current folder as parent for the next path segment.
+        parent_folder_id = folder_id
 
         parent_folder_id = folder_id
 

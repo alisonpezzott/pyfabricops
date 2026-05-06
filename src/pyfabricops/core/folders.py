@@ -39,12 +39,22 @@ def list_folders(
     )
 
 
-def get_folder_id(workspace: str, folder_name: str) -> str | None:
+def get_folder_id(
+    workspace: str,
+    folder_name: str,
+    *,
+    parent_folder_id: str | None = None,
+) -> str | None:
     """
     Retrieves the ID of a folder by its name.
 
     Args:
+        workspace (str): The name or ID of the workspace.
         folder_name (str): The name of the folder.
+        parent_folder_id (str | None): When provided, only folders whose
+            ``parentFolderId`` matches this value are considered. This is
+            required to disambiguate folders that share the same
+            ``displayName`` at different hierarchy levels.
 
     Returns:
         (str | None): The ID of the folder if found, otherwise None.
@@ -54,19 +64,31 @@ def get_folder_id(workspace: str, folder_name: str) -> str | None:
         df=False,
     )
     for _folder in folders:
-        if _folder["displayName"] == folder_name:
-            return _folder["id"]
+        if _folder["displayName"] != folder_name:
+            continue
+        if parent_folder_id is not None:
+            if _folder.get("parentFolderId") != parent_folder_id:
+                continue
+        return _folder["id"]
     logger.warning(f"Folder {folder_name} not found in workspace {workspace}.")
     return None
 
 
-def resolve_folder(workspace: str, folder: str) -> str | None:
+def resolve_folder(
+    workspace: str,
+    folder: str,
+    *,
+    parent_folder_id: str | None = None,
+) -> str | None:
     """
     Resolves a folder name to its ID.
 
     Args:
         workspace (str): The name or ID of the workspace.
         folder (str): The name or ID of the folder.
+        parent_folder_id (str | None): When provided and ``folder`` is a
+            display name (not a UUID), only folders whose
+            ``parentFolderId`` matches this value are considered.
 
     Returns:
         (str | None): The ID of the folder if found, otherwise None.
@@ -74,7 +96,9 @@ def resolve_folder(workspace: str, folder: str) -> str | None:
     if is_valid_uuid(folder):
         return folder
     else:
-        return get_folder_id(workspace, folder)
+        return get_folder_id(
+            workspace, folder, parent_folder_id=parent_folder_id
+        )
 
 
 @df
