@@ -39,12 +39,22 @@ def list_folders(
     )
 
 
-def get_folder_id(workspace: str, folder_name: str) -> str | None:
+def get_folder_id(
+    workspace: str,
+    folder_name: str,
+    *,
+    parent_folder_id: str | None = None,
+) -> str | None:
     """
     Retrieves the ID of a folder by its name.
 
     Args:
+        workspace (str): The name or ID of the workspace.
         folder_name (str): The name of the folder.
+        parent_folder_id (str | None): When provided, only folders whose
+            ``parentFolderId`` matches this value are considered. This is
+            required to disambiguate folders that share the same
+            ``displayName`` at different hierarchy levels.
 
     Returns:
         (str | None): The ID of the folder if found, otherwise None.
@@ -54,19 +64,31 @@ def get_folder_id(workspace: str, folder_name: str) -> str | None:
         df=False,
     )
     for _folder in folders:
-        if _folder["displayName"] == folder_name:
-            return _folder["id"]
+        if _folder["displayName"] != folder_name:
+            continue
+        if parent_folder_id is not None:
+            if _folder.get("parentFolderId") != parent_folder_id:
+                continue
+        return _folder["id"]
     logger.warning(f"Folder {folder_name} not found in workspace {workspace}.")
     return None
 
 
-def resolve_folder(workspace: str, folder: str) -> str | None:
+def resolve_folder(
+    workspace: str,
+    folder: str,
+    *,
+    parent_folder_id: str | None = None,
+) -> str | None:
     """
     Resolves a folder name to its ID.
 
     Args:
         workspace (str): The name or ID of the workspace.
         folder (str): The name or ID of the folder.
+        parent_folder_id (str | None): When provided and ``folder`` is a
+            display name (not a UUID), only folders whose
+            ``parentFolderId`` matches this value are considered.
 
     Returns:
         (str | None): The ID of the folder if found, otherwise None.
@@ -74,7 +96,9 @@ def resolve_folder(workspace: str, folder: str) -> str | None:
     if is_valid_uuid(folder):
         return folder
     else:
-        return get_folder_id(workspace, folder)
+        return get_folder_id(
+            workspace, folder, parent_folder_id=parent_folder_id
+        )
 
 
 @df
@@ -182,6 +206,63 @@ def delete_folder(workspace: str, folder: str) -> None:
         + resolve_folder(workspace_id, folder),
         method="delete",
     )
+
+
+def delete_empty_folders(workspace: str) -> None:
+    """
+    Delete all folders in a workspace that contain no items and no
+    sub-folders, repeating until no more empty folders remain.
+
+    A folder is considered empty when:
+    - no workspace item has ``folderId`` pointing to it, **and**
+    - no other folder has ``parentFolderId`` pointing to it.
+
+    The function iterates in passes (bottom-up) so that parent folders
+    become empty only after their children are removed.
+
+    Args:
+        workspace (str): The name or ID of the workspace.
+
+    Returns:
+        None
+
+    Examples:
+        ```python
+        delete_empty_folders('MyWorkspace')
+        ```
+    """
+    from ..items.items import list_items  # local import avoids circular dep
+
+    workspace_id = resolve_workspace(workspace)
+
+    while True:
+        folders = list_folders(workspace_id, df=False) or []
+        items = list_items(workspace_id, df=False) or []
+
+        # IDs of folders that contain at least one item
+        folders_with_items = {
+            item["folderId"] for item in items if item.get("folderId")
+        }
+        # IDs of folders that are a parent of at least one sub-folder
+        folders_with_children = {
+            f["parentFolderId"] for f in folders if f.get("parentFolderId")
+        }
+
+        occupied = folders_with_items | folders_with_children
+        empty = [f for f in folders if f["id"] not in occupied]
+
+        if not empty:
+            break
+
+        for folder in empty:
+            api_request(
+                "/workspaces/" + workspace_id + "/folders/" + folder["id"],
+                method="delete",
+            )
+            logger.success(
+                f'Deleted empty folder "{folder["displayName"]}" '
+                f"({folder['id']})."
+            )
 
 
 @df

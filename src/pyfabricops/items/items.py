@@ -178,6 +178,45 @@ def update_item(
     )
 
 
+def move_item(
+    workspace: str,
+    item: str,
+    target_folder: str | None = None,
+) -> None:
+    """
+    Move an item into a folder (or to the root if target_folder is None).
+
+    Args:
+        workspace (str): The workspace name or ID.
+        item (str): The name or ID of the item to move.
+        target_folder (str, optional): The name or ID of the destination
+            folder. Pass ``None`` to move the item to the workspace root.
+
+    Returns:
+        None
+
+    Examples:
+        ```python
+        move_item('MyWorkspace', 'SalesModel', 'Comercial')
+        move_item('MyWorkspace', '123e4567-...', '456e7890-...')
+        ```
+    """
+    workspace_id = resolve_workspace(workspace)
+    item_id = resolve_item(workspace_id, item)
+
+    payload = {}
+    if target_folder is not None:
+        folder_id = resolve_folder(workspace_id, target_folder)
+        if folder_id:
+            payload["targetFolderId"] = folder_id
+
+    api_request(
+        endpoint="/workspaces/" + workspace_id + "/items/" + item_id + "/move",
+        method="post",
+        payload=payload,
+    )
+
+
 def delete_item(workspace: str, item: str) -> None:
     """
     Delete an item from the specified workspace.

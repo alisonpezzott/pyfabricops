@@ -61,6 +61,7 @@ from .core.domains import (
 )
 from .core.folders import (
     create_folder,
+    delete_empty_folders,
     delete_folder,
     get_folder,
     get_folder_id,
@@ -301,6 +302,7 @@ from .items.items import (
     get_item_definition,
     get_item_id,
     list_items,
+    move_item,
     resolve_item,
     update_item,
     update_item_definition,
@@ -495,6 +497,7 @@ __all__ = [
     "delete_deployment_pipeline_role_assignment",
     "delete_domain",
     "delete_environment",
+    "delete_empty_folders",
     "delete_folder",
     "delete_item",
     "delete_lakehouse",
@@ -704,6 +707,7 @@ __all__ = [
     "list_workspaces",
     "load_and_sanitize",
     "move_folder",
+    "move_item",
     "pack_item_definition",
     "parse_definition_report",
     "parse_tmdl_parameters",

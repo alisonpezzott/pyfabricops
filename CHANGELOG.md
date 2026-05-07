@@ -9,6 +9,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.6.0] - 2026-05-06
+
+### Added
+- `set_auth_provider()` now accepts a `credential_type` keyword argument
+  (`"spn"` or `"user"`) when using the `"env"` provider. Setting
+  `credential_type="user"` activates the ROPC (`password`) grant flow using
+  `FAB_USERNAME` and `FAB_PASSWORD`, enabling authentication in CI/CD
+  environments without a Service Principal.
+- `move_item()` — moves any Fabric item to a target folder using the
+  `POST /workspaces/{id}/items/{id}/move` endpoint.
+- `delete_empty_folders()` — recursively deletes all folders in a workspace
+  that contain no items and no sub-folders. Iterates in passes (leaves
+  first) until no empty folders remain.
+
+### Fixed
+- `get_folder_id()` and `resolve_folder()` now accept an optional
+  `parent_folder_id` argument. Folder resolution in
+  `create_folders_from_path_string()` is scoped per path segment, preventing
+  items from being deployed to the wrong folder when two folders share the
+  same display name under different parents.
+- `deploy_folders()` had a typo (`parente_folder` instead of `parent_folder`)
+  that silently skipped parent assignment for name-based parent references.
+- `parse_tmdl_parameters()` now recognises numeric parameters
+  (`Decimal Number` / `Whole Number`) whose values are not enclosed in
+  double quotes in `expressions.tmdl`, and returns them as `int` or `float`
+  instead of `str`.
+- `extract_middle_path()` now normalises both `path` and `start_path` with
+  `Path.as_posix()` before comparison, fixing cases where a `./workspace`
+  prefix caused the folder path to resolve as `None`.
+- All `deploy_*` and `deploy_all_*` helpers (`semantic_models`, `reports`,
+  `notebooks`, `data_pipelines`, `dataflows_gen2`, `environments`, `items`)
+  now call `move_item()` on the update path, so existing items are moved to
+  the correct folder whenever the local folder structure changes.
+
+---
+
 ## [0.5.4] - 2026-03-15
 
 ### Changed

@@ -317,15 +317,25 @@ def parse_tmdl_parameters(path: str) -> dict:
     """
     Parse TMDL parameters from a file.
 
+    Recognises the following parameter types defined in ``expressions.tmdl``:
+
+    - **Text / any quoted value** — ``expression p_env = "prod" meta [...]``
+    - **Date / DateTime / Time** — ``expression p_date = #date(2024,1,1) meta [...]``
+    - **Decimal Number / Whole Number** — ``expression p_mult = 12 meta [...]``
+    - **Direct Lake connection** — ``Sql.Database("server", "database")``
+
     Args:
-        path (str): The path to the TMDL file.
+        path (str): The path to the TMDL expressions file.
 
     Returns:
-        dict: A dictionary containing the parsed parameters.
+        dict: A dictionary mapping parameter names to their values. Text
+            parameters are returned as ``str``; numeric parameters
+            (``Decimal Number`` / ``Whole Number``) are returned as
+            ``int`` or ``float``.
 
     Raises:
         PyFabricOpsFileNotFoundError: If the specified file does not exist.
-        ValueError: If the file content is not in the expected format.
+        ValueError: If the file content cannot be read.
 
     Examples:
         ```python
@@ -385,6 +395,22 @@ def parse_tmdl_parameters(path: str) -> dict:
             database_value.startswith("#{") and database_value.endswith("}#")
         ):
             params["DatabaseId"] = database_value
+
+    # Pattern 4: Numeric parameters (Decimal Number / Whole Number)
+    # e.g. expression p_multiplicador = 12 meta [IsParameterQuery=true, ...]
+    # Numeric values are not quoted in TMDL, so none of the previous patterns
+    # catch them. The `meta [IsParameterQuery` clause distinguishes parameters
+    # from ordinary measures or calculated columns.
+    pattern4 = r"expression\s+(\w+)\s*=\s*(-?\d+(?:\.\d+)?)\s+meta\s*\["
+    matches4 = re.findall(pattern4, expressions)
+
+    for match in matches4:
+        variable_name = match[0]
+        raw_value = match[1]
+        # Convert to int when there is no decimal point, float otherwise
+        params[variable_name] = (
+            int(raw_value) if "." not in raw_value else float(raw_value)
+        )
 
     if not params:
         logger.warning(f"No parameters found in file: {path}")
@@ -656,6 +682,8 @@ def extract_middle_path(
     """
     Extract the middle of a full path given a start.
     """
+    # Normalize to remove ./ prefix and unify separators
+    path = str(Path(path).as_posix())
     path_list = path.split("/")[:-1]
     if len(path_list) == 0:
         return None
@@ -666,7 +694,8 @@ def extract_middle_path(
         return middle_path
     else:
         try:
-            middle_path = middle_path.split(start_path + "/")[1]
+            prefix = str(Path(start_path).as_posix()).rstrip("/") + "/"
+            middle_path = middle_path.split(prefix)[1]
             return middle_path
         except Exception:
             return None

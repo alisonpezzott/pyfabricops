@@ -11,6 +11,7 @@ from ..helpers.folders import (
     create_folders_from_path_string,
     resolve_folder_from_id_to_path,
 )
+from ..items.items import move_item
 from ..items.notebooks import (
     create_notebook,
     get_notebook,
@@ -243,6 +244,8 @@ def deploy_notebook(
         )
 
     else:
+        if folder_id:
+            move_item(workspace_id, item_id, target_folder=folder_id)
         return update_notebook_definition(
             workspace_id,
             item_id,
@@ -294,6 +297,8 @@ def deploy_all_notebooks(
             )
 
         else:
+            if folder_id:
+                move_item(workspace_id, item_id, target_folder=folder_id)
             update_notebook_definition(
                 workspace_id,
                 item_id,

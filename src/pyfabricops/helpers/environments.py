@@ -18,6 +18,7 @@ from ..items.environments import (
     resolve_environment,
     update_environment_definition,
 )
+from ..items.items import move_item
 from ..utils.decorators import df
 from ..utils.logging import get_logger
 from ..utils.utils import (
@@ -247,6 +248,8 @@ def deploy_environment(
         )
 
     else:
+        if folder_id:
+            move_item(workspace_id, environment_id, target_folder=folder_id)
         return update_environment_definition(
             workspace_id,
             environment_id,
@@ -298,6 +301,10 @@ def deploy_all_environments(
             )
 
         else:
+            if folder_id:
+                move_item(
+                    workspace_id, environment_id, target_folder=folder_id
+                )
             update_environment_definition(
                 workspace_id,
                 environment_id,

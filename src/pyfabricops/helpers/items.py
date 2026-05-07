@@ -14,6 +14,7 @@ from ..items.items import (
     get_item,
     get_item_definition,
     list_items,
+    move_item,
     resolve_item,
     update_item_definition,
 )
@@ -191,11 +192,12 @@ def deploy_item(
 
     item_definition = pack_item_definition(path)
 
+    folder_path_string = extract_middle_path(path, start_path=start_path)
+    folder_id = create_folders_from_path_string(
+        workspace_id, folder_path_string
+    )
+
     if item_id is None:
-        folder_path_string = extract_middle_path(path, start_path=start_path)
-        folder_id = create_folders_from_path_string(
-            workspace_id, folder_path_string
-        )
         return create_item(
             workspace_id,
             display_name=display_name,
@@ -206,6 +208,8 @@ def deploy_item(
         )
 
     else:
+        if folder_id:
+            move_item(workspace_id, item_id, target_folder=folder_id)
         return update_item_definition(
             workspace_id,
             item_id,
@@ -272,6 +276,14 @@ def deploy_all_items(
                 )
 
             else:
+                folder_path_string = extract_middle_path(
+                    path_, start_path=start_path
+                )
+                folder_id = create_folders_from_path_string(
+                    workspace_id, folder_path_string
+                )
+                if folder_id:
+                    move_item(workspace_id, item_id, target_folder=folder_id)
                 update_item_definition(
                     workspace_id,
                     item_id,

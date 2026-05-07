@@ -13,6 +13,7 @@ from ..helpers.folders import (
     create_folders_from_path_string,
     resolve_folder_from_id_to_path,
 )
+from ..items.items import move_item
 from ..items.reports import (
     create_report,
     get_report,
@@ -299,6 +300,8 @@ def deploy_report(
         )
 
     else:
+        if folder_id:
+            move_item(workspace_id, item_id, target_folder=folder_id)
         return update_report_definition(
             workspace_id,
             item_id,
@@ -350,6 +353,8 @@ def deploy_all_reports(
             )
 
         else:
+            if folder_id:
+                move_item(workspace_id, item_id, target_folder=folder_id)
             update_report_definition(
                 workspace_id,
                 item_id,

@@ -230,6 +230,7 @@ class TokenManager:
     ):
         self.cache = TokenCache()
         self.auth_provider = auth_provider
+        self.credential_type: Literal["spn", "user"] = "spn"
         self._credential_providers = {
             "env": EnvCredentialProvider(),
         }
@@ -237,14 +238,21 @@ class TokenManager:
         self.fabric_provider = FabricNotebookProvider(self.cache)
 
     def set_auth_provider(
-        self, source: Literal["env", "oauth", "fabric"] = "env"
+        self,
+        source: Literal["env", "oauth", "fabric"] = "env",
+        credential_type: Literal["spn", "user"] = "spn",
     ):
-        """Define the authentication provider"""
+        """Define the authentication provider and credential type"""
         if source not in ["env", "oauth", "fabric"]:
             raise OptionNotAvailableError(
                 f"Source not available. Available: env, oauth, fabric. Got: {source}"
             )
+        if credential_type not in ["spn", "user"]:
+            raise OptionNotAvailableError(
+                f"credential_type not available. Available: spn, user. Got: {credential_type}"
+            )
         self.auth_provider = source
+        self.credential_type = credential_type
 
     def _build_token_payload(
         self,
@@ -311,9 +319,14 @@ class TokenManager:
     def get_token(
         self,
         audience: Literal["fabric", "powerbi", "graph"] = "fabric",
-        credential_type: Literal["spn", "user"] = "spn",
+        credential_type: Literal["spn", "user"] | None = None,
     ) -> dict:
         """Get a valid token, using cache when possible"""
+
+        # Resolve credential_type: use the globally configured value when not
+        # explicitly overridden by the caller.
+        if credential_type is None:
+            credential_type = self.credential_type
 
         # OAuth uses a different flow
         if self.auth_provider == "oauth":
@@ -354,23 +367,42 @@ _token_manager = TokenManager()
 
 def set_auth_provider(
     source: Literal["env", "oauth", "fabric"] = "env",
+    *,
+    credential_type: Literal["spn", "user"] = "spn",
 ) -> None:
     """
     Set the authentication provider for token retrieval.
 
     Args:
-        source (str): The provider of credentials. Can be "env", "oauth", or "fabric".
+        source (str): The provider of credentials. Can be ``"env"``,
+            ``"oauth"``, or ``"fabric"``.
+        credential_type (str): The credential flow to use when
+            ``source="env"``. ``"spn"`` (default) uses the
+            ``client_credentials`` grant with ``FAB_CLIENT_ID``,
+            ``FAB_CLIENT_SECRET``, and ``FAB_TENANT_ID``.
+            ``"user"`` uses the ROPC ``password`` grant with
+            ``FAB_USERNAME``, ``FAB_PASSWORD``, ``FAB_CLIENT_ID``, and
+            ``FAB_TENANT_ID``. Ignored for ``"oauth"`` and ``"fabric"``
+            providers.
 
     Returns:
         None
 
     Raises:
-        OptionNotAvailableError: If the source is not one of the available options.
+        OptionNotAvailableError: If the source or credential_type is not
+            one of the available options.
 
     Examples:
-        ### Environment variables (.env, GitHub Secrets, Ado Secrets...)
+        ### Service Principal (default)
         ```python
         set_auth_provider("env")
+        # or explicitly:
+        set_auth_provider("env", credential_type="spn")
+        ```
+
+        ### User / ROPC — useful for CI/CD without a Service Principal
+        ```python
+        set_auth_provider("env", credential_type="user")
         ```
 
         ### OAuth (Interactive)
@@ -387,7 +419,7 @@ def set_auth_provider(
         to retrieve the access token.
     """
     global _token_manager
-    _token_manager.set_auth_provider(source)
+    _token_manager.set_auth_provider(source, credential_type=credential_type)
 
 
 def clear_token_cache() -> None:
@@ -415,7 +447,7 @@ def clear_token_cache() -> None:
 def _get_token(
     audience: Literal["fabric", "powerbi", "graph"] = "fabric",
     auth_provider: Literal["env", "oauth", "fabric"] = "env",
-    credential_type: Literal["spn", "user"] = "spn",
+    credential_type: Literal["spn", "user"] | None = None,
 ) -> dict | None:
-    """Get a token"""
+    """Get a token, using the globally configured credential_type when not overridden."""
     return _token_manager.get_token(audience, credential_type)
