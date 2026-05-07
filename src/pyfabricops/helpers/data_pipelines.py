@@ -19,6 +19,7 @@ from ..items.data_pipelines import (
     resolve_data_pipeline,
     update_data_pipeline_definition,
 )
+from ..items.items import move_item
 from ..utils.decorators import df
 from ..utils.logging import get_logger
 from ..utils.utils import (
@@ -247,6 +248,8 @@ def deploy_data_pipeline(
         )
 
     else:
+        if folder_id:
+            move_item(workspace_id, item_id, target_folder=folder_id)
         return update_data_pipeline_definition(
             workspace_id,
             item_id,
@@ -298,6 +301,8 @@ def deploy_all_data_pipelines(
             )
 
         else:
+            if folder_id:
+                move_item(workspace_id, item_id, target_folder=folder_id)
             update_data_pipeline_definition(
                 workspace_id,
                 item_id,

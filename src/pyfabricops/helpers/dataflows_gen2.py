@@ -19,6 +19,7 @@ from ..items.dataflows_gen2 import (
     resolve_dataflow_gen2,
     update_dataflow_gen2_definition,
 )
+from ..items.items import move_item
 from ..utils.decorators import df
 from ..utils.logging import get_logger
 from ..utils.utils import (
@@ -243,6 +244,8 @@ def deploy_dataflow_gen2(
         )
 
     else:
+        if folder_id:
+            move_item(workspace_id, item_id, target_folder=folder_id)
         return update_dataflow_gen2_definition(
             workspace_id,
             item_id,
@@ -293,6 +296,8 @@ def deploy_all_dataflows_gen2(
             )
 
         else:
+            if folder_id:
+                move_item(workspace_id, item_id, target_folder=folder_id)
             update_dataflow_gen2_definition(
                 workspace_id,
                 item_id,
