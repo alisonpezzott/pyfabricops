@@ -386,6 +386,19 @@ def parse_tmdl_parameters(path: str) -> dict:
         ):
             params["DatabaseId"] = database_value
 
+    # Pattern 4: Numeric parameters (Decimal Number / Whole Number)
+    # e.g. expression p_multiplicador = 12 meta [IsParameterQuery=true, ...]
+    # Numeric values are not quoted in TMDL, so none of the previous patterns
+    # catch them. The `meta [IsParameterQuery` clause distinguishes parameters
+    # from ordinary measures or calculated columns.
+    pattern4 = r"expression\s+(\w+)\s*=\s*(-?\d+(?:\.\d+)?)\s+meta\s*\["
+    matches4 = re.findall(pattern4, expressions)
+
+    for match in matches4:
+        variable_name = match[0]
+        variable_value = match[1]
+        params[variable_name] = variable_value
+
     if not params:
         logger.warning(f"No parameters found in file: {path}")
 
