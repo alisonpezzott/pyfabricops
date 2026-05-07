@@ -61,6 +61,7 @@ from .core.domains import (
 )
 from .core.folders import (
     create_folder,
+    delete_empty_folders,
     delete_folder,
     get_folder,
     get_folder_id,
@@ -496,6 +497,7 @@ __all__ = [
     "delete_deployment_pipeline_role_assignment",
     "delete_domain",
     "delete_environment",
+    "delete_empty_folders",
     "delete_folder",
     "delete_item",
     "delete_lakehouse",

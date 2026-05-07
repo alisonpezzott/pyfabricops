@@ -208,6 +208,63 @@ def delete_folder(workspace: str, folder: str) -> None:
     )
 
 
+def delete_empty_folders(workspace: str) -> None:
+    """
+    Delete all folders in a workspace that contain no items and no
+    sub-folders, repeating until no more empty folders remain.
+
+    A folder is considered empty when:
+    - no workspace item has ``folderId`` pointing to it, **and**
+    - no other folder has ``parentFolderId`` pointing to it.
+
+    The function iterates in passes (bottom-up) so that parent folders
+    become empty only after their children are removed.
+
+    Args:
+        workspace (str): The name or ID of the workspace.
+
+    Returns:
+        None
+
+    Examples:
+        ```python
+        delete_empty_folders('MyWorkspace')
+        ```
+    """
+    from ..items.items import list_items  # local import avoids circular dep
+
+    workspace_id = resolve_workspace(workspace)
+
+    while True:
+        folders = list_folders(workspace_id, df=False) or []
+        items = list_items(workspace_id, df=False) or []
+
+        # IDs of folders that contain at least one item
+        folders_with_items = {
+            item["folderId"] for item in items if item.get("folderId")
+        }
+        # IDs of folders that are a parent of at least one sub-folder
+        folders_with_children = {
+            f["parentFolderId"] for f in folders if f.get("parentFolderId")
+        }
+
+        occupied = folders_with_items | folders_with_children
+        empty = [f for f in folders if f["id"] not in occupied]
+
+        if not empty:
+            break
+
+        for folder in empty:
+            api_request(
+                "/workspaces/" + workspace_id + "/folders/" + folder["id"],
+                method="delete",
+            )
+            logger.success(
+                f'Deleted empty folder "{folder["displayName"]}" '
+                f"({folder['id']})."
+            )
+
+
 @df
 def update_folder(
     workspace: str,
