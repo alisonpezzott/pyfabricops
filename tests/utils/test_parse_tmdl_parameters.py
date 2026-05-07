@@ -39,43 +39,47 @@ def test_parse_string_parameter(tmp_path) -> None:
 
 
 def test_parse_integer_parameter(tmp_path) -> None:
-    """Whole-number parameters without quotes are parsed correctly."""
+    """Whole-number parameters are returned as int."""
     content = (
         "expression p_multiplicador = 12 meta [IsParameterQuery=true, "
         'Type="Number", IsParameterQueryRequired=true]\n'
     )
     result = parse_tmdl_parameters(_write_tmdl(tmp_path, content))
-    assert result == {"p_multiplicador": "12"}
+    assert result == {"p_multiplicador": 12}
+    assert isinstance(result["p_multiplicador"], int)
 
 
 def test_parse_decimal_parameter(tmp_path) -> None:
-    """Decimal Number parameters without quotes are parsed correctly."""
+    """Decimal Number parameters are returned as float."""
     content = (
         "expression p_taxa = 3.14 meta [IsParameterQuery=true, "
         'Type="Number", IsParameterQueryRequired=true]\n'
     )
     result = parse_tmdl_parameters(_write_tmdl(tmp_path, content))
-    assert result == {"p_taxa": "3.14"}
+    assert result == {"p_taxa": 3.14}
+    assert isinstance(result["p_taxa"], float)
 
 
 def test_parse_negative_numeric_parameter(tmp_path) -> None:
-    """Negative numeric parameters are parsed correctly."""
+    """Negative whole-number parameters are returned as int."""
     content = (
         "expression p_offset = -5 meta [IsParameterQuery=true, "
         'Type="Number", IsParameterQueryRequired=true]\n'
     )
     result = parse_tmdl_parameters(_write_tmdl(tmp_path, content))
-    assert result == {"p_offset": "-5"}
+    assert result == {"p_offset": -5}
+    assert isinstance(result["p_offset"], int)
 
 
 def test_parse_negative_decimal_parameter(tmp_path) -> None:
-    """Negative decimal parameters are parsed correctly."""
+    """Negative decimal parameters are returned as float."""
     content = (
         "expression p_rate = -0.75 meta [IsParameterQuery=true, "
         'Type="Number", IsParameterQueryRequired=true]\n'
     )
     result = parse_tmdl_parameters(_write_tmdl(tmp_path, content))
-    assert result == {"p_rate": "-0.75"}
+    assert result == {"p_rate": -0.75}
+    assert isinstance(result["p_rate"], float)
 
 
 # ---------------------------------------------------------------------------
@@ -92,7 +96,8 @@ def test_parse_mixed_string_and_numeric_parameters(tmp_path) -> None:
         'Type="Number", IsParameterQueryRequired=true]\n'
     )
     result = parse_tmdl_parameters(_write_tmdl(tmp_path, content))
-    assert result == {"p_env": "prod", "p_multiplicador": "12"}
+    assert result == {"p_env": "prod", "p_multiplicador": 12}
+    assert isinstance(result["p_multiplicador"], int)
 
 
 # ---------------------------------------------------------------------------

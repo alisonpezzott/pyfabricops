@@ -328,7 +328,10 @@ def parse_tmdl_parameters(path: str) -> dict:
         path (str): The path to the TMDL expressions file.
 
     Returns:
-        dict: A dictionary mapping parameter names to their string values.
+        dict: A dictionary mapping parameter names to their values. Text
+            parameters are returned as ``str``; numeric parameters
+            (``Decimal Number`` / ``Whole Number``) are returned as
+            ``int`` or ``float``.
 
     Raises:
         PyFabricOpsFileNotFoundError: If the specified file does not exist.
@@ -403,8 +406,11 @@ def parse_tmdl_parameters(path: str) -> dict:
 
     for match in matches4:
         variable_name = match[0]
-        variable_value = match[1]
-        params[variable_name] = variable_value
+        raw_value = match[1]
+        # Convert to int when there is no decimal point, float otherwise
+        params[variable_name] = (
+            int(raw_value) if "." not in raw_value else float(raw_value)
+        )
 
     if not params:
         logger.warning(f"No parameters found in file: {path}")
@@ -676,6 +682,8 @@ def extract_middle_path(
     """
     Extract the middle of a full path given a start.
     """
+    # Normalize to remove ./ prefix and unify separators
+    path = str(Path(path).as_posix())
     path_list = path.split("/")[:-1]
     if len(path_list) == 0:
         return None
@@ -686,7 +694,8 @@ def extract_middle_path(
         return middle_path
     else:
         try:
-            middle_path = middle_path.split(start_path + "/")[1]
+            prefix = str(Path(start_path).as_posix()).rstrip("/") + "/"
+            middle_path = middle_path.split(prefix)[1]
             return middle_path
         except Exception:
             return None

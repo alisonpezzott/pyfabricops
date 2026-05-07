@@ -21,6 +21,7 @@ from ..items.semantic_models import (
     get_semantic_model_definition,
     list_semantic_models,
     resolve_semantic_model,
+    update_semantic_model,
     update_semantic_model_definition,
 )
 from ..utils.decorators import df
@@ -636,6 +637,13 @@ def deploy_semantic_model(
         )
 
     else:
+        if folder_id:
+            update_semantic_model(
+                workspace_id,
+                semantic_model_id,
+                folder=folder_id,
+                df=False,
+            )
         return update_semantic_model_definition(
             workspace_id,
             semantic_model_id,
@@ -687,6 +695,13 @@ def deploy_all_semantic_models(
             )
 
         else:
+            if folder_id:
+                update_semantic_model(
+                    workspace_id,
+                    semantic_model_id,
+                    folder=folder_id,
+                    df=False,
+                )
             update_semantic_model_definition(
                 workspace_id,
                 semantic_model_id,

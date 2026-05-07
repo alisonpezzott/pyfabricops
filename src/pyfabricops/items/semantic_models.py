@@ -5,6 +5,7 @@ from pandas import DataFrame
 from ..api.api import api_request
 from ..core.folders import resolve_folder
 from ..core.workspaces import resolve_workspace
+from ..items.items import move_item
 from ..utils.decorators import df
 from ..utils.logging import get_logger
 from ..utils.utils import is_valid_uuid
@@ -167,6 +168,7 @@ def update_semantic_model(
     *,
     display_name: str | None = None,
     description: str | None = None,
+    folder: str | None = None,
     df: bool | None = False,
 ) -> DataFrame | dict[str, Any] | None:
     """
@@ -177,6 +179,7 @@ def update_semantic_model(
         semantic_model (str): The ID of the semantic model to update.
         display_name (str, optional): The new display name for the semantic model.
         description (str, optional): The new description for the semantic model.
+        folder (str, optional): The name or ID of the folder to move the model into.
         df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
             If False, returns a list of dictionaries.
 
@@ -203,6 +206,12 @@ def update_semantic_model(
 
     if description:
         payload["description"] = description
+
+    if folder:
+        move_item(workspace_id, semantic_model_id, target_folder=folder)
+
+    if not payload:
+        return None
 
     return api_request(
         endpoint="/workspaces/"
