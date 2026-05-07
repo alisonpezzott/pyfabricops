@@ -317,15 +317,22 @@ def parse_tmdl_parameters(path: str) -> dict:
     """
     Parse TMDL parameters from a file.
 
+    Recognises the following parameter types defined in ``expressions.tmdl``:
+
+    - **Text / any quoted value** — ``expression p_env = "prod" meta [...]``
+    - **Date / DateTime / Time** — ``expression p_date = #date(2024,1,1) meta [...]``
+    - **Decimal Number / Whole Number** — ``expression p_mult = 12 meta [...]``
+    - **Direct Lake connection** — ``Sql.Database("server", "database")``
+
     Args:
-        path (str): The path to the TMDL file.
+        path (str): The path to the TMDL expressions file.
 
     Returns:
-        dict: A dictionary containing the parsed parameters.
+        dict: A dictionary mapping parameter names to their string values.
 
     Raises:
         PyFabricOpsFileNotFoundError: If the specified file does not exist.
-        ValueError: If the file content is not in the expected format.
+        ValueError: If the file content cannot be read.
 
     Examples:
         ```python

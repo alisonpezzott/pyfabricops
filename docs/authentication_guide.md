@@ -6,7 +6,7 @@ This guide explains the three authentication methods available in pyfabricops an
 
 pyfabricops supports three authentication methods:
 
-1. **`env`** - Environment variables (Service Principal or User credentials)
+1. **`env`** - Environment variables (Service Principal or User / ROPC credentials)
 2. **`oauth`** - Interactive browser authentication
 3. **`fabric`** - Fabric notebook authenticated user (NEW!)
 
@@ -20,33 +20,47 @@ Create a `.env` file or set environment variables:
 
 ```env
 FAB_CLIENT_ID=your_client_id_here
-FAB_CLIENT_SECRET=your_client_secret_here
+FAB_CLIENT_SECRET=your_client_secret_here  # Required for SPN flow
 FAB_TENANT_ID=your_tenant_id_here
-FAB_USERNAME=your_username_here    # Optional: for user-based auth
-FAB_PASSWORD=your_password_here    # Optional: for user-based auth
+FAB_USERNAME=your_username_here    # Required for user (ROPC) flow
+FAB_PASSWORD=your_password_here    # Required for user (ROPC) flow
 ```
 
-**Usage:**
+**Usage — Service Principal (default):**
 
 ```python
 import pyfabricops as pf
 
-# This is the default, but you can set it explicitly
-pf.set_auth_provider("env")
+pf.set_auth_provider("env")                       # default: credential_type="spn"
+pf.set_auth_provider("env", credential_type="spn")  # explicit equivalent
 
-# Now use the library
 workspaces = pf.list_workspaces()
 ```
 
+**Usage — User / ROPC (CI/CD without a Service Principal):**
+
+```python
+import pyfabricops as pf
+
+pf.set_auth_provider("env", credential_type="user")
+
+workspaces = pf.list_workspaces()
+```
+
+> **Note:** The ROPC flow sends `FAB_USERNAME` and `FAB_PASSWORD` directly to
+> Azure AD. It is incompatible with accounts that have MFA or Conditional
+> Access policies enforced.
+
 **Pros:**
 - ✅ Works everywhere (local, CI/CD, containers)
-- ✅ Service principal support
+- ✅ Service principal and user (ROPC) support
 - ✅ Secure credential management
 - ✅ No user interaction required
 
 **Cons:**
 - ❌ Requires credential management
 - ❌ Need to configure environment variables
+- ❌ ROPC flow is incompatible with MFA / Conditional Access
 
 ---
 
@@ -124,16 +138,17 @@ access_token = credentials.getToken("pbi")
 
 ## Comparison Table
 
-| Feature | `env` | `oauth` | `fabric` |
-|---------|-------|---------|----------|
-| Works in Fabric notebooks | ✅ | ✅ | ✅ |
-| Works in VSCode | ✅ | ✅ | ❌ |
-| Works in CI/CD | ✅ | ❌ | ❌ |
-| Requires credentials | ✅ | ❌ | ❌ |
-| Requires browser | ❌ | ✅ | ❌ |
-| Service Principal support | ✅ | ❌ | ❌ |
-| User token | Optional | ✅ | ✅ |
-| Auto-refresh | ✅ | ✅ | ✅ |
+| Feature | `env` (spn) | `env` (user) | `oauth` | `fabric` |
+|---------|-------------|--------------|---------|----------|
+| Works in Fabric notebooks | ✅ | ✅ | ✅ | ✅ |
+| Works in VSCode | ✅ | ✅ | ✅ | ❌ |
+| Works in CI/CD | ✅ | ✅ | ❌ | ❌ |
+| Requires credentials | ✅ | ✅ | ❌ | ❌ |
+| Requires browser | ❌ | ❌ | ✅ | ❌ |
+| Service Principal support | ✅ | ❌ | ❌ | ❌ |
+| User token | ❌ | ✅ | ✅ | ✅ |
+| MFA / Conditional Access | ✅ | ❌ | ✅ | ✅ |
+| Auto-refresh | ✅ | ✅ | ✅ | ✅ |
 
 ---
 
@@ -170,13 +185,13 @@ for item in items:
     print(f"- {item['displayName']} ({item['type']})")
 ```
 
-### Example 3: CI/CD Pipeline
+### Example 3: CI/CD Pipeline — Service Principal
 
 ```python
 import pyfabricops as pf
 import os
 
-# Use env method with service principal
+# Use env method with service principal (default)
 pf.set_auth_provider("env")
 
 # Credentials come from environment variables
@@ -185,6 +200,18 @@ workspaces = pf.list_workspaces()
 
 # Deploy items
 pf.deploy_item("my-workspace", "my-item", source_path="./artifacts")
+```
+
+### Example 4: CI/CD Pipeline — User (ROPC, no Service Principal)
+
+```python
+import pyfabricops as pf
+
+# Use ROPC flow when a Service Principal is not available
+pf.set_auth_provider("env", credential_type="user")
+
+# FAB_USERNAME and FAB_PASSWORD must be set in the environment
+workspaces = pf.list_workspaces()
 ```
 
 ---
@@ -223,6 +250,19 @@ This means you're trying to use `fabric` authentication outside of a Microsoft F
 **Solution:** Use `oauth` or `env` instead:
 ```python
 pf.set_auth_provider("oauth")  # or "env"
+```
+
+### Error: "client_secret is required for client_credentials" (AADSTS7000216)
+
+This happens when using `set_auth_provider("env")` (default SPN flow) without
+`FAB_CLIENT_SECRET` set.
+
+**Solution A:** Provide `FAB_CLIENT_SECRET` for Service Principal authentication.
+
+**Solution B:** Switch to the user (ROPC) flow and provide user credentials:
+```python
+pf.set_auth_provider("env", credential_type="user")
+# Requires FAB_USERNAME and FAB_PASSWORD in the environment
 ```
 
 ### Error: "Failed to retrieve token"

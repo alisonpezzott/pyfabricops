@@ -3,14 +3,14 @@
 [![PyPI version](https://img.shields.io/pypi/v/pyfabricops.svg)](https://pypi.org/project/pyfabricops/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python versions](https://img.shields.io/pypi/pyversions/pyfabricops.svg)](https://pypi.org/project/pyfabricops/)
-[![Typing status](https://img.shields.io/badge/typing-PEP%20561-blue)](https://peps.python.org/pep-0561/)    
+[![Typing status](https://img.shields.io/badge/typing-PEP%20561-blue)](https://peps.python.org/pep-0561/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![Tests](https://github.com/alisonpezzott/pyfabricops/actions/workflows/test.yml/badge.svg)](https://github.com/alisonpezzott/pyfabricops/actions/workflows/test.yml)  
+[![Tests](https://github.com/alisonpezzott/pyfabricops/actions/workflows/test.yml/badge.svg)](https://github.com/alisonpezzott/pyfabricops/actions/workflows/test.yml)
 
 > A Python wrapper library for Microsoft Fabric (and Power BI) operations, providing a simple interface to the official Fabric REST APIs. Falls back to Power BI REST APIs where needed. Designed to run in Python notebooks, pure Python scripts or integrated into YAML-based workflows for CI/CD.
 Access to the repositoy on [GitHub](https://github.com/alisonpezzott/pyfabricops).
 
-## 🚀 Features  
+## 🚀 Features
 
 - Authenticate using environment variables (GitHub Secrets, ADO Secrets, .env ...)
 - Manage workspaces, capacities, semantic models, lakehouses, reports and connections
@@ -18,12 +18,12 @@ Access to the repositoy on [GitHub](https://github.com/alisonpezzott/pyfabricops
 - Capture and Manage Git branches automatically for CI/CD scenarios
 - Many use cases and scenarios including yaml for test and deploy using GitHub Actions
 
-## 📃 Documentation  
-Access: [https://pyfabricops.readthedocs.io/en/latest/](https://pyfabricops.readthedocs.io/en/latest/) 
+## 📃 Documentation
+Access: [https://pyfabricops.readthedocs.io/en/latest/](https://pyfabricops.readthedocs.io/en/latest/)
 
-## ✅ Requirements  
+## ✅ Requirements
 
-- Requires Python >=3.10,<3.15  
+- Requires Python >=3.10,<3.15
 
 ## ⚒️ Installation
 
@@ -53,7 +53,7 @@ import pyfabricops as pf
 
 ### Set the authentication provider
 
-> Set auth environment variables acording to your authentication method  
+> Set auth environment variables acording to your authentication method
 #### Environment variables (.env, GitHub Secrets, Ado Secrets...)
 ```python
 pf.set_auth_provider("env")
@@ -71,23 +71,31 @@ FAB_USERNAME=your_username_here   # Necessary for some functions with no SPN sup
 FAB_PASSWORD=your_password_here   # Necessary for some functions with no SPN support
 ```
 
+By default the `"env"` provider uses the **Service Principal** (`client_credentials`) flow.
+To authenticate as a **user** (ROPC / password grant) — e.g. in CI/CD pipelines where a
+Service Principal is not available — pass `credential_type="user"`:
+
+```python
+pf.set_auth_provider("env", credential_type="user")
+```
+
 #### OAuth (Interactive)
 
 ```python
 pf.set_auth_provider("oauth")
 ```
-This will open a browser window for user authentication.  
+This will open a browser window for user authentication.
 
 #### Fabric Notebook (Authenticated User)
 
 ```python
 pf.set_auth_provider("fabric")
 ```
-This method is designed for use inside Microsoft Fabric notebooks where the user is already authenticated.  
-It uses `notebookutils.credentials.getToken()` to retrieve the access token automatically.  
+This method is designed for use inside Microsoft Fabric notebooks where the user is already authenticated.
+It uses `notebookutils.credentials.getToken()` to retrieve the access token automatically.
 No browser authentication required - perfect for notebooks running in Fabric!
 
-See more details in the [authentication guide](authentication_guide.md)  
+See more details in the [authentication guide](authentication_guide.md)
 
 > Create a repository and clone it locally.
 > Prepare your environment with the required variables according to your authentication method (GitHub Secrets, ADO Secrets, .env ...)
@@ -114,7 +122,7 @@ This file maps your local branches to Fabric branches, allowing the library to a
 Visit: [https://github.com/alisonpezzott/pyfabricops-examples](https://github.com/alisonpezzott/pyfabricops-examples)
 
 
-## 🧬 Project Structure  
+## 🧬 Project Structure
 
 ```bash
 src/
@@ -184,9 +192,9 @@ src/
     │   └── utils.py
     ├── __init__.py
     └── _version.py
-```  
+```
 
-### Logging configuration  
+### Logging configuration
 
 The custom logging system implemented in `pyfabricops` provides a complete and flexible solution for monitoring and debugging the library.
 
@@ -213,9 +221,9 @@ pf.disable_logging()
 
 # Reset to default configuration
 pf.reset_logging()
-```  
+```
 
-For complete logging configuration options, refer to the [logging_system.md](logging_system.md)  
+For complete logging configuration options, refer to the [logging_system.md](logging_system.md)
 
 
 ## ❤️Contributing
@@ -224,7 +232,7 @@ For complete logging configuration options, refer to the [logging_system.md](log
 3. Run `uv sync --group dev` to set up the development environment
 4. Run `uv run ruff format --check --diff . && uv run ruff check .`
 5. Run `uv run pytest -s -x --cov=pyfabricops -v` to run tests
-6. Submit a pull request to branch `develop` 🚀  
+6. Submit a pull request to branch `develop` 🚀
 
 ## 🚀 Publishing
 
@@ -255,13 +263,13 @@ pip install --index-url https://test.pypi.org/simple/ pyfabricops
 
 - Set up a PyPI account at https://pypi.org/
 - Generate an API token at https://pypi.org/manage/account/token/
-- Add the token as `PYPI_TOKEN` secret in GitHub repository settings  
+- Add the token as `PYPI_TOKEN` secret in GitHub repository settings
 
-## 🐞 Issues  
-If you encounter any issues, please report them at [https://github.com/alisonpezzott/pyfabricops/issues](https://github.com/alisonpezzott/pyfabricops/issues)  
+## 🐞 Issues
+If you encounter any issues, please report them at [https://github.com/alisonpezzott/pyfabricops/issues](https://github.com/alisonpezzott/pyfabricops/issues)
 
 ## ⚖️ License
-This project is licensed under the MIT License – see the [LICENSE](LICENSE) file for details.  
+This project is licensed under the MIT License – see the [LICENSE](LICENSE) file for details.
 
 ## 🌟 Acknowledgements
 Created and maintained by Alison Pezzott
@@ -272,6 +280,6 @@ Feedback, issues and stars are welcome 🌟
 [![LinkedIn](https://custom-icon-badges.demolab.com/badge/LinkedIn-0A66C2?logo=linkedin-white&logoColor=fff)](https://linkedin.com/in/alisonpezzott)
 [![Discord](https://img.shields.io/badge/Discord-%235865F2.svg?&logo=discord&logoColor=white)](https://discord.gg/sJTDvWz9sM)
 [![Telegram](https://img.shields.io/badge/Telegram-2CA5E0?logo=telegram&logoColor=white)](https://t.me/alisonpezzott)
-[![Instagram](https://img.shields.io/badge/Instagram-%23E4405F.svg?logo=Instagram&logoColor=white)](https://instagram.com/alisonpezzott)  
+[![Instagram](https://img.shields.io/badge/Instagram-%23E4405F.svg?logo=Instagram&logoColor=white)](https://instagram.com/alisonpezzott)
 
 
