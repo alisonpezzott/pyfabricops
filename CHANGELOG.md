@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- `docs/functions/items/environments.md` referenced the removed
+  `pyfabricops.items.environments_gen2` module (renamed to `environments` in
+  an earlier refactor), which made `mkdocs build` fail outright and broke
+  the entire generated API reference, not just that one page.
+- `create_workspace_custom_pool()` docstring documented a `workspace_custom_pool`
+  parameter that isn't part of its signature (copy-pasted from
+  `update_workspace_custom_pool`), and mislabeled `display_name` in the
+  example. Corrected the `Args`, `Returns`, and example to match the actual
+  function.
+
 ---
 
 ## [0.6.0] - 2026-05-06

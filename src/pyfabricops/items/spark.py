@@ -160,8 +160,7 @@ def create_workspace_custom_pool(
 
     Args:
         workspace (str): The workspace name or ID.
-        workspace_custom_pool (str): The name or ID of the workspace custom pool to update.
-        display_name (str, optional): The new display name for the workspace custom pool.
+        display_name (str, optional): The display name for the new workspace custom pool.
         auto_scale_enabled (bool, optional): Whether auto-scaling is enabled.
         min_node_count (int, optional): The minimum number of nodes.
         max_node_count (int, optional): The maximum number of nodes.
@@ -174,13 +173,13 @@ def create_workspace_custom_pool(
             If False, returns a list of dictionaries.
 
     Returns:
-        (Union[DataFrame, Dict[str, Any], None]): The updated workspace custom pool details if successful, otherwise None.
+        (Union[DataFrame, Dict[str, Any], None]): The created workspace custom pool details if successful, otherwise None.
 
     Examples:
         ```python
         create_workspace_custom_pool(
             'MyProjectWorkspace',
-            'MyCustomPool',
+            'MyNewCustomPool',
             auto_scale_enabled=True,
             min_node_count=1,
             max_node_count=10,
