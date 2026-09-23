@@ -23,6 +23,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   deleting is not supported yet, and needs nothing once it is gone. Git must
   be on PATH and the baseline commit in the local history; a shallow clone
   may lack it.
+- Deployment state: `deploy_all_items(state_backend=..., environment=...)`
+  takes the baseline from the last successful deployment to the environment,
+  instead of a manual `baseline_commit`. The state keeps one commit per item
+  type, so a run limited by `item_types` advances only its types and a later
+  full run still deploys what changed in the others. HEAD is recorded only
+  when every item succeeded; a type never deployed gets every item. A state
+  recorded for another workspace is ignored. `LocalJsonStateBackend` keeps
+  states as JSON files in a folder; any object with `load(environment)` and
+  `save(environment, state)` is a `DeploymentStateBackend`. States hold no
+  secrets.
 - `set_lro_options()` — configures the long-running operation timeout
   (default 600 s) and the maximum polling interval (default 5 s).
 - `get_item_definition()` accepts an optional `format` (e.g. `"TMDL"`).

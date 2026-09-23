@@ -3,9 +3,10 @@ Source changes: which items changed in Git since a baseline commit.
 
 ``ItemResolver`` maps changed files to the item folders they belong to, and
 ``GitChangeDetector`` asks git which files changed between a baseline commit
-and HEAD and whether each changed item was added, modified or deleted. Both
-only read. Git runs as a subprocess, so selective deployment needs git on
-PATH and the baseline commit in the local history.
+and HEAD and whether each changed item was added, modified or deleted.
+``head_commit`` and ``has_uncommitted_changes`` tell what a deployment state
+records. Everything here only reads. Git runs as a subprocess, so selective
+deployment needs git on PATH and the baseline commit in the local history.
 
 Internal for now: nothing here is exported from ``pyfabricops``.
 """
@@ -20,7 +21,13 @@ from pathlib import PurePosixPath
 from ..helpers.deployment_plan import SourceChange
 from ..utils.exceptions import ConfigurationError
 
-__all__ = ["GitChangeDetector", "ItemChange", "ItemResolver"]
+__all__ = [
+    "GitChangeDetector",
+    "ItemChange",
+    "ItemResolver",
+    "has_uncommitted_changes",
+    "head_commit",
+]
 
 
 @dataclass(frozen=True)
@@ -91,44 +98,39 @@ class ItemResolver:
 
 class GitChangeDetector:
     """
-    Find the items that changed in Git between a baseline commit and HEAD.
+    Find the items that changed in Git between a baseline and a target.
 
-    Git runs in ``path`` and only reads. The baseline is resolved to a
-    commit ID once, so a branch or tag cannot move during the run.
+    Git runs in ``path`` and only reads. Both commits are resolved to
+    commit IDs once, so a branch or tag cannot move during the run.
 
     Args:
         path (str): The folder that holds the items, inside a Git repository.
-        baseline_commit (str): The commit to compare HEAD with: a commit ID,
-            tag or branch.
+        baseline_commit (str): The commit to compare from: a commit ID, tag
+            or branch.
+        target_commit (str, optional): The commit to compare to. Defaults to
+            ``"HEAD"``.
 
     Raises:
         ConfigurationError: If git cannot run, ``path`` is not inside a Git
-            repository, or the baseline commit is not in its history.
+            repository, or a commit is not in its history.
     """
 
-    def __init__(self, path: str, baseline_commit: str) -> None:
-        self._path = path
-        if baseline_commit.startswith("-"):
-            raise ConfigurationError(f"'{baseline_commit}' is not a commit.")
-        self._run(
-            "rev-parse",
-            "--show-toplevel",
-            error=f"{path} is not inside a Git repository.",
+    def __init__(
+        self, path: str, baseline_commit: str, target_commit: str = "HEAD"
+    ) -> None:
+        self._git = _Git(path)
+        self._git.check_repository()
+        self._baseline = self._git.commit_id(
+            baseline_commit,
+            error=(
+                f"Commit '{baseline_commit}' is not in the Git history of "
+                f"{path}. A shallow clone may lack it: fetch the history that "
+                "contains it."
+            ),
         )
-        self._baseline = (
-            self._run(
-                "rev-parse",
-                "--verify",
-                "--quiet",
-                f"{baseline_commit}^{{commit}}",
-                error=(
-                    f"Commit '{baseline_commit}' is not in the Git history of "
-                    f"{path}. A shallow clone may lack it: fetch the history "
-                    "that contains it."
-                ),
-            )
-            .decode()
-            .strip()
+        self._target = self._git.commit_id(
+            target_commit,
+            error=f"Commit '{target_commit}' is not in the Git history of {path}.",
         )
 
     @property
@@ -136,12 +138,17 @@ class GitChangeDetector:
         """The ID of the baseline commit."""
         return self._baseline
 
+    @property
+    def target(self) -> str:
+        """The ID of the target commit."""
+        return self._target
+
     def changed_items(self, resolver: ItemResolver) -> list[ItemChange]:
         """
-        List the items with changed files between the baseline and HEAD.
+        List the items with changed files between the baseline and target.
 
-        An item folder missing at the baseline was added, one missing at
-        HEAD was deleted, and any other was modified, even when all its
+        An item folder missing at the baseline was added, one missing at the
+        target was deleted, and any other was modified, even when all its
         changed files are new.
 
         Args:
@@ -150,17 +157,17 @@ class GitChangeDetector:
         Returns:
             list[ItemChange]: Each changed item once, in path order.
         """
-        output = self._run(
+        output = self._git.run(
             "diff",
             "--name-only",
             "-z",
             "--no-renames",
             "--relative",
             self._baseline,
-            "HEAD",
+            self._target,
             "--",
             ".",
-            error=f"Could not compare commit {self._baseline} with HEAD.",
+            error=f"Could not compare commit {self._baseline} with {self._target}.",
         )
         paths = [path for path in output.decode("utf-8").split("\0") if path]
         return [
@@ -181,7 +188,7 @@ class GitChangeDetector:
         Raises:
             ConfigurationError: If the file did not exist at the baseline.
         """
-        return self._run(
+        return self._git.run(
             "cat-file",
             "blob",
             f"{self._baseline}:./{path}",
@@ -191,28 +198,106 @@ class GitChangeDetector:
     def _classify(self, item_path: str) -> SourceChange:
         """Tell whether an item folder was added, modified or deleted."""
         at_baseline = self._exists(self._baseline, item_path)
-        at_head = self._exists("HEAD", item_path)
-        if at_baseline and at_head:
+        at_target = self._exists(self._target, item_path)
+        if at_baseline and at_target:
             return SourceChange.MODIFIED
-        return SourceChange.ADDED if at_head else SourceChange.DELETED
+        return SourceChange.ADDED if at_target else SourceChange.DELETED
 
     def _exists(self, commit: str, path: str) -> bool:
         """Tell whether a path exists at a commit."""
-        found = self._git(
+        return self._git.succeeds(
             "rev-parse", "--verify", "--quiet", f"{commit}:./{path}"
         )
-        return found.returncode == 0
 
-    def _run(self, *args: str, error: str) -> bytes:
+
+def head_commit(path: str) -> str:
+    """
+    Return the ID of the commit HEAD points to, in the repository of a folder.
+
+    Args:
+        path (str): A folder inside a Git repository.
+
+    Returns:
+        str: The commit ID.
+
+    Raises:
+        ConfigurationError: If git cannot run, the folder is not inside a Git
+            repository, or the repository has no commit yet.
+    """
+    git = _Git(path)
+    git.check_repository()
+    return git.commit_id(
+        "HEAD", error=f"The Git repository of {path} has no commit yet."
+    )
+
+
+def has_uncommitted_changes(path: str) -> bool:
+    """
+    Tell whether a folder has changes that are in no commit.
+
+    Untracked files count: a deployment reads them, but no commit has them.
+
+    Args:
+        path (str): A folder inside a Git repository.
+
+    Returns:
+        bool: True when ``git status`` lists anything under the folder.
+
+    Raises:
+        ConfigurationError: If git cannot run or the folder is not inside a
+            Git repository.
+    """
+    output = _Git(path).run(
+        "status",
+        "--porcelain",
+        "--",
+        ".",
+        error=f"{path} is not inside a Git repository.",
+    )
+    return bool(output.strip())
+
+
+class _Git:
+    """Runs git in a folder, only to read."""
+
+    def __init__(self, path: str) -> None:
+        self._path = path
+
+    def check_repository(self) -> None:
+        """Raise unless the folder is inside a Git repository."""
+        self.run(
+            "rev-parse",
+            "--show-toplevel",
+            error=f"{self._path} is not inside a Git repository.",
+        )
+
+    def commit_id(self, revision: str, *, error: str) -> str:
+        """Resolve a commit ID, tag or branch to the ID of its commit."""
+        if revision.startswith("-"):
+            raise ConfigurationError(f"'{revision}' is not a commit.")
+        output = self.run(
+            "rev-parse",
+            "--verify",
+            "--quiet",
+            f"{revision}^{{commit}}",
+            error=error,
+        )
+        return output.decode().strip()
+
+    def run(self, *args: str, error: str) -> bytes:
         """Run git and return its output, or raise ``error`` on failure."""
-        result = self._git(*args)
+        result = self._call(*args)
         if result.returncode != 0:
             detail = result.stderr.decode("utf-8", errors="replace").strip()
             raise ConfigurationError(f"{error} {detail}".strip())
         return result.stdout
 
-    def _git(self, *args: str) -> subprocess.CompletedProcess[bytes]:
-        """Run git in the compared folder, capturing its output."""
+    def succeeds(self, *args: str) -> bool:
+        """Tell whether git exits without an error."""
+        return self._call(*args).returncode == 0
+
+    def _call(self, *args: str) -> subprocess.CompletedProcess[bytes]:
+        """Run git in the folder, capturing its output."""
         try:
             return subprocess.run(
                 ["git", "-C", self._path, *args],

@@ -167,6 +167,11 @@ from .helpers.deployment import (
     DeploymentReport,
     DeploymentResult,
 )
+from .helpers.deployment_state import (
+    DeploymentState,
+    DeploymentStateBackend,
+    LocalJsonStateBackend,
+)
 from .helpers.environments import (
     add_environment_external_library_from_pypi,
     deploy_all_environments,
@@ -443,6 +448,9 @@ __all__ = [
     "DEPLOY_ORDER",
     "DeploymentReport",
     "DeploymentResult",
+    "DeploymentState",
+    "DeploymentStateBackend",
+    "LocalJsonStateBackend",
     "PyFabricOpsFileNotFoundError",
     "InvalidParameterError",
     "OptionNotAvailableError",

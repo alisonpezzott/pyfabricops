@@ -13,6 +13,8 @@ from pyfabricops.helpers.source_changes import (
     GitChangeDetector,
     ItemChange,
     ItemResolver,
+    has_uncommitted_changes,
+    head_commit,
 )
 from pyfabricops.utils.exceptions import ConfigurationError
 from tests.helpers.git_repo import GitRepo
@@ -212,6 +214,61 @@ def test_a_file_missing_at_the_baseline_is_a_configuration_error(
 
     with pytest.raises(ConfigurationError, match="does not exist at commit"):
         detector.read_baseline_file("Nope.Report/.platform")
+
+
+def test_the_target_commit_bounds_the_comparison(
+    git_repo: GitRepo, workspace: Path
+) -> None:
+    """Changes after the target are not part of the comparison."""
+    baseline = git_repo.commit("empty")
+    _write_item(workspace, "First.Notebook")
+    target = git_repo.commit("first")
+    _write_item(workspace, "Later.Notebook")
+    git_repo.commit("later")
+
+    detector = GitChangeDetector(str(workspace), baseline, target)
+
+    assert detector.target == target
+    assert detector.changed_items(ItemResolver(_TYPES)) == [
+        ItemChange("Notebook", "First.Notebook", ADDED)
+    ]
+
+
+# ---------------------------------------------------------------------------
+# What a deployment state records
+# ---------------------------------------------------------------------------
+
+
+def test_head_commit_is_the_commit_head_points_to(
+    git_repo: GitRepo, workspace: Path
+) -> None:
+    """The commit a deployment state records as deployed."""
+    head = git_repo.commit("first")
+
+    assert head_commit(str(workspace)) == head
+
+
+def test_a_repository_without_commits_has_no_head(
+    git_repo: GitRepo, workspace: Path
+) -> None:
+    """Nothing to record before the first commit."""
+    with pytest.raises(ConfigurationError, match="has no commit yet"):
+        head_commit(str(workspace))
+
+
+def test_uncommitted_changes_count_only_under_the_folder(
+    git_repo: GitRepo, workspace: Path
+) -> None:
+    """Untracked files count too: a deployment reads them."""
+    item = _write_item(workspace, "Orders.Notebook")
+    git_repo.commit("first")
+    assert not has_uncommitted_changes(str(workspace))
+
+    (git_repo.root / "README.md").write_text("elsewhere", encoding="utf-8")
+    assert not has_uncommitted_changes(str(workspace))
+
+    (item / "draft.py").write_text("untracked", encoding="utf-8")
+    assert has_uncommitted_changes(str(workspace))
 
 
 # ---------------------------------------------------------------------------

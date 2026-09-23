@@ -16,6 +16,7 @@ import pytest
 
 from pyfabricops.api.api import ApiResult
 from pyfabricops.helpers.deployment import (
+    DEPLOY_ORDER,
     DeploymentExecutor,
     DeploymentReport,
     DeploymentResult,
@@ -26,6 +27,10 @@ from pyfabricops.helpers.deployment_plan import (
     DeploymentActionType,
     DeploymentPlan,
     DeploymentReason,
+)
+from pyfabricops.helpers.deployment_state import (
+    DeploymentState,
+    LocalJsonStateBackend,
 )
 from pyfabricops.helpers.items import deploy_all_items
 from pyfabricops.utils.exceptions import ConfigurationError
@@ -522,6 +527,7 @@ def test_type_specific_helpers_delegate_to_deploy_all_items(
 
 def test_deploy_all_items_delegates_to_the_engine() -> None:
     """The public function forwards every argument to the engine."""
+    backend = MagicMock()
     with patch(
         "pyfabricops.helpers.items._deploy_all",
         return_value=MagicMock(spec=DeploymentReport),
@@ -534,6 +540,8 @@ def test_deploy_all_items_delegates_to_the_engine() -> None:
             fail_fast=True,
             baseline_commit="abc123",
             repository_path="src",
+            state_backend=backend,
+            environment="dev",
         )
 
     engine.assert_called_once_with(
@@ -544,6 +552,8 @@ def test_deploy_all_items_delegates_to_the_engine() -> None:
         fail_fast=True,
         baseline_commit="abc123",
         repository_path="src",
+        state_backend=backend,
+        environment="dev",
     )
 
 
@@ -919,5 +929,260 @@ def test_selective_with_an_unknown_baseline_raises(
 
     with pytest.raises(ConfigurationError, match="shallow clone"):
         _deploy(root, baseline_commit="0" * 40)
+
+    fabric.resolve_workspace.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Deployment state: state_backend
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def state(tmp_path_factory: pytest.TempPathFactory) -> LocalJsonStateBackend:
+    """A local state folder, outside the repository."""
+    return LocalJsonStateBackend(tmp_path_factory.mktemp("state"))
+
+
+def _recorded(
+    state: LocalJsonStateBackend, environment: str
+) -> DeploymentState:
+    """The state recorded for an environment, which must exist."""
+    recorded = state.load(environment)
+    assert recorded is not None
+    return recorded
+
+
+def _change(item_dir: Path, content: str = "changed") -> None:
+    """Change the content file of an item written by _write_item."""
+    (item_dir / "content.txt").write_text(content, encoding="utf-8")
+
+
+def test_first_run_deploys_every_item_and_records_head(
+    git_repo: GitRepo,
+    root: Path,
+    fabric: SimpleNamespace,
+    state: LocalJsonStateBackend,
+) -> None:
+    """Without a state the run is full, which bootstraps the state."""
+    _write_item(root, "A.Notebook")
+    _write_item(root, "Sales.Report")
+    head = git_repo.commit("first")
+
+    report = _deploy(root, state_backend=state, environment="dev")
+
+    assert [r.action for r in report.results] == ["created", "created"]
+    recorded = _recorded(state, "dev")
+    assert recorded.source_commit == head
+    assert (recorded.workspace, recorded.workspace_id) == (
+        "Sales-DEV",
+        _WORKSPACE_ID,
+    )
+    assert dict(recorded.commits) == dict.fromkeys(DEPLOY_ORDER, head)
+    assert recorded.deployed_at_utc.endswith("Z")
+
+
+def test_the_state_makes_the_next_run_incremental(
+    git_repo: GitRepo,
+    root: Path,
+    fabric: SimpleNamespace,
+    state: LocalJsonStateBackend,
+) -> None:
+    """The next run deploys what changed since the recorded commit."""
+    fabric.list_items.return_value = [
+        {"id": "nb-a", "type": "Notebook", "displayName": "A"},
+        {"id": "nb-b", "type": "Notebook", "displayName": "B"},
+    ]
+    item = _write_item(root, "A.Notebook")
+    _write_item(root, "B.Notebook")
+    git_repo.commit("first")
+    _deploy(root, state_backend=state, environment="dev")
+
+    _change(item)
+    head = git_repo.commit("second")
+    report = _deploy(root, state_backend=state, environment="dev")
+
+    assert [(r.display_name, r.action) for r in report.results] == [
+        ("A", "updated")
+    ]
+    assert _recorded(state, "dev").source_commit == head
+
+
+def test_a_failed_run_leaves_the_state_where_it_was(
+    git_repo: GitRepo,
+    root: Path,
+    fabric: SimpleNamespace,
+    state: LocalJsonStateBackend,
+) -> None:
+    """State A, B fails, repository at C: the next run compares A to C."""
+    fabric.list_items.return_value = [
+        {"id": "nb-a", "type": "Notebook", "displayName": "A"},
+        {"id": "nb-b", "type": "Notebook", "displayName": "B"},
+    ]
+    a = _write_item(root, "A.Notebook")
+    b = _write_item(root, "B.Notebook")
+    first = git_repo.commit("A")
+    _deploy(root, state_backend=state, environment="dev")
+
+    _change(a)
+    git_repo.commit("B")
+    fabric.update.return_value = _failure("InvalidDefinition")
+    failed = _deploy(root, state_backend=state, environment="dev")
+    assert failed.failed
+    assert _recorded(state, "dev").source_commit == first
+
+    fabric.update.return_value = ApiResult(True, 200)
+    _change(b)
+    last = git_repo.commit("C")
+    report = _deploy(root, state_backend=state, environment="dev")
+
+    assert [r.display_name for r in report.results] == ["A", "B"]
+    assert _recorded(state, "dev").source_commit == last
+
+
+def test_a_partial_run_advances_only_its_types(
+    git_repo: GitRepo,
+    root: Path,
+    fabric: SimpleNamespace,
+    state: LocalJsonStateBackend,
+) -> None:
+    """Notebooks on every merge do not make the full run lose a Report."""
+    fabric.list_items.return_value = [
+        {"id": "nb-n", "type": "Notebook", "displayName": "N"},
+        {"id": "rp-r", "type": "Report", "displayName": "R"},
+    ]
+    notebook = _write_item(root, "N.Notebook")
+    report_dir = _write_item(root, "R.Report")
+    first = git_repo.commit("first")
+    _deploy(root, state_backend=state, environment="dev")
+
+    _change(notebook)
+    _change(report_dir)
+    second = git_repo.commit("second")
+    partial = _deploy(
+        root, state_backend=state, environment="dev", item_types=["Notebook"]
+    )
+
+    assert [r.display_name for r in partial.results] == ["N"]
+    commits = _recorded(state, "dev").commits
+    assert (commits["Notebook"], commits["Report"]) == (second, first)
+
+    full = _deploy(root, state_backend=state, environment="dev")
+
+    assert [r.display_name for r in full.results] == ["R"]
+    assert dict(_recorded(state, "dev").commits) == dict.fromkeys(
+        DEPLOY_ORDER, second
+    )
+
+
+def test_a_state_of_another_workspace_is_ignored(
+    git_repo: GitRepo,
+    root: Path,
+    fabric: SimpleNamespace,
+    state: LocalJsonStateBackend,
+) -> None:
+    """Its commits say nothing about this workspace: deploy every item."""
+    _write_item(root, "A.Notebook")
+    git_repo.commit("first")
+    _deploy(root, state_backend=state, environment="shared")
+
+    report = deploy_all_items(
+        "Sales-PRD",
+        str(root),
+        start_path=str(root),
+        state_backend=state,
+        environment="shared",
+    )
+
+    assert [r.display_name for r in report.results] == ["A"]
+    assert _recorded(state, "shared").workspace == "Sales-PRD"
+
+
+def test_an_explicit_baseline_wins_over_the_state(
+    git_repo: GitRepo,
+    root: Path,
+    fabric: SimpleNamespace,
+    state: LocalJsonStateBackend,
+) -> None:
+    """baseline_commit still forces where the comparison starts."""
+    b = _write_item(root, "B.Notebook")
+    zero = git_repo.commit("B")
+    _write_item(root, "A.Notebook")
+    git_repo.commit("A")
+    _deploy(root, state_backend=state, environment="dev")
+
+    _change(b)
+    git_repo.commit("B changed")
+    report = _deploy(
+        root, state_backend=state, environment="dev", baseline_commit=zero
+    )
+
+    assert [r.display_name for r in report.results] == ["A", "B"]
+
+
+def test_a_run_with_nothing_to_deploy_still_advances_the_state(
+    git_repo: GitRepo,
+    root: Path,
+    fabric: SimpleNamespace,
+    state: LocalJsonStateBackend,
+) -> None:
+    """HEAD is recorded without a Fabric call; the state has the ID."""
+    _write_item(root, "A.Notebook")
+    git_repo.commit("first")
+    _deploy(root, state_backend=state, environment="dev")
+
+    (git_repo.root / "README.md").write_text("docs", encoding="utf-8")
+    head = git_repo.commit("docs only")
+    fabric.resolve_workspace.reset_mock()
+    report = _deploy(root, state_backend=state, environment="dev")
+
+    assert report.results == []
+    assert _recorded(state, "dev").source_commit == head
+    fabric.resolve_workspace.assert_not_called()
+
+
+def test_the_environment_defaults_to_the_workspace(
+    git_repo: GitRepo,
+    root: Path,
+    fabric: SimpleNamespace,
+    state: LocalJsonStateBackend,
+) -> None:
+    """Without an environment the state is kept under the workspace."""
+    _write_item(root, "A.Notebook")
+    git_repo.commit("first")
+
+    _deploy(root, state_backend=state)
+
+    assert _recorded(state, "Sales-DEV").workspace == "Sales-DEV"
+
+
+def test_uncommitted_changes_are_warned_about(
+    git_repo: GitRepo,
+    root: Path,
+    fabric: SimpleNamespace,
+    state: LocalJsonStateBackend,
+) -> None:
+    """The state records HEAD, which lacks what is not committed."""
+    item = _write_item(root, "A.Notebook")
+    git_repo.commit("first")
+    _change(item, "not committed")
+
+    with patch(f"{_ENGINE}.logger") as logger:
+        _deploy(root, state_backend=state, environment="dev")
+
+    warnings = " ".join(str(c.args[0]) for c in logger.warning.call_args_list)
+    assert "changes in no commit" in warnings
+
+
+def test_the_state_needs_the_items_in_a_git_repository(
+    root: Path, fabric: SimpleNamespace, state: LocalJsonStateBackend
+) -> None:
+    """No HEAD to record without Git: stop before any Fabric call."""
+    if shutil.which("git") is None:
+        pytest.skip("git is not installed")
+    _write_item(root, "A.Notebook")
+
+    with pytest.raises(ConfigurationError, match="not inside a Git"):
+        _deploy(root, state_backend=state, environment="dev")
 
     fabric.resolve_workspace.assert_not_called()

@@ -2,20 +2,22 @@
 Deployment engine shared by the ``deploy_all_*`` helpers.
 
 A run plans first, then applies. It selects the local items (every item, or
-only those changed in Git since a baseline commit), lists the workspace
-items and folders once, and builds a ``DeploymentPlan`` from them without
-changing anything. ``DeploymentExecutor`` then applies the plan, and the run
-returns a ``DeploymentReport`` with the outcome of each item, so a partial
-failure reaches the caller instead of being logged and lost. Nothing is ever
-deleted.
+only those changed in Git since a baseline commit, which a deployment state
+can supply per item type), lists the workspace items and folders once, and
+builds a ``DeploymentPlan`` from them without changing anything.
+``DeploymentExecutor`` then applies the plan, and the run returns a
+``DeploymentReport`` with the outcome of each item, so a partial failure
+reaches the caller instead of being logged and lost. The state is recorded
+only when every item succeeded. Nothing is ever deleted.
 """
 
 from __future__ import annotations
 
 import json
 import time
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field, fields
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal, TypeAlias, cast
 
@@ -32,10 +34,16 @@ from ..helpers.deployment_plan import (
     SourceChange,
     SourceItem,
 )
+from ..helpers.deployment_state import (
+    DeploymentState,
+    DeploymentStateBackend,
+)
 from ..helpers.source_changes import (
     GitChangeDetector,
     ItemChange,
     ItemResolver,
+    has_uncommitted_changes,
+    head_commit,
 )
 from ..items.items import list_items
 from ..utils.exceptions import (
@@ -426,80 +434,97 @@ def _read_changed_items(
     *,
     start_path: str | None,
     baseline_commit: str,
+    target_commit: str,
     repository_path: str,
 ) -> list[SourceItem]:
     """
-    Describe the items changed in Git since the baseline commit.
+    Describe the items of the given types changed in Git between commits.
 
     Changes are found in ``repository_path`` and the items are read from the
-    same place under ``path``, which may be a staging copy. Changed items
-    come in dependency order, deleted items after them with dependents
-    first.
+    same place under ``path``, which may be a staging copy.
 
     Raises:
-        ConfigurationError: If git cannot compare the baseline with HEAD.
+        ConfigurationError: If git cannot compare the commits.
     """
-    detector = GitChangeDetector(repository_path, baseline_commit)
-    changes = detector.changed_items(ItemResolver(item_types))
-    rank = {item_type: n for n, item_type in enumerate(item_types)}
-    kept = sorted(
-        (c for c in changes if c.change is not SourceChange.DELETED),
-        key=lambda c: (rank[c.item_type], c.path),
-    )
-    deleted = sorted(
-        (c for c in changes if c.change is SourceChange.DELETED),
-        key=lambda c: (-rank[c.item_type], c.path),
+    detector = GitChangeDetector(
+        repository_path, baseline_commit, target_commit
     )
     return [
-        _read_source_item(
+        _read_deleted_item(detector, c, path=path, start_path=start_path)
+        if c.change is SourceChange.DELETED
+        else _read_source_item(
             c.item_type,
             Path(path, c.path).as_posix(),
             start_path=start_path,
             change=c.change,
         )
-        for c in kept
-    ] + [
-        _read_deleted_item(detector, c, path=path, start_path=start_path)
-        for c in deleted
+        for c in detector.changed_items(ItemResolver(item_types))
     ]
+
+
+def _in_deployment_order(
+    items: list[SourceItem], item_types: Sequence[str]
+) -> list[SourceItem]:
+    """Order items by type and path; deleted ones last, dependents first."""
+    rank = {item_type: n for n, item_type in enumerate(item_types)}
+    kept = sorted(
+        (i for i in items if i.change is not SourceChange.DELETED),
+        key=lambda i: (rank[i.item_type], i.source_path),
+    )
+    deleted = sorted(
+        (i for i in items if i.change is SourceChange.DELETED),
+        key=lambda i: (-rank[i.item_type], i.source_path),
+    )
+    return kept + deleted
 
 
 def _select_items(
     path: str,
-    item_types: Sequence[str] | None,
+    baselines: Mapping[str, str | None],
     *,
     start_path: str | None,
-    baseline_commit: str | None,
+    target_commit: str,
     repository_path: str | None,
 ) -> list[SourceItem]:
     """
     Select the items of a run and describe them for the planner.
 
-    Every local item of the given types, or with ``baseline_commit`` only
-    those changed since that commit. Logs when there is none.
+    ``baselines`` maps each item type, in dependency order, to the commit
+    its changes are compared from. A type without one gets every local item
+    of that type; a type with one gets its items changed since then. Items
+    come in dependency order, deleted ones last with dependents first.
     """
-    types = _ordered_types(item_types)
-    if baseline_commit is None:
-        items = _read_source_items(
-            _find_local_items(path, types), start_path=start_path
-        )
-        if not items:
-            logger.warning(f"No items to deploy were found under {path}.")
-        return items
+    types = list(baselines)
+    every = [t for t in types if baselines[t] is None]
+    groups: dict[str, list[str]] = {}
+    for item_type in types:
+        baseline = baselines[item_type]
+        if baseline is not None:
+            groups.setdefault(baseline, []).append(item_type)
+
+    items = _read_source_items(
+        _find_local_items(path, every), start_path=start_path
+    )
+    if not groups and not items:
+        logger.warning(f"No items to deploy were found under {path}.")
 
     compared = repository_path or path
-    items = _read_changed_items(
-        path,
-        types,
-        start_path=start_path,
-        baseline_commit=baseline_commit,
-        repository_path=compared,
-    )
-    logger.info(
-        f"{len(items)} item(s) changed under {compared} since "
-        f"{baseline_commit}."
-    )
-    return items
+    for baseline, group in groups.items():
+        changed = _read_changed_items(
+            path,
+            group,
+            start_path=start_path,
+            baseline_commit=baseline,
+            target_commit=target_commit,
+            repository_path=compared,
+        )
+        scope = "" if len(group) == len(types) else f" ({', '.join(group)})"
+        logger.info(
+            f"{len(changed)} item(s) changed under {compared} since "
+            f"{baseline}{scope}."
+        )
+        items += changed
+    return _in_deployment_order(items, types)
 
 
 def _describe_error(result: ApiResult) -> str:
@@ -866,6 +891,121 @@ class DeploymentExecutor:
         return results
 
 
+def _utc_now() -> str:
+    """Return the current UTC time as ``YYYY-MM-DDTHH:MM:SSZ``."""
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+@dataclass
+class _StateTracker:
+    """The state of an environment, read before a run and recorded after."""
+
+    backend: DeploymentStateBackend
+    environment: str
+    workspace: str
+    head: str
+    previous: DeploymentState | None
+
+    @classmethod
+    def open(
+        cls,
+        backend: DeploymentStateBackend,
+        *,
+        environment: str,
+        workspace: str,
+        repository_path: str,
+    ) -> _StateTracker:
+        """
+        Resolve HEAD and load the state of the environment.
+
+        A state recorded for another workspace is ignored, so this workspace
+        gets every item.
+
+        Raises:
+            ConfigurationError: If git cannot resolve HEAD in
+                ``repository_path``, or the stored state is invalid.
+        """
+        head = head_commit(repository_path)
+        if has_uncommitted_changes(repository_path):
+            logger.warning(
+                f"{repository_path} has changes in no commit; the deployment "
+                f"state will still record commit {head[:12]}."
+            )
+        previous = backend.load(environment)
+        if previous is not None and not previous.targets(workspace):
+            logger.warning(
+                f"Deployment state '{environment}' was recorded for workspace "
+                f"'{previous.workspace}', not '{workspace}'; ignoring it."
+            )
+            previous = None
+        return cls(backend, environment, workspace, head, previous)
+
+    def baselines(
+        self, item_types: Sequence[str], baseline_commit: str | None
+    ) -> dict[str, str | None]:
+        """Give each type the baseline passed, else the state's commit."""
+        if baseline_commit is not None:
+            return dict.fromkeys(item_types, baseline_commit)
+        if self.previous is None:
+            logger.info(
+                f"No usable deployment state '{self.environment}': deploying "
+                "every item."
+            )
+            return dict.fromkeys(item_types, None)
+
+        baselines = {t: self.previous.commits.get(t) for t in item_types}
+        unrecorded = [t for t in item_types if baselines[t] is None]
+        if unrecorded:
+            logger.info(
+                f"Deployment state '{self.environment}' has no deployment of "
+                f"{', '.join(unrecorded)} yet: deploying every item of those "
+                "types."
+            )
+        return baselines
+
+    def record(
+        self, report: DeploymentReport, item_types: Sequence[str]
+    ) -> None:
+        """Record HEAD as deployed for the run's types, if all succeeded."""
+        if not report.ok:
+            logger.warning(
+                f"Deployment state '{self.environment}' not updated: not "
+                "every item succeeded, so the next run compares from the same "
+                "commits."
+            )
+            return
+
+        workspace_id = report.workspace_id or (
+            self.previous.workspace_id
+            if self.previous is not None
+            else resolve_workspace(self.workspace)
+        )
+        if workspace_id is None:
+            logger.warning(
+                f"Deployment state '{self.environment}' not updated: "
+                f"workspace '{self.workspace}' not found."
+            )
+            return
+
+        commits = dict(self.previous.commits) if self.previous else {}
+        commits.update(dict.fromkeys(item_types, self.head))
+        self.backend.save(
+            self.environment,
+            DeploymentState(
+                environment=self.environment,
+                workspace=self.workspace,
+                workspace_id=workspace_id,
+                source_commit=self.head,
+                commits=commits,
+                deployed_at_utc=_utc_now(),
+            ),
+        )
+        logger.info(
+            f"Deployment state '{self.environment}' updated to commit "
+            f"{self.head[:12]}."
+        )
+
+
 def _deploy_all(
     workspace: str,
     path: str,
@@ -875,22 +1015,73 @@ def _deploy_all(
     fail_fast: bool = False,
     baseline_commit: str | None = None,
     repository_path: str | None = None,
+    state_backend: DeploymentStateBackend | None = None,
+    environment: str | None = None,
+) -> DeploymentReport:
+    """
+    Select, plan and apply; with a state backend, record the run.
+
+    Without a state backend every type compares from ``baseline_commit``, or
+    deploys every item without one. With a backend, each type compares from
+    its last successful deployment unless ``baseline_commit`` is given, and
+    the run is recorded when every item succeeded. See ``deploy_all_items``
+    for the public contract.
+    """
+    types = _ordered_types(item_types)
+    if state_backend is None:
+        return _deploy_selected(
+            workspace,
+            path,
+            dict.fromkeys(types, baseline_commit),
+            start_path=start_path,
+            fail_fast=fail_fast,
+            target_commit="HEAD",
+            repository_path=repository_path,
+        )
+
+    tracker = _StateTracker.open(
+        state_backend,
+        environment=environment or workspace,
+        workspace=workspace,
+        repository_path=repository_path or path,
+    )
+    report = _deploy_selected(
+        workspace,
+        path,
+        tracker.baselines(types, baseline_commit),
+        start_path=start_path,
+        fail_fast=fail_fast,
+        target_commit=tracker.head,
+        repository_path=repository_path,
+    )
+    tracker.record(report, types)
+    return report
+
+
+def _deploy_selected(
+    workspace: str,
+    path: str,
+    baselines: Mapping[str, str | None],
+    *,
+    start_path: str | None,
+    fail_fast: bool,
+    target_commit: str,
+    repository_path: str | None,
 ) -> DeploymentReport:
     """
     Plan, then apply, the deployment of the selected local items.
 
-    Until the plan is built the run only reads: the local items, Git when
-    ``baseline_commit`` is given, and one listing of the workspace. Every
-    change is made by the executor. See ``deploy_all_items`` for the public
-    contract.
+    Until the plan is built the run only reads: the local items, Git for
+    the types with a baseline, and one listing of the workspace. Every
+    change is made by the executor.
     """
     report = DeploymentReport(workspace=workspace)
 
     items = _select_items(
         path,
-        item_types,
+        baselines,
         start_path=start_path,
-        baseline_commit=baseline_commit,
+        target_commit=target_commit,
         repository_path=repository_path,
     )
     if not items:

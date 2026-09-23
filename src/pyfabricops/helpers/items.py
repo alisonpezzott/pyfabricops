@@ -7,6 +7,7 @@ from pandas import DataFrame
 
 from ..core.workspaces import resolve_workspace
 from ..helpers.deployment import DeploymentReport, _deploy_all
+from ..helpers.deployment_state import DeploymentStateBackend
 from ..helpers.folders import (
     create_folders_from_path_string,
     resolve_folder_from_id_to_path,
@@ -249,6 +250,8 @@ def deploy_all_items(
     fail_fast: bool = False,
     baseline_commit: str | None = None,
     repository_path: str | None = None,
+    state_backend: DeploymentStateBackend | None = None,
+    environment: str | None = None,
 ) -> DeploymentReport:
     """
     Deploy all items found under a local path to a workspace.
@@ -266,6 +269,13 @@ def deploy_all_items(
     because deleting is not supported yet; once it is gone, it needs
     nothing.
 
+    With ``state_backend``, the baseline comes from the last successful
+    deployment to ``environment``, kept per item type: a type deploys what
+    changed since it was last deployed, or every item when it never was.
+    When every item succeeds, HEAD is recorded for the types of the run;
+    otherwise the state stays, and the next run compares from the same
+    commits.
+
     Args:
         workspace (str): The name or ID of the workspace.
         path (str): The path to the items.
@@ -282,17 +292,24 @@ def deploy_all_items(
         repository_path (str, optional): The folder of the Git repository
             that ``path`` was copied from, such as the one given to
             ``copy_to_staging``: changes are found there and the items read
-            from ``path``. Only used with ``baseline_commit``. Defaults to
-            ``path``.
+            from ``path``. Only used with ``baseline_commit`` or
+            ``state_backend``. Defaults to ``path``.
+        state_backend (DeploymentStateBackend, optional): Where the
+            deployment state is kept, such as a ``LocalJsonStateBackend``.
+            An explicit ``baseline_commit`` still wins over the state.
+            Defaults to None: no state.
+        environment (str, optional): The name the state is kept under, such
+            as ``'prod'``. Defaults to ``workspace``.
 
     Returns:
         DeploymentReport: The outcome of each item; ``report.failed`` lists
             the items that failed.
 
     Raises:
-        ConfigurationError: With ``baseline_commit``, if git cannot run, the
-            folder is not in a Git repository or the commit is not in its
-            history (a shallow clone may lack it).
+        ConfigurationError: With ``baseline_commit`` or ``state_backend``, if
+            git cannot run, the folder is not in a Git repository or a commit
+            is not in its history (a shallow clone may lack it); with
+            ``state_backend``, also if the stored state is invalid.
 
     Examples:
         ```python
@@ -314,6 +331,16 @@ def deploy_all_items(
             baseline_commit=last_deployed_commit,
             repository_path='workspace',
         )
+
+        # The same, with the baseline kept by the deployment state
+        report = deploy_all_items(
+            'Sales-PRD',
+            staging,
+            start_path=staging,
+            repository_path='workspace',
+            state_backend=LocalJsonStateBackend('.pyfabricops/state'),
+            environment='prod',
+        )
         ```
     """
     return _deploy_all(
@@ -324,4 +351,6 @@ def deploy_all_items(
         fail_fast=fail_fast,
         baseline_commit=baseline_commit,
         repository_path=repository_path,
+        state_backend=state_backend,
+        environment=environment,
     )
