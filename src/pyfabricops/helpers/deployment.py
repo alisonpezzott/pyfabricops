@@ -1083,6 +1083,7 @@ def _deploy_all(
         items,
         fail_fast=fail_fast,
         deployed_items=tracker.deployed_items if tracker else None,
+        root=path,
     )
     if tracker is not None:
         tracker.record(report, types, items)
@@ -1136,6 +1137,7 @@ def _plan_all(
     planner = DeploymentPlanner(
         existing_items=index.items.keys(),
         deployed_items=tracker.deployed_items if tracker else None,
+        root=path,
     )
     return planner.plan(items)
 
@@ -1210,12 +1212,14 @@ def _deploy_items(
     *,
     fail_fast: bool,
     deployed_items: Mapping[tuple[str, str], DeployedItem] | None = None,
+    root: str | None = None,
 ) -> DeploymentReport:
     """
     Plan, then apply, the deployment of the selected items.
 
     Until the plan is built the run only reads: one listing of the
-    workspace. Every change is made by the executor.
+    workspace. Every change is made by the executor. ``root`` is the folder
+    the items were read from, for the plan details.
     """
     report = DeploymentReport(workspace=workspace)
     if not items:
@@ -1236,7 +1240,9 @@ def _deploy_items(
         )
 
     planner = DeploymentPlanner(
-        existing_items=index.items.keys(), deployed_items=deployed_items
+        existing_items=index.items.keys(),
+        deployed_items=deployed_items,
+        root=root,
     )
     plan = planner.plan(items)
 

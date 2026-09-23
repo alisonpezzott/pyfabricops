@@ -65,8 +65,9 @@ def _changed(
 def _plan(
     items: list[SourceItem],
     existing: Collection[tuple[str, str]] = (),
+    root: str | None = None,
 ) -> DeploymentPlan:
-    return DeploymentPlanner(existing_items=existing).plan(items)
+    return DeploymentPlanner(existing_items=existing, root=root).plan(items)
 
 
 # ---------------------------------------------------------------------------
@@ -260,6 +261,57 @@ def test_a_workspace_item_is_deleted_once() -> None:
     assert [a.action for a in plan.actions] == [DELETE, NOOP]
     assert plan.actions[1].detail == (
         "Its deletion is planned with workspace/A/Old.Notebook."
+    )
+
+
+def test_details_show_other_item_folders_relative_to_the_root() -> None:
+    """The prefix of a staging folder would only add noise to each detail."""
+    moved = _plan(
+        [
+            _changed("Orders", SourceChange.DELETED, folder="Sales"),
+            _changed("Orders", SourceChange.ADDED, folder="Finance"),
+        ],
+        existing={("Notebook", "Orders")},
+        root="workspace",
+    )
+    deleted_twice = _plan(
+        [
+            _changed("Old", SourceChange.DELETED, folder="A"),
+            _changed("Old", SourceChange.DELETED, folder="B"),
+        ],
+        existing={("Notebook", "Old")},
+        root="workspace",
+    )
+    duplicate = _plan(
+        [_item("Orders", folder="A"), _item("Orders", folder="B")],
+        root="workspace",
+    )
+
+    assert moved.actions[1].detail == (
+        "Still defined at Finance/Orders.Notebook."
+    )
+    assert deleted_twice.actions[1].detail == (
+        "Its deletion is planned with A/Old.Notebook."
+    )
+    assert duplicate.actions[1].detail == (
+        "Orders.Notebook is also defined at A/Orders.Notebook; deploying "
+        "both would overwrite the same item."
+    )
+
+
+def test_a_folder_outside_the_root_is_shown_as_given() -> None:
+    """Nothing to show it relative to, so the full path stays."""
+    plan = _plan(
+        [
+            _changed("Orders", SourceChange.DELETED, folder="Sales"),
+            _changed("Orders", SourceChange.ADDED, folder="Finance"),
+        ],
+        existing={("Notebook", "Orders")},
+        root="elsewhere",
+    )
+
+    assert plan.actions[1].detail == (
+        "Still defined at workspace/Finance/Orders.Notebook."
     )
 
 

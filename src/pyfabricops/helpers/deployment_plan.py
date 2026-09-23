@@ -17,6 +17,7 @@ from __future__ import annotations
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import PurePath
 
 __all__ = [
     "DeploymentAction",
@@ -257,6 +258,9 @@ class DeploymentPlanner:
         deployed_items (Mapping[tuple[str, str], DeployedItem], optional):
             What the last successful deployment sent for each item, from the
             deployment state. Defaults to nothing known.
+        root (str, optional): The folder the items were read from. A detail
+            that points to another item folder shows it relative to this
+            one. Defaults to showing it as given.
 
     Examples:
         ```python
@@ -273,9 +277,12 @@ class DeploymentPlanner:
         self,
         existing_items: Collection[tuple[str, str]],
         deployed_items: Mapping[tuple[str, str], DeployedItem] | None = None,
+        *,
+        root: str | None = None,
     ) -> None:
         self._existing_items = frozenset(existing_items)
         self._deployed_items = dict(deployed_items or {})
+        self._root = root
 
     def plan(self, items: Iterable[SourceItem]) -> DeploymentPlan:
         """
@@ -328,8 +335,8 @@ class DeploymentPlanner:
                 item,
                 DeploymentActionType.BLOCKED,
                 f"{display_name}.{item.item_type} is also defined at "
-                f"{defined[identity]}; deploying both would overwrite the "
-                "same item.",
+                f"{self._where(defined[identity])}; deploying both would "
+                "overwrite the same item.",
             )
         defined[identity] = item.source_path
 
@@ -367,13 +374,14 @@ class DeploymentPlanner:
             return _action(
                 item,
                 DeploymentActionType.NOOP,
-                f"Still defined at {defined[identity]}.",
+                f"Still defined at {self._where(defined[identity])}.",
             )
         if identity in deleted:
             return _action(
                 item,
                 DeploymentActionType.NOOP,
-                f"Its deletion is planned with {deleted[identity]}.",
+                "Its deletion is planned with "
+                f"{self._where(deleted[identity])}.",
             )
         deleted[identity] = item.source_path
 
@@ -389,6 +397,15 @@ class DeploymentPlanner:
             DeploymentActionType.NOOP,
             "Deleted from the source and not in the workspace.",
         )
+
+    def _where(self, source_path: str) -> str:
+        """Show an item folder relative to the root, when it is inside it."""
+        if self._root is None:
+            return source_path
+        try:
+            return PurePath(source_path).relative_to(self._root).as_posix()
+        except ValueError:
+            return source_path
 
 
 # Why an item is in the plan, from how it changed; None means a full run.

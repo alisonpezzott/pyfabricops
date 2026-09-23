@@ -380,7 +380,9 @@ def test_duplicate_identity_fails_the_second_item(
     report = _deploy(root)
 
     assert [r.action for r in report.results] == ["created", "failed"]
-    assert "is also defined at" in (report.results[1].error or "")
+    assert "is also defined at A/Orders.Notebook;" in (
+        report.results[1].error or ""
+    )
     assert fabric.create.call_count == 1
 
 
@@ -1370,6 +1372,27 @@ def test_plan_all_items_with_nothing_selected_calls_nothing(
     """An empty selection is an empty plan, without a Fabric call."""
     assert _plan(root) == DeploymentPlan()
     fabric.resolve_workspace.assert_not_called()
+
+
+def test_plan_details_show_folders_relative_to_the_items_path(
+    git_repo: GitRepo, root: Path, fabric: SimpleNamespace
+) -> None:
+    """A moved item points to its new folder under path, not the full path."""
+    fabric.list_items.return_value = [
+        {"id": "nb-a", "type": "Notebook", "displayName": "A"},
+    ]
+    _write_item(root, "A.Notebook")
+    baseline = git_repo.commit("first")
+    (root / "Sales").mkdir()
+    (root / "A.Notebook").rename(root / "Sales" / "A.Notebook")
+    git_repo.commit("move")
+
+    plan = _plan(root, baseline_commit=baseline)
+
+    assert [(a.action, a.detail) for a in plan.actions] == [
+        (DeploymentActionType.UPDATE, None),
+        (DeploymentActionType.NOOP, "Still defined at Sales/A.Notebook."),
+    ]
 
 
 def test_plan_all_items_needs_the_workspace(
