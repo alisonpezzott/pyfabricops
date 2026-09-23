@@ -40,6 +40,9 @@ class DeploymentActionType(str, Enum):
     Attributes:
         CREATE: Create the item, which is not in the workspace yet.
         UPDATE: Replace the definition of the item already in the workspace.
+        MOVE: Move the item to its folder, or to the workspace root. Its
+            definition is the one the last successful deployment sent, so it
+            is not sent again.
         DELETE: Delete the item from the workspace, because it was deleted
             from the source. The executor refuses it until a policy allows
             deletions.
@@ -51,6 +54,7 @@ class DeploymentActionType(str, Enum):
 
     CREATE = "CREATE"
     UPDATE = "UPDATE"
+    MOVE = "MOVE"
     DELETE = "DELETE"
     NOOP = "NOOP"
     BLOCKED = "BLOCKED"
@@ -289,9 +293,9 @@ class DeploymentPlanner:
         Plan one action per item.
 
         An item already in the workspace is updated and any other is
-        created, but an item whose definition and folder are those its last
-        successful deployment sent needs nothing. An item deleted from the
-        source is deleted from the
+        created. An item whose definition is the one its last successful
+        deployment sent needs nothing, or only a move when its folder
+        changed. An item deleted from the source is deleted from the
         workspace, or needs nothing when the workspace no longer has it or
         another item of the plan still defines it, as when its folder moved.
         An item whose display name is unknown is blocked, and so is an item
@@ -342,21 +346,36 @@ class DeploymentPlanner:
 
         if identity not in self._existing_items:
             return _action(item, DeploymentActionType.CREATE)
-        if self._unchanged(identity, item):
+        sent = self._sent_before(identity, item)
+        if sent is None:
+            return _action(item, DeploymentActionType.UPDATE)
+        if sent.folder_path == item.folder_path:
             return _action(
                 item,
                 DeploymentActionType.NOOP,
                 "Definition and folder unchanged since the last successful "
                 "deployment.",
             )
-        return _action(item, DeploymentActionType.UPDATE)
+        return _action(
+            item,
+            DeploymentActionType.MOVE,
+            "Definition unchanged since the last successful deployment; "
+            f"folder changed from {_folder(sent.folder_path)} to "
+            f"{_folder(item.folder_path)}.",
+        )
 
-    def _unchanged(self, identity: tuple[str, str], item: SourceItem) -> bool:
-        """Tell whether the last deployment sent exactly this item."""
-        if item.content_hash is None:
-            return False
-        deployed = DeployedItem(item.content_hash, item.folder_path)
-        return self._deployed_items.get(identity) == deployed
+    def _sent_before(
+        self, identity: tuple[str, str], item: SourceItem
+    ) -> DeployedItem | None:
+        """What the last deployment sent, when it sent this definition."""
+        deployed = self._deployed_items.get(identity)
+        if (
+            deployed is None
+            or item.content_hash is None
+            or deployed.content_hash != item.content_hash
+        ):
+            return None
+        return deployed
 
     def _plan_deletion(
         self,
@@ -432,6 +451,11 @@ def _action(
         folder_path=item.folder_path,
         detail=detail,
     )
+
+
+def _folder(folder_path: str | None) -> str:
+    """Name a workspace folder for a detail."""
+    return f"'{folder_path}'" if folder_path else "the workspace root"
 
 
 def _blocked(item: SourceItem) -> DeploymentAction:

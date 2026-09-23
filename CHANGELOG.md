@@ -35,11 +35,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   secrets.
 - Content hash: with a deployment state, an item whose definition and
   folder are those its last successful deployment sent is skipped, even
-  when Git lists it as changed. The hash is taken on what would be sent
-  (after placeholders are replaced, so it is per environment) and ignores
-  part order, UTF-8 byte order marks, Windows line endings and the layout
-  and key order of JSON files. The state records it per item; states
-  written without it still load. Without a state, nothing is skipped.
+  when Git lists it as changed, and one whose folder only changed is moved
+  (`MOVE` in the plan, `"moved"` in the report) without sending its
+  definition again, to the workspace root too. The hash is taken on what
+  would be sent (after placeholders are replaced, so it is per environment)
+  and ignores part order, UTF-8 byte order marks, Windows line endings and
+  the layout and key order of JSON files. The state records it per item;
+  states written without it still load. Without a state, nothing is
+  skipped or moved without its definition.
 - `plan_all_items()` shows what `deploy_all_items()` would do with the
   same arguments, without doing it: it returns the `DeploymentPlan`, one
   action per item saying what would happen and why (`plan.describe()` gives

@@ -275,7 +275,9 @@ def deploy_all_items(
     changed since it was last deployed, or every item when it never was.
     An item whose definition and folder are those its last successful
     deployment sent is skipped, even when Git lists it, since changes of
-    layout or line endings do not count. When every item succeeds, HEAD and
+    layout or line endings do not count; one whose folder only changed is
+    moved without sending its definition, to the workspace root too. When
+    every item succeeds, HEAD and
     what was sent for each item are recorded; otherwise the state stays,
     and the next run compares from the same commits. A run without
     ``state_backend`` compares nothing and deploys every candidate.

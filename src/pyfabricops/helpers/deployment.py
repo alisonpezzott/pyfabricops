@@ -80,12 +80,13 @@ DEPLOY_ORDER: tuple[str, ...] = (
 )
 
 DeploymentOutcome: TypeAlias = Literal[
-    "created", "updated", "failed", "skipped"
+    "created", "updated", "moved", "failed", "skipped"
 ]
 
 _ACTIONS: tuple[DeploymentOutcome, ...] = (
     "created",
     "updated",
+    "moved",
     "failed",
     "skipped",
 )
@@ -101,9 +102,10 @@ class DeploymentResult:
         display_name (str | None): The display name from ``.platform``, or
             None when it could not be read.
         path (str): The local item folder.
-        action (str): ``"created"``, ``"updated"``, ``"failed"``, or
-            ``"skipped"`` when the item was not attempted because an earlier
-            one failed with ``fail_fast=True``.
+        action (str): ``"created"``, ``"updated"``, ``"moved"`` (only its
+            folder changed, so its definition was not sent), ``"failed"``,
+            or ``"skipped"`` when the item was not attempted because an
+            earlier one failed with ``fail_fast=True``.
         item_id (str | None): The item ID in the workspace, when known.
         moved (bool): Whether the item was moved to another folder.
         duration_seconds (float): Wall-clock time spent on the item.
@@ -156,8 +158,10 @@ class DeploymentReport:
 
     @property
     def ok(self) -> bool:
-        """True when every item was created or updated."""
-        return all(r.action in ("created", "updated") for r in self.results)
+        """True when every item was created, updated or moved."""
+        return all(
+            r.action in ("created", "updated", "moved") for r in self.results
+        )
 
     @property
     def duration_seconds(self) -> float:
@@ -169,8 +173,8 @@ class DeploymentReport:
         Count the items by action.
 
         Returns:
-            dict[str, int]: The number of items created, updated, failed and
-                skipped.
+            dict[str, int]: The number of items created, updated, moved,
+                failed and skipped.
         """
         counts: dict[str, int] = {action: 0 for action in _ACTIONS}
         for result in self.results:
@@ -601,15 +605,15 @@ def _request_update_item_definition(
 
 
 def _request_move_item(
-    workspace_id: str, item_id: str, folder_id: str
+    workspace_id: str, item_id: str, folder_id: str | None
 ) -> ApiResult:
-    """Move an item into a folder."""
+    """Move an item into a folder, or to the workspace root for None."""
     return cast(
         ApiResult,
         api_request(
             endpoint=f"/workspaces/{workspace_id}/items/{item_id}/move",
             method="post",
-            payload={"targetFolderId": folder_id},
+            payload={"targetFolderId": folder_id} if folder_id else {},
             return_result=True,
         ),
     )
@@ -638,8 +642,8 @@ def _action_result(
 
 
 def _identity(action: DeploymentAction) -> tuple[str, str]:
-    """Return the ``(item_type, display_name)`` a CREATE or UPDATE targets."""
-    # DeploymentAction guarantees a display name for CREATE and UPDATE.
+    """Return the ``(item_type, display_name)`` an action targets."""
+    # DeploymentAction guarantees a display name to every action but BLOCKED.
     return action.item_type, cast(str, action.display_name)
 
 
@@ -647,7 +651,7 @@ def _planned_target(
     index: _WorkspaceIndex, action: DeploymentAction
 ) -> dict[str, Any]:
     """
-    Return the workspace item an UPDATE action replaces.
+    Return the workspace item an UPDATE or MOVE action changes.
 
     Raises:
         ConfigurationError: If the item is not in the workspace, which means
@@ -656,8 +660,13 @@ def _planned_target(
     item_type, display_name = _identity(action)
     existing = index.items.get((item_type, display_name))
     if existing is None:
+        planned = (
+            "a move"
+            if action.action is DeploymentActionType.MOVE
+            else "an update"
+        )
         raise ConfigurationError(
-            f"{display_name}.{item_type} is planned as an update but is not "
+            f"{display_name}.{item_type} is planned as {planned} but is not "
             "in the workspace."
         )
     return existing
@@ -693,8 +702,25 @@ def _move_if_needed(
     existing: dict[str, Any],
     folder_id: str | None,
 ) -> bool:
-    """Move an existing item into its folder when it is elsewhere."""
-    if not folder_id or existing.get("folderId") == folder_id:
+    """
+    Move an existing item into its folder when it is elsewhere.
+
+    An item at the root of the source is left in its workspace folder: only
+    a MOVE, planned when the source moved the item, takes it to the root.
+    """
+    if not folder_id:
+        return False
+    return _move_to(index, item_id, existing, folder_id)
+
+
+def _move_to(
+    index: _WorkspaceIndex,
+    item_id: str,
+    existing: dict[str, Any],
+    folder_id: str | None,
+) -> bool:
+    """Move an existing item to a folder, or to the root for None."""
+    if existing.get("folderId") == folder_id:
         return False
     _raise_for_failure(
         _request_move_item(index.workspace_id, item_id, folder_id), "Move"
@@ -748,6 +774,12 @@ def _apply_action(
                 "Update definition",
             )
             outcome = "updated"
+        elif action.action is DeploymentActionType.MOVE:
+            existing = _planned_target(index, action)
+            folder_id = index.ensure_folder(action.folder_path)
+            item_id = cast(str, existing["id"])
+            moved = _move_to(index, item_id, existing, folder_id)
+            outcome = "moved"
         else:
             raise ConfigurationError(
                 f"Unsupported deployment action: {action.action.value}."
@@ -797,7 +829,7 @@ def _log_report(report: DeploymentReport) -> None:
             SUCCESS_LEVEL,
             f"{len(report.results)} item(s) deployed to workspace "
             f"'{report.workspace}' ({counts['created']} created, "
-            f"{counts['updated']} updated) in "
+            f"{counts['updated']} updated, {counts['moved']} moved) in "
             f"{report.duration_seconds:.1f}s.",
         )
         return
@@ -844,10 +876,11 @@ class DeploymentExecutor:
 
     The executor decides nothing: it creates the items planned as CREATE,
     updates the items planned as UPDATE (moving them first when their folder
-    differs) and reports BLOCKED items as failed, creating missing folders on
-    the way. It refuses DELETE, which no policy allows yet, reporting it as
-    failed, and a NOOP gets a log line but no result. Used by
-    ``deploy_all_items``; not exported from ``pyfabricops`` yet.
+    differs), moves the items planned as MOVE without sending their
+    definition, and reports BLOCKED items as failed, creating missing
+    folders on the way. It refuses DELETE, which no policy allows yet,
+    reporting it as failed, and a NOOP gets a log line but no result. Used
+    by ``deploy_all_items``; not exported from ``pyfabricops`` yet.
 
     Args:
         index (_WorkspaceIndex): The workspace items and folders the plan was

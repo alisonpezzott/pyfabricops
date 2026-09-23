@@ -9,9 +9,10 @@ what it created.
 
 Steps: bootstrap without a state; nothing changed; one notebook changed;
 only the layout of a file changed (content hash); a notebook moved to a
-folder; a run limited to notebooks, then a full one; a broken pipeline that
-fails and leaves the state alone; a notebook deleted from Git (refused,
-then deleted by hand).
+folder, then back to the root, without sending its definition; a run
+limited to notebooks, then a full one; a broken pipeline that fails and
+leaves the state alone; a notebook deleted from Git (refused, then deleted
+by hand).
 
 Prerequisites:
 
@@ -205,11 +206,33 @@ def _step_move(run: Run) -> None:
 
     report = _deploy_step(
         run,
-        "A notebook moved to a folder: moved, not deleted",
-        plan=[("UPDATE", "B"), ("NOOP", "B")],
-        results=[("B", "updated")],
+        "A notebook moved to a folder: moved, not deleted or sent again",
+        plan=[("MOVE", "B"), ("NOOP", "B")],
+        results=[("B", "moved")],
     )
     _check(report.results[0].moved, "notebook B was moved")
+    _check(
+        _folder_of(run, "Notebook", run.name("B")) is not None,
+        "notebook B is in a folder of the workspace",
+    )
+
+
+def _step_move_back(run: Run) -> None:
+    name = f"{run.name('B')}.Notebook"
+    shutil.move(str(run.items / run.folder / name), str(run.items / name))
+    _commit(run, "Move notebook B back to the root")
+
+    report = _deploy_step(
+        run,
+        "The notebook moved back to the root: moved there",
+        plan=[("MOVE", "B"), ("NOOP", "B")],
+        results=[("B", "moved")],
+    )
+    _check(report.results[0].moved, "notebook B was moved")
+    _check(
+        _folder_of(run, "Notebook", run.name("B")) is None,
+        "notebook B is at the root of the workspace",
+    )
 
 
 def _step_partial_run(run: Run) -> None:
@@ -307,6 +330,7 @@ _STEPS: tuple[Callable[[Run], None], ...] = (
     _step_one_change,
     _step_layout_only,
     _step_move,
+    _step_move_back,
     _step_partial_run,
     _step_failure,
     _step_deletion,
@@ -563,6 +587,15 @@ def _list_items(workspace_id: str) -> list[dict[str, Any]]:
     if items is None:
         raise E2EFailure("Could not list the workspace items.")
     return list(items)
+
+
+def _folder_of(run: Run, item_type: str, name: str) -> str | None:
+    """The ID of the workspace folder an item is in, or None at the root."""
+    for item in _list_items(run.workspace_id):
+        if (item["type"], item["displayName"]) == (item_type, name):
+            folder_id: str | None = item.get("folderId")
+            return folder_id
+    raise E2EFailure(f"{name}.{item_type} is not in the workspace")
 
 
 def _remove_staging(run: Run) -> None:

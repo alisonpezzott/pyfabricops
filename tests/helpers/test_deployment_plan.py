@@ -24,6 +24,7 @@ from pyfabricops.helpers.deployment_plan import (
 
 CREATE = DeploymentActionType.CREATE
 UPDATE = DeploymentActionType.UPDATE
+MOVE = DeploymentActionType.MOVE
 DELETE = DeploymentActionType.DELETE
 NOOP = DeploymentActionType.NOOP
 BLOCKED = DeploymentActionType.BLOCKED
@@ -372,9 +373,31 @@ def test_a_changed_definition_is_updated() -> None:
     assert action.action == UPDATE
 
 
-def test_a_moved_item_is_updated_even_with_the_same_definition() -> None:
-    """The same definition in another folder still needs the move."""
+def test_a_moved_item_with_the_same_definition_is_only_moved() -> None:
+    """The definition was already sent; only the folder needs to change."""
     action = _plan_after(_sent("h1", folder="Sales"), DeployedItem("h1"))
+
+    assert (action.action, action.folder_path) == (MOVE, "Sales")
+    assert action.detail == (
+        "Definition unchanged since the last successful deployment; folder "
+        "changed from the workspace root to 'Sales'."
+    )
+
+
+def test_an_item_moved_to_the_root_is_moved_there() -> None:
+    """The root is a folder like any other for a move."""
+    action = _plan_after(_sent("h1"), DeployedItem("h1", folder_path="Sales"))
+
+    assert (action.action, action.folder_path) == (MOVE, None)
+    assert action.detail == (
+        "Definition unchanged since the last successful deployment; folder "
+        "changed from 'Sales' to the workspace root."
+    )
+
+
+def test_a_moved_item_with_a_new_definition_is_updated() -> None:
+    """The update moves it too, so one action does both."""
+    action = _plan_after(_sent("h2", folder="Sales"), DeployedItem("h1"))
 
     assert action.action == UPDATE
 
@@ -422,6 +445,7 @@ def test_a_plan_counts_and_describes_its_actions() -> None:
     assert plan.summary() == {
         "CREATE": 1,
         "UPDATE": 1,
+        "MOVE": 0,
         "DELETE": 0,
         "NOOP": 1,
         "BLOCKED": 0,
@@ -431,14 +455,14 @@ def test_a_plan_counts_and_describes_its_actions() -> None:
         "UPDATE   B.Notebook  FULL_DEPLOYMENT",
         "NOOP     Old.Notebook  ITEM_DELETED: Deleted from the source and "
         "not in the workspace.",
-        "1 create, 1 update, 0 delete, 1 noop, 0 blocked",
+        "1 create, 1 update, 0 move, 0 delete, 1 noop, 0 blocked",
     ]
 
 
 def test_an_empty_plan_says_so() -> None:
     """Nothing to do is said, not left blank."""
     assert DeploymentPlan().describe() == (
-        "No actions.\n0 create, 0 update, 0 delete, 0 noop, 0 blocked"
+        "No actions.\n0 create, 0 update, 0 move, 0 delete, 0 noop, 0 blocked"
     )
 
 

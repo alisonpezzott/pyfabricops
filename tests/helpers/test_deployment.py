@@ -404,6 +404,7 @@ def test_missing_platform_file_is_reported(
     assert report.summary() == {
         "created": 1,
         "updated": 0,
+        "moved": 0,
         "failed": 1,
         "skipped": 0,
     }
@@ -470,6 +471,7 @@ def test_report_helpers() -> None:
     assert report.summary() == {
         "created": 1,
         "updated": 1,
+        "moved": 0,
         "failed": 1,
         "skipped": 0,
     }
@@ -494,6 +496,17 @@ def test_empty_report_to_df_keeps_the_columns() -> None:
 
     assert df.empty
     assert "duration_seconds" in df.columns
+
+
+def test_a_moved_item_is_a_success() -> None:
+    """Moving is what the plan asked for, so the run is still ok."""
+    report = DeploymentReport(
+        workspace="Sales-DEV",
+        results=[DeploymentResult("Notebook", "A", "a", "moved", moved=True)],
+    )
+
+    assert report.ok
+    assert report.summary()["moved"] == 1
 
 
 # ---------------------------------------------------------------------------
@@ -586,10 +599,11 @@ def _planned(
 
 def _index(
     items: dict[tuple[str, str], dict[str, Any]] | None = None,
+    folders: dict[str, str] | None = None,
 ) -> _WorkspaceIndex:
-    """A workspace index with the given items and no folders."""
+    """A workspace index with the given items and folders."""
     return _WorkspaceIndex(
-        workspace_id=_WORKSPACE_ID, items=items or {}, folders={}
+        workspace_id=_WORKSPACE_ID, items=items or {}, folders=folders or {}
     )
 
 
@@ -720,6 +734,90 @@ def test_update_missing_from_the_workspace_fails_before_any_change(
     assert result.action == "failed"
     assert result.error == (
         "A.Notebook is planned as an update but is not in the workspace."
+    )
+    _assert_no_change(fabric)
+
+
+def test_a_move_sends_no_definition(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """A MOVE moves the item, to the root too, and updates nothing."""
+    index = _index(
+        {
+            ("Notebook", "A"): {"id": "nb-a", "folderId": None},
+            ("Notebook", "B"): {"id": "nb-b", "folderId": "f-sales"},
+        },
+        folders={"Sales": "f-sales"},
+    )
+    plan = DeploymentPlan(
+        actions=[
+            _planned(
+                DeploymentActionType.MOVE,
+                _write_item(root, "Sales/A.Notebook"),
+                folder_path="Sales",
+            ),
+            _planned(
+                DeploymentActionType.MOVE, _write_item(root, "B.Notebook")
+            ),
+        ]
+    )
+
+    results = DeploymentExecutor(index).apply(plan)
+
+    assert [(r.display_name, r.action, r.moved) for r in results] == [
+        ("A", "moved", True),
+        ("B", "moved", True),
+    ]
+    assert [c.args for c in fabric.move.call_args_list] == [
+        (_WORKSPACE_ID, "nb-a", "f-sales"),
+        (_WORKSPACE_ID, "nb-b", None),
+    ]
+    fabric.update.assert_not_called()
+
+
+def test_a_move_to_where_the_item_already_is_calls_nothing(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """Someone moved it already: the plan is met without a call."""
+    index = _index(
+        {("Notebook", "A"): {"id": "nb-a", "folderId": "f-sales"}},
+        folders={"Sales": "f-sales"},
+    )
+    plan = DeploymentPlan(
+        actions=[
+            _planned(
+                DeploymentActionType.MOVE,
+                _write_item(root, "Sales/A.Notebook"),
+                folder_path="Sales",
+            )
+        ]
+    )
+
+    (result,) = DeploymentExecutor(index).apply(plan)
+
+    assert (result.action, result.moved) == ("moved", False)
+    _assert_no_change(fabric)
+
+
+def test_move_missing_from_the_workspace_fails_before_any_change(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """Nothing to move: the plan does not match the workspace."""
+    plan = DeploymentPlan(
+        actions=[
+            _planned(
+                DeploymentActionType.MOVE,
+                _write_item(root, "Sales/A.Notebook"),
+                folder_path="Sales",
+            )
+        ]
+    )
+
+    (result,) = DeploymentExecutor(_index()).apply(plan)
+
+    assert result.action == "failed"
+    assert result.error == (
+        "A.Notebook is planned as a move but is not in the workspace."
     )
     _assert_no_change(fabric)
 
@@ -1247,13 +1345,13 @@ def test_without_a_state_every_candidate_is_deployed(
     ]
 
 
-def test_a_moved_item_is_moved_even_with_the_same_definition(
+def test_a_moved_item_is_moved_without_its_definition(
     git_repo: GitRepo,
     root: Path,
     fabric: SimpleNamespace,
     state: LocalJsonStateBackend,
 ) -> None:
-    """The folder is part of what was sent."""
+    """The definition was already sent, so only the move happens."""
     fabric.list_items.return_value = [
         {"id": "nb-a", "type": "Notebook", "displayName": "A"},
     ]
@@ -1264,13 +1362,52 @@ def test_a_moved_item_is_moved_even_with_the_same_definition(
     (root / "Sales").mkdir()
     (root / "A.Notebook").rename(root / "Sales" / "A.Notebook")
     git_repo.commit("move")
+    fabric.update.reset_mock()
     report = _deploy(root, state_backend=state, environment="dev")
 
     assert [(r.display_name, r.action, r.moved) for r in report.results] == [
-        ("A", "updated", True)
+        ("A", "moved", True)
     ]
+    fabric.move.assert_called_once_with(_WORKSPACE_ID, "nb-a", "folder-Sales")
+    fabric.update.assert_not_called()
     items = _recorded(state, "dev").items
     assert items[("Notebook", "A")].folder_path == "Sales"
+
+
+def test_an_item_moved_to_the_root_in_git_is_moved_there(
+    git_repo: GitRepo,
+    root: Path,
+    fabric: SimpleNamespace,
+    state: LocalJsonStateBackend,
+) -> None:
+    """The state shows Git moved it, so it leaves its workspace folder."""
+    fabric.list_folders.return_value = [
+        {"id": "f-sales", "displayName": "Sales"},
+    ]
+    fabric.list_items.return_value = [
+        {
+            "id": "nb-a",
+            "type": "Notebook",
+            "displayName": "A",
+            "folderId": "f-sales",
+        },
+    ]
+    _write_item(root, "Sales/A.Notebook")
+    git_repo.commit("first")
+    _deploy(root, state_backend=state, environment="dev")
+
+    (root / "Sales" / "A.Notebook").rename(root / "A.Notebook")
+    git_repo.commit("move to the root")
+    fabric.update.reset_mock()
+    report = _deploy(root, state_backend=state, environment="dev")
+
+    assert [(r.display_name, r.action, r.moved) for r in report.results] == [
+        ("A", "moved", True)
+    ]
+    fabric.move.assert_called_once_with(_WORKSPACE_ID, "nb-a", None)
+    fabric.update.assert_not_called()
+    items = _recorded(state, "dev").items
+    assert items[("Notebook", "A")].folder_path is None
 
 
 def test_the_state_records_each_item_and_forgets_deleted_ones(

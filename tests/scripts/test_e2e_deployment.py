@@ -107,7 +107,7 @@ class FakeWorkspace:
         return ApiResult(True, 200)
 
     def move_item(
-        self, workspace_id: str, item_id: str, folder_id: str
+        self, workspace_id: str, item_id: str, folder_id: str | None
     ) -> ApiResult:
         self.items[item_id]["folderId"] = folder_id
         return ApiResult(True, 200)
