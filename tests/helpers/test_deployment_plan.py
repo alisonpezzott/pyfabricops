@@ -17,11 +17,14 @@ from pyfabricops.helpers.deployment_plan import (
     DeploymentPlan,
     DeploymentPlanner,
     DeploymentReason,
+    SourceChange,
     SourceItem,
 )
 
 CREATE = DeploymentActionType.CREATE
 UPDATE = DeploymentActionType.UPDATE
+DELETE = DeploymentActionType.DELETE
+NOOP = DeploymentActionType.NOOP
 BLOCKED = DeploymentActionType.BLOCKED
 
 
@@ -46,6 +49,16 @@ def _broken(name: str) -> SourceItem:
         source_path=path,
         error=f"{path}/.platform not found.",
     )
+
+
+def _changed(
+    name: str,
+    change: SourceChange | None,
+    item_type: str = "Notebook",
+    folder: str | None = None,
+) -> SourceItem:
+    """A local item that changed since the baseline commit."""
+    return dataclasses.replace(_item(name, item_type, folder), change=change)
 
 
 def _plan(
@@ -141,6 +154,119 @@ def test_a_duplicate_identity_blocks_the_later_item() -> None:
     assert plan.actions[1].detail == (
         "Orders.Notebook is also defined at workspace/A/Orders.Notebook; "
         "deploying both would overwrite the same item."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Changes since a baseline commit
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("change", "reason"),
+    [
+        (None, DeploymentReason.FULL_DEPLOYMENT),
+        (SourceChange.ADDED, DeploymentReason.ITEM_ADDED),
+        (SourceChange.MODIFIED, DeploymentReason.SOURCE_CHANGED),
+        (SourceChange.DELETED, DeploymentReason.ITEM_DELETED),
+    ],
+)
+def test_the_reason_follows_how_the_item_changed(
+    change: SourceChange | None, reason: DeploymentReason
+) -> None:
+    """Every action says why the item is in the plan."""
+    (action,) = _plan([_changed("Orders", change)]).actions
+
+    assert action.reason is reason
+
+
+def test_a_changed_item_missing_from_the_workspace_is_created() -> None:
+    """The source says modified, the workspace lacks it: create it."""
+    (action,) = _plan([_changed("Orders", SourceChange.MODIFIED)]).actions
+
+    assert action.action == CREATE
+
+
+def test_a_deleted_item_in_the_workspace_is_planned_for_deletion() -> None:
+    """The plan says DELETE; refusing it is the executor's business."""
+    (action,) = _plan(
+        [_changed("Old", SourceChange.DELETED)],
+        existing={("Notebook", "Old")},
+    ).actions
+
+    assert action.action == DELETE
+
+
+def test_a_deleted_item_gone_from_the_workspace_needs_nothing() -> None:
+    """Nothing to delete, so nothing to refuse."""
+    (action,) = _plan([_changed("Old", SourceChange.DELETED)]).actions
+
+    assert action.action == NOOP
+    assert action.detail == "Deleted from the source and not in the workspace."
+
+
+def test_deletions_come_after_every_other_action() -> None:
+    """Creates and updates go first, whatever order the items came in."""
+    plan = _plan(
+        [
+            _changed("Old", SourceChange.DELETED),
+            _changed("Orders", SourceChange.MODIFIED),
+            _changed("Sales", SourceChange.ADDED, "Report"),
+        ],
+        existing={("Notebook", "Old"), ("Notebook", "Orders")},
+    )
+
+    assert [(a.action, a.display_name) for a in plan.actions] == [
+        (UPDATE, "Orders"),
+        (CREATE, "Sales"),
+        (DELETE, "Old"),
+    ]
+
+
+def test_a_moved_item_is_updated_not_deleted() -> None:
+    """Its old folder is gone, but the same item is defined elsewhere."""
+    plan = _plan(
+        [
+            _changed("Orders", SourceChange.DELETED, folder="Sales"),
+            _changed("Orders", SourceChange.ADDED, folder="Finance"),
+        ],
+        existing={("Notebook", "Orders")},
+    )
+
+    assert [(a.action, a.folder_path) for a in plan.actions] == [
+        (UPDATE, "Finance"),
+        (NOOP, "Sales"),
+    ]
+    assert plan.actions[1].detail == (
+        "Still defined at workspace/Finance/Orders.Notebook."
+    )
+
+
+def test_a_workspace_item_is_deleted_once() -> None:
+    """Two deleted folders for one workspace item give one DELETE."""
+    plan = _plan(
+        [
+            _changed("Old", SourceChange.DELETED, folder="A"),
+            _changed("Old", SourceChange.DELETED, folder="B"),
+        ],
+        existing={("Notebook", "Old")},
+    )
+
+    assert [a.action for a in plan.actions] == [DELETE, NOOP]
+    assert plan.actions[1].detail == (
+        "Its deletion is planned with workspace/A/Old.Notebook."
+    )
+
+
+def test_a_deleted_item_with_an_unreadable_baseline_is_blocked() -> None:
+    """Without its old name there is no workspace item to match."""
+    broken = dataclasses.replace(_broken("Old"), change=SourceChange.DELETED)
+
+    (action,) = _plan([broken]).actions
+
+    assert (action.action, action.reason) == (
+        BLOCKED,
+        DeploymentReason.ITEM_DELETED,
     )
 
 

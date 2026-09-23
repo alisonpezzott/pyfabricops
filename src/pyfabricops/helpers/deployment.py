@@ -1,12 +1,13 @@
 """
 Deployment engine shared by the ``deploy_all_*`` helpers.
 
-A run plans first, then applies. It finds the local items in dependency
-order, lists the workspace items and folders once, and builds a
-``DeploymentPlan`` from them without changing anything. ``DeploymentExecutor``
-then applies the plan, and the run returns a ``DeploymentReport`` with the
-outcome of each item, so a partial failure reaches the caller instead of
-being logged and lost. Nothing is ever deleted.
+A run plans first, then applies. It selects the local items (every item, or
+only those changed in Git since a baseline commit), lists the workspace
+items and folders once, and builds a ``DeploymentPlan`` from them without
+changing anything. ``DeploymentExecutor`` then applies the plan, and the run
+returns a ``DeploymentReport`` with the outcome of each item, so a partial
+failure reaches the caller instead of being logged and lost. Nothing is ever
+deleted.
 """
 
 from __future__ import annotations
@@ -28,7 +29,13 @@ from ..helpers.deployment_plan import (
     DeploymentActionType,
     DeploymentPlan,
     DeploymentPlanner,
+    SourceChange,
     SourceItem,
+)
+from ..helpers.source_changes import (
+    GitChangeDetector,
+    ItemChange,
+    ItemResolver,
 )
 from ..items.items import list_items
 from ..utils.exceptions import (
@@ -111,8 +118,8 @@ class DeploymentReport:
     Attributes:
         workspace (str): The workspace name or ID the run targeted.
         workspace_id (str | None): The resolved workspace ID.
-        results (list[DeploymentResult]): One result per local item, in
-            deployment order.
+        results (list[DeploymentResult]): One result per item acted on, in
+            deployment order. An item that needs nothing has none.
 
     Examples:
         ```python
@@ -314,32 +321,32 @@ def _read_display_name(item_path: str) -> str:
     """
     platform_path = Path(item_path) / ".platform"
     try:
-        with open(platform_path, encoding="utf-8-sig") as f:
-            platform = json.load(f)
+        content = platform_path.read_bytes()
     except FileNotFoundError as e:
         raise ConfigurationError(f"{platform_path} not found.") from e
+    return _parse_display_name(content, str(platform_path))
+
+
+def _parse_display_name(content: bytes, source: str) -> str:
+    """
+    Read the display name from the content of a ``.platform`` file.
+
+    Raises:
+        ConfigurationError: If the content is not valid JSON or has no
+            ``metadata.displayName``.
+    """
+    try:
+        platform = json.loads(content)
     except ValueError as e:
-        raise ConfigurationError(
-            f"{platform_path} is not valid JSON: {e}"
-        ) from e
+        raise ConfigurationError(f"{source} is not valid JSON: {e}") from e
 
     metadata = platform.get("metadata") if isinstance(platform, dict) else None
     display_name = (
         metadata.get("displayName") if isinstance(metadata, dict) else None
     )
     if not isinstance(display_name, str) or not display_name:
-        raise ConfigurationError(
-            f"{platform_path} has no metadata.displayName."
-        )
+        raise ConfigurationError(f"{source} has no metadata.displayName.")
     return display_name
-
-
-def _try_display_name(item_path: str) -> str | None:
-    """Read the display name, or None when ``.platform`` is unusable."""
-    try:
-        return _read_display_name(item_path)
-    except ConfigurationError:
-        return None
 
 
 def _read_source_items(
@@ -353,7 +360,11 @@ def _read_source_items(
 
 
 def _read_source_item(
-    item_type: str, item_path: str, *, start_path: str | None
+    item_type: str,
+    item_path: str,
+    *,
+    start_path: str | None,
+    change: SourceChange | None = None,
 ) -> SourceItem:
     """Describe one local item, or record why it cannot be deployed."""
     folder_path = extract_middle_path(item_path, start_path=start_path)
@@ -365,13 +376,130 @@ def _read_source_item(
             source_path=item_path,
             folder_path=folder_path,
             error=str(e),
+            change=change,
         )
     return SourceItem(
         item_type=item_type,
         source_path=item_path,
         display_name=display_name,
         folder_path=folder_path,
+        change=change,
     )
+
+
+def _read_deleted_item(
+    detector: GitChangeDetector,
+    change: ItemChange,
+    *,
+    path: str,
+    start_path: str | None,
+) -> SourceItem:
+    """Describe an item deleted since the baseline, named as it was then."""
+    item_path = Path(path, change.path).as_posix()
+    folder_path = extract_middle_path(item_path, start_path=start_path)
+    platform = f"{change.path}/.platform"
+    try:
+        display_name = _parse_display_name(
+            detector.read_baseline_file(platform),
+            f"{platform} at commit {detector.baseline[:12]}",
+        )
+    except PyFabricOpsError as e:
+        return SourceItem(
+            item_type=change.item_type,
+            source_path=item_path,
+            folder_path=folder_path,
+            error=str(e),
+            change=SourceChange.DELETED,
+        )
+    return SourceItem(
+        item_type=change.item_type,
+        source_path=item_path,
+        display_name=display_name,
+        folder_path=folder_path,
+        change=SourceChange.DELETED,
+    )
+
+
+def _read_changed_items(
+    path: str,
+    item_types: Sequence[str],
+    *,
+    start_path: str | None,
+    baseline_commit: str,
+    repository_path: str,
+) -> list[SourceItem]:
+    """
+    Describe the items changed in Git since the baseline commit.
+
+    Changes are found in ``repository_path`` and the items are read from the
+    same place under ``path``, which may be a staging copy. Changed items
+    come in dependency order, deleted items after them with dependents
+    first.
+
+    Raises:
+        ConfigurationError: If git cannot compare the baseline with HEAD.
+    """
+    detector = GitChangeDetector(repository_path, baseline_commit)
+    changes = detector.changed_items(ItemResolver(item_types))
+    rank = {item_type: n for n, item_type in enumerate(item_types)}
+    kept = sorted(
+        (c for c in changes if c.change is not SourceChange.DELETED),
+        key=lambda c: (rank[c.item_type], c.path),
+    )
+    deleted = sorted(
+        (c for c in changes if c.change is SourceChange.DELETED),
+        key=lambda c: (-rank[c.item_type], c.path),
+    )
+    return [
+        _read_source_item(
+            c.item_type,
+            Path(path, c.path).as_posix(),
+            start_path=start_path,
+            change=c.change,
+        )
+        for c in kept
+    ] + [
+        _read_deleted_item(detector, c, path=path, start_path=start_path)
+        for c in deleted
+    ]
+
+
+def _select_items(
+    path: str,
+    item_types: Sequence[str] | None,
+    *,
+    start_path: str | None,
+    baseline_commit: str | None,
+    repository_path: str | None,
+) -> list[SourceItem]:
+    """
+    Select the items of a run and describe them for the planner.
+
+    Every local item of the given types, or with ``baseline_commit`` only
+    those changed since that commit. Logs when there is none.
+    """
+    types = _ordered_types(item_types)
+    if baseline_commit is None:
+        items = _read_source_items(
+            _find_local_items(path, types), start_path=start_path
+        )
+        if not items:
+            logger.warning(f"No items to deploy were found under {path}.")
+        return items
+
+    compared = repository_path or path
+    items = _read_changed_items(
+        path,
+        types,
+        start_path=start_path,
+        baseline_commit=baseline_commit,
+        repository_path=compared,
+    )
+    logger.info(
+        f"{len(items)} item(s) changed under {compared} since "
+        f"{baseline_commit}."
+    )
+    return items
 
 
 def _describe_error(result: ApiResult) -> str:
@@ -554,6 +682,17 @@ def _apply_action(
     """Execute one planned action and report the outcome."""
     if action.action is DeploymentActionType.BLOCKED:
         return _action_result(action, "failed", error=action.detail)
+    if action.action is DeploymentActionType.DELETE:
+        # No policy allows deletions yet: refuse, and say what to do.
+        return _action_result(
+            action,
+            "failed",
+            error=(
+                "Deleting items is not supported yet; delete "
+                f"{action.display_name}.{action.item_type} from the "
+                "workspace by hand."
+            ),
+        )
 
     started = time.monotonic()
     item_id: str | None = None
@@ -644,21 +783,29 @@ def _log_report(report: DeploymentReport) -> None:
     )
 
 
+def _log_noop(action: DeploymentAction) -> None:
+    """Log an action that needs no change to the workspace."""
+    logger.info(
+        f"{action.display_name}.{action.item_type}: nothing to do. "
+        f"{action.detail or ''}".rstrip()
+    )
+
+
 def _fail_all(
     report: DeploymentReport,
-    local_items: list[tuple[str, str]],
+    items: Sequence[SourceItem],
     error: str,
 ) -> DeploymentReport:
-    """Mark every local item as failed with the same error."""
+    """Mark every selected item as failed with the same error."""
     report.results.extend(
         DeploymentResult(
-            item_type=item_type,
-            display_name=_try_display_name(item_path),
-            path=item_path,
+            item_type=item.item_type,
+            display_name=item.display_name,
+            path=item.source_path,
             action="failed",
             error=error,
         )
-        for item_type, item_path in local_items
+        for item in items
     )
     _log_report(report)
     return report
@@ -671,8 +818,9 @@ class DeploymentExecutor:
     The executor decides nothing: it creates the items planned as CREATE,
     updates the items planned as UPDATE (moving them first when their folder
     differs) and reports BLOCKED items as failed, creating missing folders on
-    the way. Used by ``deploy_all_items``; not exported from ``pyfabricops``
-    yet.
+    the way. It refuses DELETE, which no policy allows yet, reporting it as
+    failed, and a NOOP gets a log line but no result. Used by
+    ``deploy_all_items``; not exported from ``pyfabricops`` yet.
 
     Args:
         index (_WorkspaceIndex): The workspace items and folders the plan was
@@ -695,10 +843,15 @@ class DeploymentExecutor:
             plan (DeploymentPlan): The plan to execute.
 
         Returns:
-            list[DeploymentResult]: One result per action, in plan order.
+            list[DeploymentResult]: One result per action other than NOOP,
+                in plan order.
         """
         results: list[DeploymentResult] = []
         for position, action in enumerate(plan.actions):
+            if action.action is DeploymentActionType.NOOP:
+                _log_noop(action)
+                continue
+
             result = _apply_action(self._index, action)
             results.append(result)
             _log_result(result)
@@ -707,6 +860,7 @@ class DeploymentExecutor:
                 results.extend(
                     _action_result(skipped, "skipped")
                     for skipped in plan.actions[position + 1 :]
+                    if skipped.action is not DeploymentActionType.NOOP
                 )
                 break
         return results
@@ -719,39 +873,45 @@ def _deploy_all(
     start_path: str | None = None,
     item_types: Sequence[str] | None = None,
     fail_fast: bool = False,
+    baseline_commit: str | None = None,
+    repository_path: str | None = None,
 ) -> DeploymentReport:
     """
-    Plan, then apply, the deployment of every local item of the given types.
+    Plan, then apply, the deployment of the selected local items.
 
-    Until the plan is built the run only reads: the local items and one
-    listing of the workspace. Every change is made by the executor. See
-    ``deploy_all_items`` for the public contract.
+    Until the plan is built the run only reads: the local items, Git when
+    ``baseline_commit`` is given, and one listing of the workspace. Every
+    change is made by the executor. See ``deploy_all_items`` for the public
+    contract.
     """
     report = DeploymentReport(workspace=workspace)
 
-    local_items = _find_local_items(path, _ordered_types(item_types))
-    if not local_items:
-        logger.warning(f"No items to deploy were found under {path}.")
+    items = _select_items(
+        path,
+        item_types,
+        start_path=start_path,
+        baseline_commit=baseline_commit,
+        repository_path=repository_path,
+    )
+    if not items:
         return report
 
     workspace_id = resolve_workspace(workspace)
     if workspace_id is None:
-        return _fail_all(
-            report, local_items, f"Workspace '{workspace}' not found."
-        )
+        return _fail_all(report, items, f"Workspace '{workspace}' not found.")
     report.workspace_id = workspace_id
 
     index = _WorkspaceIndex.load(workspace_id)
     if index is None:
         return _fail_all(
             report,
-            local_items,
+            items,
             f"Could not list the items and folders of workspace "
             f"'{workspace}'.",
         )
 
     planner = DeploymentPlanner(existing_items=index.items.keys())
-    plan = planner.plan(_read_source_items(local_items, start_path=start_path))
+    plan = planner.plan(items)
 
     executor = DeploymentExecutor(index, fail_fast=fail_fast)
     report.results.extend(executor.apply(plan))

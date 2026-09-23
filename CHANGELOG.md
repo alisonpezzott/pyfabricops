@@ -15,6 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `report.to_df()`.
 - `DEPLOY_ORDER` — the item types `deploy_all_items()` deploys by default, in
   dependency order.
+- Selective deployment: `deploy_all_items(baseline_commit=...)` deploys only
+  the items changed in Git between that commit and HEAD, and
+  `repository_path` names the repository folder to compare when `path` is a
+  staging copy (as made by `copy_to_staging()`). An item deleted since the
+  baseline is reported as failed while the workspace still has it, because
+  deleting is not supported yet, and needs nothing once it is gone. Git must
+  be on PATH and the baseline commit in the local history; a shallow clone
+  may lack it.
 - `set_lro_options()` — configures the long-running operation timeout
   (default 600 s) and the maximum polling interval (default 5 s).
 - `get_item_definition()` accepts an optional `format` (e.g. `"TMDL"`).

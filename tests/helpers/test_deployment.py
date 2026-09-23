@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import base64
 import importlib
 import json
+import shutil
 from collections.abc import Iterator
 from pathlib import Path
 from types import SimpleNamespace
@@ -26,6 +28,8 @@ from pyfabricops.helpers.deployment_plan import (
     DeploymentReason,
 )
 from pyfabricops.helpers.items import deploy_all_items
+from pyfabricops.utils.exceptions import ConfigurationError
+from tests.helpers.git_repo import GitRepo
 
 _WORKSPACE_ID = "00000000-0000-0000-0000-000000000001"
 _ENGINE = "pyfabricops.helpers.deployment"
@@ -524,18 +528,22 @@ def test_deploy_all_items_delegates_to_the_engine() -> None:
     ) as engine:
         deploy_all_items(
             "Sales-DEV",
-            "src",
-            "src",
+            "stg",
+            "stg",
             item_types=["Notebook"],
             fail_fast=True,
+            baseline_commit="abc123",
+            repository_path="src",
         )
 
     engine.assert_called_once_with(
         "Sales-DEV",
-        "src",
-        start_path="src",
+        "stg",
+        start_path="stg",
         item_types=["Notebook"],
         fail_fast=True,
+        baseline_commit="abc123",
+        repository_path="src",
     )
 
 
@@ -700,3 +708,216 @@ def test_update_missing_from_the_workspace_fails_before_any_change(
         "A.Notebook is planned as an update but is not in the workspace."
     )
     _assert_no_change(fabric)
+
+
+def test_executor_refuses_to_delete(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """No policy allows deletions yet: the item is reported, not deleted."""
+    index = _index({("Notebook", "Old"): {"id": "nb-old", "folderId": None}})
+    plan = DeploymentPlan(
+        actions=[_planned(DeploymentActionType.DELETE, root / "Old.Notebook")]
+    )
+
+    (result,) = DeploymentExecutor(index).apply(plan)
+
+    assert result.action == "failed"
+    assert result.error == (
+        "Deleting items is not supported yet; delete Old.Notebook from the "
+        "workspace by hand."
+    )
+    _assert_no_change(fabric)
+
+
+def test_noop_actions_get_no_result(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """A NOOP calls nothing and is neither reported nor skipped."""
+    plan = DeploymentPlan(
+        actions=[
+            _planned(DeploymentActionType.NOOP, root / "Gone.Notebook"),
+            _planned(DeploymentActionType.DELETE, root / "Old.Notebook"),
+            _planned(DeploymentActionType.NOOP, root / "Moved.Notebook"),
+            _planned(
+                DeploymentActionType.CREATE, _write_item(root, "A.Notebook")
+            ),
+        ]
+    )
+
+    results = DeploymentExecutor(_index(), fail_fast=True).apply(plan)
+
+    assert [(r.display_name, r.action) for r in results] == [
+        ("Old", "failed"),
+        ("A", "skipped"),
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Selective deployment: baseline_commit
+# ---------------------------------------------------------------------------
+
+
+def test_selective_deploys_only_what_changed(
+    git_repo: GitRepo, root: Path, fabric: SimpleNamespace
+) -> None:
+    """Unchanged items are left alone; changed ones go as usual."""
+    fabric.list_items.return_value = [
+        {"id": "nb-a", "type": "Notebook", "displayName": "A"},
+        {"id": "nb-b", "type": "Notebook", "displayName": "B"},
+    ]
+    _write_item(root, "A.Notebook")
+    _write_item(root, "B.Notebook")
+    baseline = git_repo.commit("baseline")
+
+    (root / "A.Notebook/content.txt").write_text("changed", encoding="utf-8")
+    _write_item(root, "Sales/C.Notebook")
+    git_repo.commit("head")
+
+    report = _deploy(root, baseline_commit=baseline)
+
+    assert [(r.display_name, r.action) for r in report.results] == [
+        ("A", "updated"),
+        ("C", "created"),
+    ]
+    assert fabric.update.call_args.args[:2] == (_WORKSPACE_ID, "nb-a")
+    assert fabric.create.call_args.kwargs["folder_id"] == "folder-Sales"
+
+
+def test_selective_plan_says_why(
+    git_repo: GitRepo, root: Path, fabric: SimpleNamespace
+) -> None:
+    """Each change gets its action and reason; deletions come last."""
+    fabric.list_items.return_value = [
+        {"id": "nb-a", "type": "Notebook", "displayName": "A"},
+        {"id": "rp-old", "type": "Report", "displayName": "Old"},
+    ]
+    _write_item(root, "A.Notebook")
+    _write_item(root, "Old.Report")
+    _write_item(root, "Gone.Notebook")
+    baseline = git_repo.commit("baseline")
+
+    (root / "A.Notebook/content.txt").write_text("changed", encoding="utf-8")
+    _write_item(root, "Sales.Report")
+    shutil.rmtree(root / "Old.Report")
+    shutil.rmtree(root / "Gone.Notebook")
+    git_repo.commit("head")
+
+    with patch(
+        f"{_ENGINE}.DeploymentExecutor.apply", return_value=[]
+    ) as apply:
+        _deploy(root, baseline_commit=baseline)
+
+    _assert_no_change(fabric)
+    plan = apply.call_args.args[0]
+    assert [
+        (a.action, a.item_type, a.display_name, a.reason) for a in plan.actions
+    ] == [
+        (
+            DeploymentActionType.UPDATE,
+            "Notebook",
+            "A",
+            DeploymentReason.SOURCE_CHANGED,
+        ),
+        (
+            DeploymentActionType.CREATE,
+            "Report",
+            "Sales",
+            DeploymentReason.ITEM_ADDED,
+        ),
+        (
+            DeploymentActionType.DELETE,
+            "Report",
+            "Old",
+            DeploymentReason.ITEM_DELETED,
+        ),
+        (
+            DeploymentActionType.NOOP,
+            "Notebook",
+            "Gone",
+            DeploymentReason.ITEM_DELETED,
+        ),
+    ]
+
+
+def test_selective_reports_a_deleted_item_still_in_the_workspace(
+    git_repo: GitRepo, root: Path, fabric: SimpleNamespace
+) -> None:
+    """The deletion is refused and fails the run, so it is not missed."""
+    fabric.list_items.return_value = [
+        {"id": "nb-old", "type": "Notebook", "displayName": "Old"},
+    ]
+    _write_item(root, "Old.Notebook")
+    baseline = git_repo.commit("baseline")
+    shutil.rmtree(root / "Old.Notebook")
+    git_repo.commit("delete")
+
+    report = _deploy(root, baseline_commit=baseline)
+
+    assert [(r.display_name, r.action) for r in report.results] == [
+        ("Old", "failed")
+    ]
+    assert "delete Old.Notebook from the workspace by hand" in (
+        report.results[0].error or ""
+    )
+    _assert_no_change(fabric)
+
+
+def test_selective_with_nothing_changed_calls_nothing(
+    git_repo: GitRepo, root: Path, fabric: SimpleNamespace
+) -> None:
+    """No change since the baseline: no call to Fabric at all."""
+    _write_item(root, "A.Notebook")
+    baseline = git_repo.commit("baseline")
+
+    report = _deploy(root, baseline_commit=baseline)
+
+    assert report.results == []
+    fabric.resolve_workspace.assert_not_called()
+
+
+def test_selective_reads_the_items_from_the_staging_copy(
+    git_repo: GitRepo, root: Path, fabric: SimpleNamespace
+) -> None:
+    """Changes come from the repository; content comes from staging."""
+    _write_item(root, "A.Notebook")
+    baseline = git_repo.commit("baseline")
+    _write_item(root, "Sales/C.Notebook")
+    git_repo.commit("head")
+
+    staging = git_repo.root / "_stg" / "workspace"
+    shutil.copytree(root, staging)
+    (staging / "Sales/C.Notebook/content.txt").write_text(
+        "placeholders replaced", encoding="utf-8"
+    )
+
+    report = deploy_all_items(
+        "Sales-DEV",
+        str(staging),
+        start_path=str(staging),
+        baseline_commit=baseline,
+        repository_path=str(root),
+    )
+
+    assert [(r.display_name, r.path) for r in report.results] == [
+        ("C", (staging / "Sales/C.Notebook").as_posix())
+    ]
+    kwargs = fabric.create.call_args.kwargs
+    assert kwargs["folder_id"] == "folder-Sales"
+    content = {
+        part["path"]: base64.b64decode(part["payload"]).decode("utf-8")
+        for part in kwargs["item_definition"]["parts"]
+    }
+    assert content["content.txt"] == "placeholders replaced"
+
+
+def test_selective_with_an_unknown_baseline_raises(
+    git_repo: GitRepo, root: Path, fabric: SimpleNamespace
+) -> None:
+    """A misconfigured baseline stops the run before any Fabric call."""
+    _write_item(root, "A.Notebook")
+    git_repo.commit("only")
+
+    with pytest.raises(ConfigurationError, match="shallow clone"):
+        _deploy(root, baseline_commit="0" * 40)
+
+    fabric.resolve_workspace.assert_not_called()

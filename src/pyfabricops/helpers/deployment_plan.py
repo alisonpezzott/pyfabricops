@@ -23,6 +23,7 @@ __all__ = [
     "DeploymentPlan",
     "DeploymentPlanner",
     "DeploymentReason",
+    "SourceChange",
     "SourceItem",
 ]
 
@@ -36,12 +37,19 @@ class DeploymentActionType(str, Enum):
     Attributes:
         CREATE: Create the item, which is not in the workspace yet.
         UPDATE: Replace the definition of the item already in the workspace.
+        DELETE: Delete the item from the workspace, because it was deleted
+            from the source. The executor refuses it until a policy allows
+            deletions.
+        NOOP: Nothing to do, such as for an item deleted from the source
+            that the workspace no longer has.
         BLOCKED: Leave the item alone and report it as failed;
             ``DeploymentAction.detail`` says why.
     """
 
     CREATE = "CREATE"
     UPDATE = "UPDATE"
+    DELETE = "DELETE"
+    NOOP = "NOOP"
     BLOCKED = "BLOCKED"
 
 
@@ -49,15 +57,38 @@ class DeploymentReason(str, Enum):
     """
     Why an item is part of a deployment plan.
 
-    Each way of selecting items adds the reasons it gives; for now there is
-    one.
+    Each way of selecting items adds the reasons it gives.
 
     Attributes:
         FULL_DEPLOYMENT: The run deploys every local item in its scope: every
             type in ``DEPLOY_ORDER``, or the ``item_types`` requested.
+        SOURCE_CHANGED: Files of the item changed since the baseline commit.
+        ITEM_ADDED: The item was added to the source since the baseline
+            commit.
+        ITEM_DELETED: The item was deleted from the source since the baseline
+            commit.
     """
 
     FULL_DEPLOYMENT = "FULL_DEPLOYMENT"
+    SOURCE_CHANGED = "SOURCE_CHANGED"
+    ITEM_ADDED = "ITEM_ADDED"
+    ITEM_DELETED = "ITEM_DELETED"
+
+
+class SourceChange(str, Enum):
+    """
+    How an item changed in the source since the baseline commit.
+
+    Attributes:
+        ADDED: The item folder did not exist at the baseline commit.
+        MODIFIED: The item folder exists at both commits and some of its
+            files changed, even if they are all new files.
+        DELETED: The item folder no longer exists at HEAD.
+    """
+
+    ADDED = "ADDED"
+    MODIFIED = "MODIFIED"
+    DELETED = "DELETED"
 
 
 @dataclass(frozen=True)
@@ -67,13 +98,17 @@ class SourceItem:
 
     Attributes:
         item_type (str): The Fabric item type, from the folder suffix.
-        source_path (str): The local item folder.
-        display_name (str | None): The display name from ``.platform``, or
-            None when it could not be read.
+        source_path (str): The local item folder. A deleted item no longer
+            has one.
+        display_name (str | None): The display name from ``.platform`` (for
+            a deleted item, as it was at the baseline commit), or None when
+            it could not be read.
         folder_path (str | None): The workspace folder the item belongs in,
             such as ``"Sales/Staging"``, or None for the workspace root.
         error (str | None): Why the item cannot be deployed, such as an
             unreadable ``.platform``.
+        change (SourceChange | None): How the item changed since the
+            baseline commit, or None when the run deploys every item.
     """
 
     item_type: str
@@ -81,6 +116,7 @@ class SourceItem:
     display_name: str | None = None
     folder_path: str | None = None
     error: str | None = None
+    change: SourceChange | None = None
 
 
 @dataclass(frozen=True)
@@ -101,7 +137,7 @@ class DeploymentAction:
             blocked.
 
     Raises:
-        ValueError: If a CREATE or UPDATE action has no display name.
+        ValueError: If an action other than BLOCKED has no display name.
     """
 
     action: DeploymentActionType
@@ -167,68 +203,127 @@ class DeploymentPlanner:
 
     def plan(self, items: Iterable[SourceItem]) -> DeploymentPlan:
         """
-        Plan one action per item, in the order given.
+        Plan one action per item.
 
         An item already in the workspace is updated and any other is
-        created. An item whose display name is unknown is blocked, and so is
-        an item with the same type and display name as an earlier one:
-        deploying both would overwrite the same workspace item.
+        created. An item deleted from the source is deleted from the
+        workspace, or needs nothing when the workspace no longer has it or
+        another item of the plan still defines it, as when its folder moved.
+        An item whose display name is unknown is blocked, and so is an item
+        with the same type and display name as an earlier one: deploying
+        both would overwrite the same workspace item.
 
         Args:
             items (Iterable[SourceItem]): The selected items, in deployment
                 order.
 
         Returns:
-            DeploymentPlan: One action per item, in the same order.
+            DeploymentPlan: One action per item. Deletions come after every
+                other action; otherwise the order given is kept.
         """
-        first_seen: dict[tuple[str, str], str] = {}
-        return DeploymentPlan(
-            actions=[self._plan_item(item, first_seen) for item in items]
-        )
+        selected = list(items)
+        defined: dict[tuple[str, str], str] = {}
+        actions = [
+            self._plan_item(item, defined)
+            for item in selected
+            if item.change is not SourceChange.DELETED
+        ]
+        deleted: dict[tuple[str, str], str] = {}
+        actions += [
+            self._plan_deletion(item, defined, deleted)
+            for item in selected
+            if item.change is SourceChange.DELETED
+        ]
+        return DeploymentPlan(actions=actions)
 
     def _plan_item(
-        self, item: SourceItem, first_seen: dict[tuple[str, str], str]
+        self, item: SourceItem, defined: dict[tuple[str, str], str]
     ) -> DeploymentAction:
-        """Plan one item, remembering its identity to catch duplicates."""
+        """Plan an item to create or update, catching duplicate identities."""
         display_name = item.display_name
         if item.error is not None or display_name is None:
-            return _blocked(
-                item, item.error or f"{item.source_path} has no display name."
-            )
+            return _blocked(item)
 
         identity = (item.item_type, display_name)
-        if identity in first_seen:
-            return _blocked(
+        if identity in defined:
+            return _action(
                 item,
+                DeploymentActionType.BLOCKED,
                 f"{display_name}.{item.item_type} is also defined at "
-                f"{first_seen[identity]}; deploying both would overwrite the "
+                f"{defined[identity]}; deploying both would overwrite the "
                 "same item.",
             )
-        first_seen[identity] = item.source_path
+        defined[identity] = item.source_path
 
-        action = (
-            DeploymentActionType.UPDATE
-            if identity in self._existing_items
-            else DeploymentActionType.CREATE
+        if identity in self._existing_items:
+            return _action(item, DeploymentActionType.UPDATE)
+        return _action(item, DeploymentActionType.CREATE)
+
+    def _plan_deletion(
+        self,
+        item: SourceItem,
+        defined: dict[tuple[str, str], str],
+        deleted: dict[tuple[str, str], str],
+    ) -> DeploymentAction:
+        """Plan an item deleted from the source, once per workspace item."""
+        display_name = item.display_name
+        if item.error is not None or display_name is None:
+            return _blocked(item)
+
+        identity = (item.item_type, display_name)
+        if identity in defined:
+            return _action(
+                item,
+                DeploymentActionType.NOOP,
+                f"Still defined at {defined[identity]}.",
+            )
+        if identity in deleted:
+            return _action(
+                item,
+                DeploymentActionType.NOOP,
+                f"Its deletion is planned with {deleted[identity]}.",
+            )
+        deleted[identity] = item.source_path
+
+        if identity in self._existing_items:
+            return _action(item, DeploymentActionType.DELETE)
+        return _action(
+            item,
+            DeploymentActionType.NOOP,
+            "Deleted from the source and not in the workspace.",
         )
-        return DeploymentAction(
-            action=action,
-            item_type=item.item_type,
-            display_name=display_name,
-            source_path=item.source_path,
-            reason=DeploymentReason.FULL_DEPLOYMENT,
-            folder_path=item.folder_path,
-        )
 
 
-def _blocked(item: SourceItem, detail: str) -> DeploymentAction:
-    """Plan an item that cannot be deployed, keeping its place in the run."""
+# Why an item is in the plan, from how it changed; None means a full run.
+_REASONS: dict[SourceChange | None, DeploymentReason] = {
+    None: DeploymentReason.FULL_DEPLOYMENT,
+    SourceChange.ADDED: DeploymentReason.ITEM_ADDED,
+    SourceChange.MODIFIED: DeploymentReason.SOURCE_CHANGED,
+    SourceChange.DELETED: DeploymentReason.ITEM_DELETED,
+}
+
+
+def _action(
+    item: SourceItem,
+    action: DeploymentActionType,
+    detail: str | None = None,
+) -> DeploymentAction:
+    """Plan an action for an item, with the reason its change gives."""
     return DeploymentAction(
-        action=DeploymentActionType.BLOCKED,
+        action=action,
         item_type=item.item_type,
         display_name=item.display_name,
         source_path=item.source_path,
-        reason=DeploymentReason.FULL_DEPLOYMENT,
+        reason=_REASONS[item.change],
         folder_path=item.folder_path,
         detail=detail,
+    )
+
+
+def _blocked(item: SourceItem) -> DeploymentAction:
+    """Block an item whose display name is unknown, keeping its place."""
+    return _action(
+        item,
+        DeploymentActionType.BLOCKED,
+        item.error or f"{item.source_path} has no display name.",
     )

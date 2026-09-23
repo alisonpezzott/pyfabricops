@@ -247,6 +247,8 @@ def deploy_all_items(
     *,
     item_types: Sequence[str] | None = None,
     fail_fast: bool = False,
+    baseline_commit: str | None = None,
+    repository_path: str | None = None,
 ) -> DeploymentReport:
     """
     Deploy all items found under a local path to a workspace.
@@ -258,6 +260,12 @@ def deploy_all_items(
     are deployed in dependency order (``DEPLOY_ORDER``). A failed item does
     not stop the run unless ``fail_fast`` is set. Nothing is ever deleted.
 
+    With ``baseline_commit``, only the items changed in Git between that
+    commit and HEAD are deployed (selective deployment). An item deleted
+    since then is reported as failed while the workspace still has it,
+    because deleting is not supported yet; once it is gone, it needs
+    nothing.
+
     Args:
         workspace (str): The name or ID of the workspace.
         path (str): The path to the items.
@@ -268,10 +276,23 @@ def deploy_all_items(
             given, the types are deployed in dependency order.
         fail_fast (bool, optional): Stop at the first failed item and mark
             the remaining ones as skipped. Defaults to False.
+        baseline_commit (str, optional): Deploy only the items changed since
+            this commit (an ID, tag or branch). Needs git, and the commit in
+            the local history. Defaults to None: every item.
+        repository_path (str, optional): The folder of the Git repository
+            that ``path`` was copied from, such as the one given to
+            ``copy_to_staging``: changes are found there and the items read
+            from ``path``. Only used with ``baseline_commit``. Defaults to
+            ``path``.
 
     Returns:
         DeploymentReport: The outcome of each item; ``report.failed`` lists
             the items that failed.
+
+    Raises:
+        ConfigurationError: With ``baseline_commit``, if git cannot run, the
+            folder is not in a Git repository or the commit is not in its
+            history (a shallow clone may lack it).
 
     Examples:
         ```python
@@ -283,6 +304,16 @@ def deploy_all_items(
         )
         if report.failed:
             raise SystemExit(1)
+
+        # Only what changed since the last deployment
+        staging = copy_to_staging('workspace')
+        report = deploy_all_items(
+            'Sales-PRD',
+            staging,
+            start_path=staging,
+            baseline_commit=last_deployed_commit,
+            repository_path='workspace',
+        )
         ```
     """
     return _deploy_all(
@@ -291,4 +322,6 @@ def deploy_all_items(
         start_path=start_path,
         item_types=item_types,
         fail_fast=fail_fast,
+        baseline_commit=baseline_commit,
+        repository_path=repository_path,
     )
