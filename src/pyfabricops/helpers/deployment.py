@@ -1,10 +1,12 @@
 """
 Deployment engine shared by the ``deploy_all_*`` helpers.
 
-A run lists the workspace items and folders once, deploys the local items in
-dependency order and returns a ``DeploymentReport`` with the outcome of each
-item, so a partial failure reaches the caller instead of being logged and
-lost. Nothing is ever deleted.
+A run plans first, then applies. It finds the local items in dependency
+order, lists the workspace items and folders once, and builds a
+``DeploymentPlan`` from them without changing anything. ``DeploymentExecutor``
+then applies the plan, and the run returns a ``DeploymentReport`` with the
+outcome of each item, so a partial failure reaches the caller instead of
+being logged and lost. Nothing is ever deleted.
 """
 
 from __future__ import annotations
@@ -21,6 +23,13 @@ from pandas import DataFrame
 from ..api.api import ApiResult, api_request
 from ..core.folders import create_folder, list_folders
 from ..core.workspaces import resolve_workspace
+from ..helpers.deployment_plan import (
+    DeploymentAction,
+    DeploymentActionType,
+    DeploymentPlan,
+    DeploymentPlanner,
+    SourceItem,
+)
 from ..items.items import list_items
 from ..utils.exceptions import (
     ConfigurationError,
@@ -53,11 +62,11 @@ DEPLOY_ORDER: tuple[str, ...] = (
     "Report",
 )
 
-DeploymentAction: TypeAlias = Literal[
+DeploymentOutcome: TypeAlias = Literal[
     "created", "updated", "failed", "skipped"
 ]
 
-_ACTIONS: tuple[DeploymentAction, ...] = (
+_ACTIONS: tuple[DeploymentOutcome, ...] = (
     "created",
     "updated",
     "failed",
@@ -87,7 +96,7 @@ class DeploymentResult:
     item_type: str
     display_name: str | None
     path: str
-    action: DeploymentAction
+    action: DeploymentOutcome
     item_id: str | None = None
     moved: bool = False
     duration_seconds: float = 0.0
@@ -333,6 +342,38 @@ def _try_display_name(item_path: str) -> str | None:
         return None
 
 
+def _read_source_items(
+    local_items: Sequence[tuple[str, str]], *, start_path: str | None
+) -> list[SourceItem]:
+    """Describe each local item for the planner, reading its ``.platform``."""
+    return [
+        _read_source_item(item_type, item_path, start_path=start_path)
+        for item_type, item_path in local_items
+    ]
+
+
+def _read_source_item(
+    item_type: str, item_path: str, *, start_path: str | None
+) -> SourceItem:
+    """Describe one local item, or record why it cannot be deployed."""
+    folder_path = extract_middle_path(item_path, start_path=start_path)
+    try:
+        display_name = _read_display_name(item_path)
+    except (PyFabricOpsError, OSError) as e:
+        return SourceItem(
+            item_type=item_type,
+            source_path=item_path,
+            folder_path=folder_path,
+            error=str(e),
+        )
+    return SourceItem(
+        item_type=item_type,
+        source_path=item_path,
+        display_name=display_name,
+        folder_path=folder_path,
+    )
+
+
 def _describe_error(result: ApiResult) -> str:
     """Summarize a failed API result as ``status: errorCode - message``."""
     detail = result.error or ""
@@ -419,83 +460,145 @@ def _request_move_item(
     )
 
 
-def _deploy_one(
-    index: _WorkspaceIndex,
-    item_type: str,
-    item_path: str,
+def _action_result(
+    action: DeploymentAction,
+    outcome: DeploymentOutcome,
     *,
-    start_path: str | None,
-    first_seen: dict[tuple[str, str], str],
+    item_id: str | None = None,
+    moved: bool = False,
+    duration_seconds: float = 0.0,
+    error: str | None = None,
 ) -> DeploymentResult:
-    """Create or update one local item and report the outcome."""
+    """Report the outcome of a planned action."""
+    return DeploymentResult(
+        item_type=action.item_type,
+        display_name=action.display_name,
+        path=action.source_path,
+        action=outcome,
+        item_id=item_id,
+        moved=moved,
+        duration_seconds=duration_seconds,
+        error=error,
+    )
+
+
+def _identity(action: DeploymentAction) -> tuple[str, str]:
+    """Return the ``(item_type, display_name)`` a CREATE or UPDATE targets."""
+    # DeploymentAction guarantees a display name for CREATE and UPDATE.
+    return action.item_type, cast(str, action.display_name)
+
+
+def _planned_target(
+    index: _WorkspaceIndex, action: DeploymentAction
+) -> dict[str, Any]:
+    """
+    Return the workspace item an UPDATE action replaces.
+
+    Raises:
+        ConfigurationError: If the item is not in the workspace, which means
+            the plan does not match the workspace it is applied to.
+    """
+    item_type, display_name = _identity(action)
+    existing = index.items.get((item_type, display_name))
+    if existing is None:
+        raise ConfigurationError(
+            f"{display_name}.{item_type} is planned as an update but is not "
+            "in the workspace."
+        )
+    return existing
+
+
+def _create_planned_item(
+    index: _WorkspaceIndex,
+    action: DeploymentAction,
+    definition: dict[str, Any],
+    folder_id: str | None,
+) -> str | None:
+    """Create the item of a CREATE action and add it to the index."""
+    item_type, display_name = _identity(action)
+    created = _request_create_item(
+        index.workspace_id,
+        display_name=display_name,
+        item_type=item_type,
+        item_definition=definition,
+        folder_id=folder_id,
+    )
+    _raise_for_failure(created, "Create")
+    item_id: str | None = (created.data or {}).get("id")
+    index.items[(item_type, display_name)] = {
+        "id": item_id,
+        "folderId": folder_id,
+    }
+    return item_id
+
+
+def _move_if_needed(
+    index: _WorkspaceIndex,
+    item_id: str,
+    existing: dict[str, Any],
+    folder_id: str | None,
+) -> bool:
+    """Move an existing item into its folder when it is elsewhere."""
+    if not folder_id or existing.get("folderId") == folder_id:
+        return False
+    _raise_for_failure(
+        _request_move_item(index.workspace_id, item_id, folder_id), "Move"
+    )
+    existing["folderId"] = folder_id
+    return True
+
+
+def _apply_action(
+    index: _WorkspaceIndex, action: DeploymentAction
+) -> DeploymentResult:
+    """Execute one planned action and report the outcome."""
+    if action.action is DeploymentActionType.BLOCKED:
+        return _action_result(action, "failed", error=action.detail)
+
     started = time.monotonic()
-    display_name: str | None = None
     item_id: str | None = None
     moved = False
-    action: DeploymentAction
+    outcome: DeploymentOutcome
 
     try:
-        display_name = _read_display_name(item_path)
-        identity = (item_type, display_name)
-        if identity in first_seen:
-            raise ConfigurationError(
-                f"{display_name}.{item_type} is also defined at "
-                f"{first_seen[identity]}; deploying both would overwrite the "
-                "same item."
+        if action.action is DeploymentActionType.CREATE:
+            definition = pack_item_definition(action.source_path)
+            folder_id = index.ensure_folder(action.folder_path)
+            item_id = _create_planned_item(
+                index, action, definition, folder_id
             )
-        first_seen[identity] = item_path
-
-        definition = pack_item_definition(item_path)
-        folder_id = index.ensure_folder(
-            extract_middle_path(item_path, start_path=start_path)
-        )
-
-        existing = index.items.get(identity)
-        if existing is None:
-            created = _request_create_item(
-                index.workspace_id,
-                display_name=display_name,
-                item_type=item_type,
-                item_definition=definition,
-                folder_id=folder_id,
-            )
-            _raise_for_failure(created, "Create")
-            item_id = (created.data or {}).get("id")
-            index.items[identity] = {"id": item_id, "folderId": folder_id}
-            action = "created"
-        else:
+            outcome = "created"
+        elif action.action is DeploymentActionType.UPDATE:
+            # Check the target before the first change to the workspace.
+            existing = _planned_target(index, action)
+            definition = pack_item_definition(action.source_path)
+            folder_id = index.ensure_folder(action.folder_path)
             item_id = cast(str, existing["id"])
-            if folder_id and existing.get("folderId") != folder_id:
-                _raise_for_failure(
-                    _request_move_item(index.workspace_id, item_id, folder_id),
-                    "Move",
-                )
-                existing["folderId"] = folder_id
-                moved = True
+            moved = _move_if_needed(index, item_id, existing, folder_id)
             _raise_for_failure(
                 _request_update_item_definition(
                     index.workspace_id, item_id, definition
                 ),
                 "Update definition",
             )
-            action = "updated"
+            outcome = "updated"
+        else:
+            raise ConfigurationError(
+                f"Unsupported deployment action: {action.action.value}."
+            )
     except (PyFabricOpsError, OSError) as e:
-        return DeploymentResult(
-            item_type=item_type,
-            display_name=display_name,
-            path=item_path,
-            action="failed",
+        return _action_result(
+            action,
+            "failed",
             item_id=item_id,
             moved=moved,
             duration_seconds=time.monotonic() - started,
             error=str(e),
         )
 
-    return DeploymentResult(
-        item_type=item_type,
-        display_name=display_name,
-        path=item_path,
-        action=action,
+    return _action_result(
+        action,
+        outcome,
         item_id=item_id,
         moved=moved,
         duration_seconds=time.monotonic() - started,
@@ -561,6 +664,54 @@ def _fail_all(
     return report
 
 
+class DeploymentExecutor:
+    """
+    Apply a deployment plan to a workspace through the Fabric API.
+
+    The executor decides nothing: it creates the items planned as CREATE,
+    updates the items planned as UPDATE (moving them first when their folder
+    differs) and reports BLOCKED items as failed, creating missing folders on
+    the way. Used by ``deploy_all_items``; not exported from ``pyfabricops``
+    yet.
+
+    Args:
+        index (_WorkspaceIndex): The workspace items and folders the plan was
+            built from.
+        fail_fast (bool, optional): Stop at the first failed action and
+            report the remaining ones as skipped. Defaults to False.
+    """
+
+    def __init__(
+        self, index: _WorkspaceIndex, *, fail_fast: bool = False
+    ) -> None:
+        self._index = index
+        self._fail_fast = fail_fast
+
+    def apply(self, plan: DeploymentPlan) -> list[DeploymentResult]:
+        """
+        Execute the actions of a plan, in order.
+
+        Args:
+            plan (DeploymentPlan): The plan to execute.
+
+        Returns:
+            list[DeploymentResult]: One result per action, in plan order.
+        """
+        results: list[DeploymentResult] = []
+        for position, action in enumerate(plan.actions):
+            result = _apply_action(self._index, action)
+            results.append(result)
+            _log_result(result)
+
+            if result.action == "failed" and self._fail_fast:
+                results.extend(
+                    _action_result(skipped, "skipped")
+                    for skipped in plan.actions[position + 1 :]
+                )
+                break
+        return results
+
+
 def _deploy_all(
     workspace: str,
     path: str,
@@ -570,9 +721,11 @@ def _deploy_all(
     fail_fast: bool = False,
 ) -> DeploymentReport:
     """
-    Deploy every local item of the given types and report each outcome.
+    Plan, then apply, the deployment of every local item of the given types.
 
-    See ``deploy_all_items`` for the public contract.
+    Until the plan is built the run only reads: the local items and one
+    listing of the workspace. Every change is made by the executor. See
+    ``deploy_all_items`` for the public contract.
     """
     report = DeploymentReport(workspace=workspace)
 
@@ -597,29 +750,11 @@ def _deploy_all(
             f"'{workspace}'.",
         )
 
-    first_seen: dict[tuple[str, str], str] = {}
-    for position, (item_type, item_path) in enumerate(local_items):
-        result = _deploy_one(
-            index,
-            item_type,
-            item_path,
-            start_path=start_path,
-            first_seen=first_seen,
-        )
-        report.results.append(result)
-        _log_result(result)
+    planner = DeploymentPlanner(existing_items=index.items.keys())
+    plan = planner.plan(_read_source_items(local_items, start_path=start_path))
 
-        if result.action == "failed" and fail_fast:
-            report.results.extend(
-                DeploymentResult(
-                    item_type=skipped_type,
-                    display_name=_try_display_name(skipped_path),
-                    path=skipped_path,
-                    action="skipped",
-                )
-                for skipped_type, skipped_path in local_items[position + 1 :]
-            )
-            break
+    executor = DeploymentExecutor(index, fail_fast=fail_fast)
+    report.results.extend(executor.apply(plan))
 
     _log_report(report)
     return report

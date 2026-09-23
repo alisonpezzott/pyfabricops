@@ -13,7 +13,18 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from pyfabricops.api.api import ApiResult
-from pyfabricops.helpers.deployment import DeploymentReport, DeploymentResult
+from pyfabricops.helpers.deployment import (
+    DeploymentExecutor,
+    DeploymentReport,
+    DeploymentResult,
+    _WorkspaceIndex,
+)
+from pyfabricops.helpers.deployment_plan import (
+    DeploymentAction,
+    DeploymentActionType,
+    DeploymentPlan,
+    DeploymentReason,
+)
 from pyfabricops.helpers.items import deploy_all_items
 
 _WORKSPACE_ID = "00000000-0000-0000-0000-000000000001"
@@ -526,3 +537,166 @@ def test_deploy_all_items_delegates_to_the_engine() -> None:
         item_types=["Notebook"],
         fail_fast=True,
     )
+
+
+# ---------------------------------------------------------------------------
+# Plan, then apply
+# ---------------------------------------------------------------------------
+
+
+def _planned(
+    action: DeploymentActionType,
+    item_dir: Path,
+    *,
+    folder_path: str | None = None,
+) -> DeploymentAction:
+    """A planned action for an item folder written by _write_item."""
+    name, item_type = item_dir.name.rsplit(".", 1)
+    return DeploymentAction(
+        action=action,
+        item_type=item_type,
+        display_name=name,
+        source_path=str(item_dir),
+        reason=DeploymentReason.FULL_DEPLOYMENT,
+        folder_path=folder_path,
+    )
+
+
+def _index(
+    items: dict[tuple[str, str], dict[str, Any]] | None = None,
+) -> _WorkspaceIndex:
+    """A workspace index with the given items and no folders."""
+    return _WorkspaceIndex(
+        workspace_id=_WORKSPACE_ID, items=items or {}, folders={}
+    )
+
+
+def _assert_no_change(fabric: SimpleNamespace) -> None:
+    """No folder or item was created, updated or moved."""
+    for mutation in (
+        fabric.create_folder,
+        fabric.create,
+        fabric.update,
+        fabric.move,
+    ):
+        mutation.assert_not_called()
+
+
+def test_planning_makes_no_change_to_the_workspace(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """Up to the plan the run only reads; every change is the executor's."""
+    fabric.list_items.return_value = [
+        {"id": "lh-1", "type": "Lakehouse", "displayName": "Bronze"},
+    ]
+    _write_item(root, "Bronze.Lakehouse")
+    _write_item(root, "Sales/Orders.Notebook")
+    (root / "Broken.Notebook").mkdir()
+
+    with patch(
+        f"{_ENGINE}.DeploymentExecutor.apply", return_value=[]
+    ) as apply:
+        _deploy(root)
+
+    _assert_no_change(fabric)
+    plan = apply.call_args.args[0]
+    assert [
+        (a.action, a.item_type, a.display_name, a.folder_path)
+        for a in plan.actions
+    ] == [
+        (DeploymentActionType.UPDATE, "Lakehouse", "Bronze", None),
+        (DeploymentActionType.BLOCKED, "Notebook", None, None),
+        (DeploymentActionType.CREATE, "Notebook", "Orders", "Sales"),
+    ]
+
+
+def test_executor_applies_the_actions_in_plan_order(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """Each action goes to the matching Fabric call, in plan order."""
+    index = _index({("Notebook", "B"): {"id": "nb-b", "folderId": None}})
+    plan = DeploymentPlan(
+        actions=[
+            _planned(
+                DeploymentActionType.CREATE, _write_item(root, "A.Notebook")
+            ),
+            _planned(
+                DeploymentActionType.UPDATE, _write_item(root, "B.Notebook")
+            ),
+        ]
+    )
+
+    results = DeploymentExecutor(index).apply(plan)
+
+    assert [(r.display_name, r.action) for r in results] == [
+        ("A", "created"),
+        ("B", "updated"),
+    ]
+    assert fabric.create.call_args.kwargs["display_name"] == "A"
+    assert fabric.update.call_args.args[:2] == (_WORKSPACE_ID, "nb-b")
+
+
+def test_executor_does_what_the_plan_says(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """The executor does not decide again: a planned CREATE is created."""
+    index = _index({("Notebook", "A"): {"id": "nb-a", "folderId": None}})
+    plan = DeploymentPlan(
+        actions=[
+            _planned(
+                DeploymentActionType.CREATE, _write_item(root, "A.Notebook")
+            )
+        ]
+    )
+
+    DeploymentExecutor(index).apply(plan)
+
+    fabric.create.assert_called_once()
+    fabric.update.assert_not_called()
+
+
+def test_blocked_action_fails_without_calling_fabric(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """A blocked item is reported as failed with the planner's reason."""
+    blocked = DeploymentAction(
+        action=DeploymentActionType.BLOCKED,
+        item_type="Notebook",
+        display_name=None,
+        source_path=str(root / "Broken.Notebook"),
+        reason=DeploymentReason.FULL_DEPLOYMENT,
+        detail="Broken.Notebook/.platform not found.",
+    )
+
+    (result,) = DeploymentExecutor(_index()).apply(
+        DeploymentPlan(actions=[blocked])
+    )
+
+    assert (result.action, result.error) == (
+        "failed",
+        "Broken.Notebook/.platform not found.",
+    )
+    _assert_no_change(fabric)
+
+
+def test_update_missing_from_the_workspace_fails_before_any_change(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """A plan that does not match the workspace is not forced onto it."""
+    plan = DeploymentPlan(
+        actions=[
+            _planned(
+                DeploymentActionType.UPDATE,
+                _write_item(root, "Sales/A.Notebook"),
+                folder_path="Sales",
+            )
+        ]
+    )
+
+    (result,) = DeploymentExecutor(_index()).apply(plan)
+
+    assert result.action == "failed"
+    assert result.error == (
+        "A.Notebook is planned as an update but is not in the workspace."
+    )
+    _assert_no_change(fabric)

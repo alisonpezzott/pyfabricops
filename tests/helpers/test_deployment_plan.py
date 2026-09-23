@@ -1,0 +1,209 @@
+"""Tests for the deployment planner in pyfabricops.helpers.deployment_plan."""
+
+from __future__ import annotations
+
+import ast
+import dataclasses
+import inspect
+import sys
+from collections.abc import Collection
+
+import pytest
+
+from pyfabricops.helpers import deployment_plan
+from pyfabricops.helpers.deployment_plan import (
+    DeploymentAction,
+    DeploymentActionType,
+    DeploymentPlan,
+    DeploymentPlanner,
+    DeploymentReason,
+    SourceItem,
+)
+
+CREATE = DeploymentActionType.CREATE
+UPDATE = DeploymentActionType.UPDATE
+BLOCKED = DeploymentActionType.BLOCKED
+
+
+def _item(
+    name: str, item_type: str = "Notebook", folder: str | None = None
+) -> SourceItem:
+    """A readable local item under workspace/, optionally in a folder."""
+    parent = f"workspace/{folder}" if folder else "workspace"
+    return SourceItem(
+        item_type=item_type,
+        source_path=f"{parent}/{name}.{item_type}",
+        display_name=name,
+        folder_path=folder,
+    )
+
+
+def _broken(name: str) -> SourceItem:
+    """A local item whose .platform could not be read."""
+    path = f"workspace/{name}.Notebook"
+    return SourceItem(
+        item_type="Notebook",
+        source_path=path,
+        error=f"{path}/.platform not found.",
+    )
+
+
+def _plan(
+    items: list[SourceItem],
+    existing: Collection[tuple[str, str]] = (),
+) -> DeploymentPlan:
+    return DeploymentPlanner(existing_items=existing).plan(items)
+
+
+# ---------------------------------------------------------------------------
+# One action per item
+# ---------------------------------------------------------------------------
+
+
+def test_no_items_give_an_empty_plan() -> None:
+    """Nothing selected, nothing planned."""
+    assert _plan([]) == DeploymentPlan(actions=[])
+
+
+def test_one_item_gives_one_action() -> None:
+    """The action says what happens, to which item, where and why."""
+    plan = _plan([_item("Orders", folder="Sales")])
+
+    assert plan.actions == (
+        DeploymentAction(
+            action=CREATE,
+            item_type="Notebook",
+            display_name="Orders",
+            source_path="workspace/Sales/Orders.Notebook",
+            reason=DeploymentReason.FULL_DEPLOYMENT,
+            folder_path="Sales",
+        ),
+    )
+
+
+@pytest.mark.parametrize("count", [2, 25])
+def test_n_items_give_n_actions_in_the_given_order(count: int) -> None:
+    """The planner keeps the order of the selection, dependency order."""
+    items = [_item(f"Item{n:02}") for n in range(count)]
+
+    plan = _plan(items)
+
+    assert len(plan.actions) == count
+    assert [a.source_path for a in plan.actions] == [
+        i.source_path for i in items
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Decisions
+# ---------------------------------------------------------------------------
+
+
+def test_items_in_the_workspace_are_updated_and_others_created() -> None:
+    """Only the same type and display name counts as the same item."""
+    plan = _plan(
+        [_item("Orders"), _item("Orders", "Report"), _item("Sales")],
+        existing={("Notebook", "Orders"), ("Notebook", "Legacy")},
+    )
+
+    assert [a.action for a in plan.actions] == [UPDATE, CREATE, CREATE]
+
+
+def test_an_unreadable_item_is_blocked_in_its_place() -> None:
+    """The item stays in the plan, so it is reported where it was found."""
+    broken = _broken("Broken")
+
+    plan = _plan([_item("A"), broken, _item("B")])
+
+    assert [a.action for a in plan.actions] == [CREATE, BLOCKED, CREATE]
+    blocked = plan.actions[1]
+    assert blocked.display_name is None
+    assert blocked.detail == broken.error
+    assert blocked.reason is DeploymentReason.FULL_DEPLOYMENT
+
+
+def test_an_item_without_a_display_name_is_blocked() -> None:
+    """Without a display name there is no workspace item to match."""
+    (action,) = _plan([SourceItem("Notebook", "workspace/X.Notebook")]).actions
+
+    assert action.action == BLOCKED
+    assert action.detail == "workspace/X.Notebook has no display name."
+
+
+def test_a_duplicate_identity_blocks_the_later_item() -> None:
+    """Two local folders for one workspace item would overwrite each other."""
+    plan = _plan(
+        [_item("Orders", folder="A"), _item("Orders", folder="B")],
+        existing={("Notebook", "Orders")},
+    )
+
+    assert [a.action for a in plan.actions] == [UPDATE, BLOCKED]
+    assert plan.actions[1].detail == (
+        "Orders.Notebook is also defined at workspace/A/Orders.Notebook; "
+        "deploying both would overwrite the same item."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Properties of a plan
+# ---------------------------------------------------------------------------
+
+
+def test_the_same_input_gives_the_same_plan() -> None:
+    """Planning is deterministic, whatever collection types are passed."""
+    items = [
+        _item("Orders"),
+        _item("Orders", folder="Copy"),
+        _item("Sales", "Report"),
+        _broken("Broken"),
+    ]
+    existing = [("Notebook", "Orders")]
+
+    assert _plan(items, existing) == _plan(list(items), set(existing))
+
+
+def test_a_plan_cannot_be_changed_once_built() -> None:
+    """A plan can be inspected, then applied, exactly as it was decided."""
+    plan = _plan([_item("Orders")])
+
+    assert isinstance(plan.actions, tuple)
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        plan.actions[0].action = UPDATE  # type: ignore[misc]
+
+
+def test_create_and_update_actions_need_a_display_name() -> None:
+    """Only a blocked action may name no workspace item."""
+    with pytest.raises(ValueError, match="needs a display name"):
+        DeploymentAction(
+            action=UPDATE,
+            item_type="Notebook",
+            display_name=None,
+            source_path="workspace/X.Notebook",
+            reason=DeploymentReason.FULL_DEPLOYMENT,
+        )
+
+
+def test_types_and_reasons_compare_equal_to_their_names() -> None:
+    """Plain strings work, e.g. for logs or a serialized plan."""
+    assert UPDATE == "UPDATE"
+    assert DeploymentReason.FULL_DEPLOYMENT == "FULL_DEPLOYMENT"
+
+
+def test_the_planner_cannot_reach_the_fabric_api() -> None:
+    """
+    The planning module imports only the standard library.
+
+    Nothing that talks to Fabric (the API client, requests, the other
+    helpers) can be reached from it, so planning cannot create, update,
+    move or delete anything.
+    """
+    tree = ast.parse(inspect.getsource(deployment_plan))
+    imported: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imported.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            assert node.level == 0, "relative import in the planning module"
+            imported.add(node.module or "")
+
+    assert {name.split(".")[0] for name in imported} <= sys.stdlib_module_names

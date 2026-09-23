@@ -37,6 +37,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - existing items are moved only when their folder differs;
   - a failed item no longer aborts the run, and the final message is a
     success only when every item succeeded.
+- The engine behind `deploy_all_items()` now plans before it deploys: a
+  planner decides, from the local items and the workspace listing, whether
+  each item is created, updated or blocked (and why), without changing the
+  workspace; an executor then applies that plan. Functions, arguments and
+  `DeploymentReport` are unchanged. The plan model
+  (`pyfabricops.helpers.deployment_plan`) is internal for now.
 - Long-running operations are polled with a backoff (1 s, 2 s, 4 s, up to
   5 s) until a 600 s timeout, instead of every 5 s for at most 50 s.
 - Throttled requests (429) are retried after the `Retry-After` seconds the
