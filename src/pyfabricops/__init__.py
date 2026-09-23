@@ -162,6 +162,11 @@ from .helpers.dataflows_gen2 import (
     replace_dataflow_gen2_placeholders_with_parameters,
     replace_dataflow_gen2_variables_with_placeholders,
 )
+from .helpers.deployment import (
+    DEPLOY_ORDER,
+    DeploymentReport,
+    DeploymentResult,
+)
 from .helpers.environments import (
     add_environment_external_library_from_pypi,
     deploy_all_environments,
@@ -435,6 +440,9 @@ __all__ = [
     "ApiResult",
     "AuthenticationError",
     "ConfigurationError",
+    "DEPLOY_ORDER",
+    "DeploymentReport",
+    "DeploymentResult",
     "PyFabricOpsFileNotFoundError",
     "InvalidParameterError",
     "OptionNotAvailableError",

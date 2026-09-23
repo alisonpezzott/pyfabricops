@@ -1,0 +1,528 @@
+"""Tests for the deploy_all_* engine in pyfabricops.helpers.deployment."""
+
+from __future__ import annotations
+
+import importlib
+import json
+from collections.abc import Iterator
+from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from pyfabricops.api.api import ApiResult
+from pyfabricops.helpers.deployment import DeploymentReport, DeploymentResult
+from pyfabricops.helpers.items import deploy_all_items
+
+_WORKSPACE_ID = "00000000-0000-0000-0000-000000000001"
+_ENGINE = "pyfabricops.helpers.deployment"
+
+
+def _write_item(
+    root: Path, relative: str, display_name: str | None = None
+) -> Path:
+    """Create a local item folder with a .platform and one content file."""
+    item_dir = root / relative
+    item_dir.mkdir(parents=True)
+    name, item_type = item_dir.name.rsplit(".", 1)
+    platform = {
+        "metadata": {"type": item_type, "displayName": display_name or name}
+    }
+    (item_dir / ".platform").write_text(json.dumps(platform), encoding="utf-8")
+    (item_dir / "content.txt").write_text("content", encoding="utf-8")
+    return item_dir
+
+
+def _failure(error_code: str) -> ApiResult:
+    """A failed API result shaped like a Fabric error response."""
+    body = {"errorCode": error_code, "message": "Something went wrong."}
+    return ApiResult(success=False, status_code=400, error=json.dumps(body))
+
+
+@pytest.fixture()
+def root(tmp_path: Path) -> Path:
+    """The local root that maps to the workspace root."""
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    return workspace
+
+
+@pytest.fixture()
+def fabric() -> Iterator[SimpleNamespace]:
+    """Patch every Fabric call the engine makes."""
+
+    def _create_folder(
+        workspace: str,
+        name: str,
+        *,
+        parent_folder: str | None = None,
+        df: bool = True,
+    ) -> dict[str, Any]:
+        return {"id": f"folder-{name}", "parentFolderId": parent_folder}
+
+    with (
+        patch(
+            f"{_ENGINE}.resolve_workspace", return_value=_WORKSPACE_ID
+        ) as resolve_workspace,
+        patch(f"{_ENGINE}.list_items", return_value=[]) as list_items,
+        patch(f"{_ENGINE}.list_folders", return_value=[]) as list_folders,
+        patch(
+            f"{_ENGINE}.create_folder", side_effect=_create_folder
+        ) as create_folder,
+        patch(
+            f"{_ENGINE}._request_create_item",
+            return_value=ApiResult(True, 201, data={"id": "new-id"}),
+        ) as create,
+        patch(
+            f"{_ENGINE}._request_update_item_definition",
+            return_value=ApiResult(True, 200),
+        ) as update,
+        patch(
+            f"{_ENGINE}._request_move_item",
+            return_value=ApiResult(True, 200),
+        ) as move,
+    ):
+        yield SimpleNamespace(
+            resolve_workspace=resolve_workspace,
+            list_items=list_items,
+            list_folders=list_folders,
+            create_folder=create_folder,
+            create=create,
+            update=update,
+            move=move,
+        )
+
+
+def _deploy(root: Path, **kwargs: Any) -> DeploymentReport:
+    return deploy_all_items(
+        "Sales-DEV", str(root), start_path=str(root), **kwargs
+    )
+
+
+# ---------------------------------------------------------------------------
+# Create, update and order
+# ---------------------------------------------------------------------------
+
+
+def test_items_are_deployed_in_dependency_order(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """Types follow DEPLOY_ORDER whatever the folder layout."""
+    _write_item(root, "Sales.Report")
+    _write_item(root, "Sales.SemanticModel")
+    _write_item(root, "Orders.Notebook")
+    _write_item(root, "Bronze.Lakehouse")
+
+    report = _deploy(root)
+
+    assert [r.item_type for r in report.results] == [
+        "Lakehouse",
+        "Notebook",
+        "SemanticModel",
+        "Report",
+    ]
+    assert report.summary()["created"] == 4
+    assert report.ok
+
+
+def test_create_sends_type_and_display_name(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """New items are created with their type, as the API requires."""
+    _write_item(root, "Orders.Notebook", display_name="Orders Load")
+
+    report = _deploy(root)
+
+    kwargs = fabric.create.call_args.kwargs
+    assert kwargs["item_type"] == "Notebook"
+    assert kwargs["display_name"] == "Orders Load"
+    assert kwargs["folder_id"] is None
+    assert {p["path"] for p in kwargs["item_definition"]["parts"]} == {
+        ".platform",
+        "content.txt",
+    }
+    assert report.results[0].item_id == "new-id"
+
+
+def test_existing_items_are_matched_by_type_and_display_name(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """Only the same type and display name counts as the same item."""
+    fabric.list_items.return_value = [
+        {"id": "nb-1", "type": "Notebook", "displayName": "Orders"},
+        {"id": "sm-1", "type": "SemanticModel", "displayName": "Orders"},
+    ]
+    _write_item(root, "Orders.Notebook")
+    _write_item(root, "Orders.Report")
+
+    report = _deploy(root)
+
+    actions = {r.item_type: r.action for r in report.results}
+    assert actions == {"Notebook": "updated", "Report": "created"}
+    assert fabric.update.call_args.args[:2] == (_WORKSPACE_ID, "nb-1")
+
+
+def test_workspace_is_listed_once_per_run(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """Items and folders are listed once, not once per item."""
+    for name in ("A", "B", "C"):
+        _write_item(root, f"{name}.Notebook")
+
+    _deploy(root)
+
+    fabric.list_items.assert_called_once_with(_WORKSPACE_ID, df=False)
+    fabric.list_folders.assert_called_once_with(_WORKSPACE_ID, df=False)
+
+
+def test_item_types_filter_keeps_dependency_order(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """Only the requested types are deployed, still in dependency order."""
+    _write_item(root, "Sales.Report")
+    _write_item(root, "Orders.Notebook")
+    _write_item(root, "Sales.SemanticModel")
+
+    report = _deploy(root, item_types=["Report", "Notebook"])
+
+    assert [r.item_type for r in report.results] == ["Notebook", "Report"]
+
+
+def test_a_single_item_type_string_is_accepted(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """item_types="Notebook" is not iterated character by character."""
+    _write_item(root, "Orders.Notebook")
+
+    report = _deploy(root, item_types="Notebook")
+
+    assert [r.item_type for r in report.results] == ["Notebook"]
+
+
+# ---------------------------------------------------------------------------
+# Folders
+# ---------------------------------------------------------------------------
+
+
+def test_missing_folders_are_created_once_and_reused(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """Folder paths are created once per run, parents first."""
+    _write_item(root, "Sales/Staging/A.Notebook")
+    _write_item(root, "Sales/Staging/B.Notebook")
+
+    _deploy(root)
+
+    created = [
+        (c.args[1], c.kwargs["parent_folder"])
+        for c in fabric.create_folder.call_args_list
+    ]
+    assert created == [("Sales", None), ("Staging", "folder-Sales")]
+    folder_ids = {c.kwargs["folder_id"] for c in fabric.create.call_args_list}
+    assert folder_ids == {"folder-Staging"}
+
+
+def test_existing_folders_are_reused(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """A folder path that already exists is not created again."""
+    fabric.list_folders.return_value = [
+        {"id": "f-sales", "displayName": "Sales"},
+        {
+            "id": "f-staging",
+            "displayName": "Staging",
+            "parentFolderId": "f-sales",
+        },
+    ]
+    _write_item(root, "Sales/Staging/A.Notebook")
+
+    _deploy(root)
+
+    fabric.create_folder.assert_not_called()
+    assert fabric.create.call_args.kwargs["folder_id"] == "f-staging"
+
+
+def test_items_are_moved_only_when_the_folder_differs(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """Moves happen only for items in another folder, never to the root."""
+    fabric.list_folders.return_value = [
+        {"id": "f-sales", "displayName": "Sales"},
+        {"id": "f-old", "displayName": "Old"},
+    ]
+    fabric.list_items.return_value = [
+        {
+            "id": "a",
+            "type": "Notebook",
+            "displayName": "A",
+            "folderId": "f-old",
+        },
+        {
+            "id": "b",
+            "type": "Notebook",
+            "displayName": "B",
+            "folderId": "f-sales",
+        },
+        {
+            "id": "c",
+            "type": "Notebook",
+            "displayName": "C",
+            "folderId": "f-old",
+        },
+    ]
+    _write_item(root, "Sales/A.Notebook")
+    _write_item(root, "Sales/B.Notebook")
+    _write_item(root, "C.Notebook")
+
+    report = _deploy(root)
+
+    fabric.move.assert_called_once_with(_WORKSPACE_ID, "a", "f-sales")
+    assert {r.display_name: r.moved for r in report.results} == {
+        "A": True,
+        "B": False,
+        "C": False,
+    }
+
+
+def test_folder_creation_failure_fails_the_item(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """An item whose folder cannot be created is reported as failed."""
+    fabric.create_folder.side_effect = None
+    fabric.create_folder.return_value = None
+    _write_item(root, "Sales/A.Notebook")
+
+    report = _deploy(root)
+
+    assert report.results[0].action == "failed"
+    assert "Could not create folder 'Sales'" in (report.results[0].error or "")
+    fabric.create.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Failures
+# ---------------------------------------------------------------------------
+
+
+def test_a_failure_does_not_stop_the_run(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """The remaining items are still deployed after a failure."""
+    fabric.list_items.return_value = [
+        {"id": "a", "type": "Notebook", "displayName": "A"},
+    ]
+    fabric.update.return_value = _failure("InvalidDefinition")
+    _write_item(root, "A.Notebook")
+    _write_item(root, "B.Notebook")
+
+    report = _deploy(root)
+
+    assert [r.action for r in report.results] == ["failed", "created"]
+    assert report.results[0].error == (
+        "Update definition failed with 400: InvalidDefinition - "
+        "Something went wrong."
+    )
+    assert report.failed == [report.results[0]]
+    assert not report.ok
+
+
+def test_fail_fast_skips_the_remaining_items(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """With fail_fast, items after the first failure are skipped."""
+    fabric.create.return_value = _failure("ItemDisplayNameAlreadyInUse")
+    _write_item(root, "Bronze.Lakehouse")
+    _write_item(root, "A.Notebook")
+    _write_item(root, "B.Notebook")
+
+    report = _deploy(root, fail_fast=True)
+
+    assert [r.action for r in report.results] == [
+        "failed",
+        "skipped",
+        "skipped",
+    ]
+    assert [r.display_name for r in report.skipped] == ["A", "B"]
+    assert fabric.create.call_count == 1
+
+
+def test_duplicate_identity_fails_the_second_item(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """Two local folders for the same item would overwrite each other."""
+    _write_item(root, "A/Orders.Notebook")
+    _write_item(root, "B/Orders.Notebook")
+
+    report = _deploy(root)
+
+    assert [r.action for r in report.results] == ["created", "failed"]
+    assert "is also defined at" in (report.results[1].error or "")
+    assert fabric.create.call_count == 1
+
+
+def test_missing_platform_file_is_reported(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """A folder without .platform fails with a clear error."""
+    (root / "Broken.Notebook").mkdir()
+    _write_item(root, "Orders.Notebook")
+
+    report = _deploy(root)
+
+    broken = next(
+        r for r in report.results if r.path.endswith("Broken.Notebook")
+    )
+    assert broken.action == "failed"
+    assert broken.display_name is None
+    assert ".platform not found" in (broken.error or "")
+    assert report.summary() == {
+        "created": 1,
+        "updated": 0,
+        "failed": 1,
+        "skipped": 0,
+    }
+
+
+def test_unknown_workspace_fails_every_item(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """Nothing is attempted when the workspace cannot be resolved."""
+    fabric.resolve_workspace.return_value = None
+    _write_item(root, "A.Notebook")
+    _write_item(root, "B.Notebook")
+
+    report = _deploy(root)
+
+    assert [r.action for r in report.results] == ["failed", "failed"]
+    assert report.results[0].error == "Workspace 'Sales-DEV' not found."
+    fabric.list_items.assert_not_called()
+
+
+def test_listing_failure_fails_every_item(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """Without an item listing, creating items could duplicate them."""
+    fabric.list_items.return_value = None
+    _write_item(root, "A.Notebook")
+
+    report = _deploy(root)
+
+    assert report.results[0].action == "failed"
+    assert "Could not list" in (report.results[0].error or "")
+    fabric.create.assert_not_called()
+
+
+def test_no_local_items_returns_an_empty_report(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """An empty path deploys nothing and calls nothing."""
+    report = _deploy(root)
+
+    assert report.results == []
+    assert report.ok
+    fabric.resolve_workspace.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Report
+# ---------------------------------------------------------------------------
+
+
+def test_report_helpers() -> None:
+    """summary, durations_by_type and to_df describe the results."""
+    report = DeploymentReport(
+        workspace="Sales-DEV",
+        results=[
+            DeploymentResult("Notebook", "A", "a", "created", "1", False, 1.5),
+            DeploymentResult("Notebook", "B", "b", "updated", "2", True, 0.5),
+            DeploymentResult(
+                "SemanticModel", "S", "s", "failed", error="boom"
+            ),
+        ],
+    )
+
+    assert report.summary() == {
+        "created": 1,
+        "updated": 1,
+        "failed": 1,
+        "skipped": 0,
+    }
+    assert report.durations_by_type() == {
+        "Notebook": 2.0,
+        "SemanticModel": 0.0,
+    }
+    assert report.duration_seconds == 2.0
+    df = report.to_df()
+    assert list(df["action"]) == ["created", "updated", "failed"]
+    assert list(df.columns)[:4] == [
+        "item_type",
+        "display_name",
+        "path",
+        "action",
+    ]
+
+
+def test_empty_report_to_df_keeps_the_columns() -> None:
+    """An empty report still has the result columns."""
+    df = DeploymentReport(workspace="Sales-DEV").to_df()
+
+    assert df.empty
+    assert "duration_seconds" in df.columns
+
+
+# ---------------------------------------------------------------------------
+# Type-specific helpers
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("module", "function", "item_type"),
+    [
+        ("notebooks", "deploy_all_notebooks", "Notebook"),
+        ("semantic_models", "deploy_all_semantic_models", "SemanticModel"),
+        ("reports", "deploy_all_reports", "Report"),
+        ("environments", "deploy_all_environments", "Environment"),
+        ("data_pipelines", "deploy_all_data_pipelines", "DataPipeline"),
+        ("dataflows_gen2", "deploy_all_dataflows_gen2", "Dataflow"),
+    ],
+)
+def test_type_specific_helpers_delegate_to_deploy_all_items(
+    module: str, function: str, item_type: str
+) -> None:
+    """deploy_all_<type> is deploy_all_items scoped to one type."""
+    helpers = importlib.import_module(f"pyfabricops.helpers.{module}")
+    expected = DeploymentReport(workspace="Sales-DEV")
+    with patch.object(
+        helpers, "deploy_all_items", return_value=expected
+    ) as deploy:
+        result = getattr(helpers, function)("Sales-DEV", "src", "src")
+
+    assert result is expected
+    deploy.assert_called_once_with(
+        "Sales-DEV", "src", "src", item_types=[item_type]
+    )
+
+
+def test_deploy_all_items_delegates_to_the_engine() -> None:
+    """The public function forwards every argument to the engine."""
+    with patch(
+        "pyfabricops.helpers.items._deploy_all",
+        return_value=MagicMock(spec=DeploymentReport),
+    ) as engine:
+        deploy_all_items(
+            "Sales-DEV",
+            "src",
+            "src",
+            item_types=["Notebook"],
+            fail_fast=True,
+        )
+
+    engine.assert_called_once_with(
+        "Sales-DEV",
+        "src",
+        start_path="src",
+        item_types=["Notebook"],
+        fail_fast=True,
+    )

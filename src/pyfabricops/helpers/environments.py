@@ -6,10 +6,12 @@ import pandas as pd
 from pandas import DataFrame
 
 from ..core.workspaces import resolve_workspace
+from ..helpers.deployment import DeploymentReport
 from ..helpers.folders import (
     create_folders_from_path_string,
     resolve_folder_from_id_to_path,
 )
+from ..helpers.items import deploy_all_items
 from ..items.environments import (
     create_environment,
     get_environment,
@@ -25,7 +27,6 @@ from ..utils.utils import (
     delete_path,
     extract_display_name_from_platform,
     extract_middle_path,
-    list_paths_of_type,
     pack_item_definition,
     unpack_item_definition,
 )
@@ -168,6 +169,8 @@ def export_all_environments(
     if items is None:
         return None
 
+    failed = []
+
     for item in items:
         try:
             folder_path = resolve_folder_from_id_to_path(
@@ -187,15 +190,28 @@ def export_all_environments(
                 / folder_path
                 / (item["displayName"] + ".Environment")
             )
-        os.makedirs(item_path, exist_ok=True)
 
         definition = get_environment_definition(workspace_id, item["id"])
         if definition is None:
-            return None
+            logger.error(
+                f"Could not get the definition of "
+                f"{item['displayName']}.Environment; skipping it."
+            )
+            failed.append(item["displayName"])
+            continue
 
+        os.makedirs(item_path, exist_ok=True)
         unpack_item_definition(definition, item_path)
 
-    logger.success(f"All environments were exported to {path} successfully.")
+    if failed:
+        logger.warning(
+            f"{len(failed)} environment(s) could not be exported: "
+            f"{', '.join(failed)}."
+        )
+    else:
+        logger.success(
+            f"All environments were exported to {path} successfully."
+        )
     return None
 
 
@@ -241,7 +257,7 @@ def deploy_environment(
         return create_environment(
             workspace_id,
             display_name=display_name,
-            item_definition=item_definition,
+            environment_definition=item_definition,
             description=description,
             folder=folder_id,
             df=False,
@@ -253,7 +269,7 @@ def deploy_environment(
         return update_environment_definition(
             workspace_id,
             environment_id,
-            item_definition=item_definition,
+            environment_definition=item_definition,
             df=False,
         )
 
@@ -262,60 +278,23 @@ def deploy_all_environments(
     workspace: str,
     path: str,
     start_path: str | None = None,
-) -> None:
+) -> DeploymentReport:
     """
     Deploy all environments to workspace.
+
+    Shortcut for ``deploy_all_items(..., item_types=["Environment"])``.
 
     Args:
         workspace (str): The name or ID of the workspace.
         path (str): The path to the environments.
         start_path (Optional[str]): The starting path for folder creation.
+
+    Returns:
+        DeploymentReport: The outcome of each environment.
     """
-    workspace_id = resolve_workspace(workspace)
-    if workspace_id is None:
-        return None
-
-    environments_paths = list_paths_of_type(path, "Environment")
-
-    for path_ in environments_paths:
-        display_name = extract_display_name_from_platform(path_)
-        if display_name is None:
-            return None
-
-        environment_id = resolve_environment(workspace_id, display_name)
-
-        folder_path_string = extract_middle_path(path_, start_path=start_path)
-        folder_id = create_folders_from_path_string(
-            workspace_id, folder_path_string
-        )
-
-        item_definition = pack_item_definition(path_)
-
-        if environment_id is None:
-            create_environment(
-                workspace_id,
-                display_name=display_name,
-                item_definition=item_definition,
-                folder=folder_id,
-                df=False,
-            )
-
-        else:
-            if folder_id:
-                move_item(
-                    workspace_id, environment_id, target_folder=folder_id
-                )
-            update_environment_definition(
-                workspace_id,
-                environment_id,
-                item_definition=item_definition,
-                df=False,
-            )
-
-    logger.success(
-        f'All environments were deployed to workspace "{workspace}" successfully.'
+    return deploy_all_items(
+        workspace, path, start_path, item_types=["Environment"]
     )
-    return None
 
 
 def _create_environment_external_library_yaml(

@@ -7,7 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `deploy_all_items()` accepts `item_types`, to deploy only some item types
+  (e.g. `["Notebook", "DataPipeline"]` on every merge), and `fail_fast`. It
+  returns a `DeploymentReport` with the outcome and duration of each item:
+  `report.failed`, `report.summary()`, `report.durations_by_type()` and
+  `report.to_df()`.
+- `DEPLOY_ORDER` — the item types `deploy_all_items()` deploys by default, in
+  dependency order.
+- `set_lro_options()` — configures the long-running operation timeout
+  (default 600 s) and the maximum polling interval (default 5 s).
+- `get_item_definition()` accepts an optional `format` (e.g. `"TMDL"`).
+- `create_item()` accepts `item_type`, sent as the `type` property the Create
+  Item API documents as required. `deploy_item()` now passes it.
+- `api_request()` accepts `return_result=True` to get the final `ApiResult`
+  after pagination or LRO polling, so callers can tell a failure from a
+  success without data.
+
+### Changed
+- `deploy_all_items()` and the `deploy_all_*` helpers for notebooks, semantic
+  models, reports, environments, data pipelines and dataflows gen2 share one
+  engine and now return a `DeploymentReport` instead of `None`:
+  - the workspace items and folders are listed once per run, not once per
+    item;
+  - item types are deployed in dependency order (VariableLibrary → Lakehouse
+    → Warehouse → Environment → Notebook → Dataflow → CopyJob → DataPipeline
+    → SemanticModel → Report);
+  - items are created through the generic Create Item API, with `type`;
+  - existing items are moved only when their folder differs;
+  - a failed item no longer aborts the run, and the final message is a
+    success only when every item succeeded.
+- Long-running operations are polled with a backoff (1 s, 2 s, 4 s, up to
+  5 s) until a 600 s timeout, instead of every 5 s for at most 50 s.
+- Throttled requests (429) are retried after the `Retry-After` seconds the
+  service returns, up to 3 times and for waits of up to 60 s.
+- Pagination follows the `continuationUri` returned by the service, which
+  keeps the original query parameters.
+
 ### Fixed
+- A long-running operation that had already succeeded at the first status
+  check returned no data, so `get_item_definition()` and the export helpers
+  could intermittently get `None`. The result is now fetched from the URL
+  the service advertises.
+- A failed long-running operation was reported as a success: the operation
+  state came back as if it were the result.
+- The `export_all_*` helpers for items, notebooks, semantic models, reports,
+  environments, data pipelines and dataflows gen2 stopped at the first item
+  whose definition could not be read. They now log it, skip it and go on,
+  without leaving an empty folder behind.
+- `deploy_environment()` and `deploy_all_environments()` passed
+  `item_definition=` to functions that take `environment_definition`, and
+  failed with `TypeError`.
+- Two local folders with the same type and display name were deployed onto
+  the same item, the last one silently winning. `deploy_all_items()` now
+  reports the second one as failed.
+- `pack_item_definition()` return annotation is now `dict[str, Any]`.
 - `docs/functions/items/environments.md` referenced the removed
   `pyfabricops.items.environments_gen2` module (renamed to `environments` in
   an earlier refactor), which made `mkdocs build` fail outright and broke
