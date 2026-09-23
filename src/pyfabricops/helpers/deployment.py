@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 import time
 from collections.abc import Mapping, Sequence
-from dataclasses import asdict, dataclass, field, fields
+from dataclasses import asdict, dataclass, field, fields, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal, TypeAlias, cast
@@ -26,7 +26,9 @@ from pandas import DataFrame
 from ..api.api import ApiResult, api_request
 from ..core.folders import create_folder, list_folders
 from ..core.workspaces import resolve_workspace
+from ..helpers.content_hash import definition_hash
 from ..helpers.deployment_plan import (
+    DeployedItem,
     DeploymentAction,
     DeploymentActionType,
     DeploymentPlan,
@@ -896,6 +898,32 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _deployed_after(
+    previous: Mapping[tuple[str, str], DeployedItem],
+    items: Sequence[SourceItem],
+) -> dict[tuple[str, str], DeployedItem]:
+    """
+    What was sent for each item once a successful run is over.
+
+    Deletions go first, so an item moved to another folder keeps a record
+    under its new place.
+    """
+    deployed = dict(previous)
+    for item in items:
+        if item.change is SourceChange.DELETED and item.display_name:
+            deployed.pop((item.item_type, item.display_name), None)
+    for item in items:
+        if (
+            item.change is not SourceChange.DELETED
+            and item.display_name
+            and item.content_hash
+        ):
+            deployed[(item.item_type, item.display_name)] = DeployedItem(
+                item.content_hash, item.folder_path
+            )
+    return deployed
+
+
 @dataclass
 class _StateTracker:
     """The state of an environment, read before a run and recorded after."""
@@ -963,10 +991,24 @@ class _StateTracker:
             )
         return baselines
 
+    @property
+    def deployed_items(self) -> Mapping[tuple[str, str], DeployedItem]:
+        """What the last successful deployment sent for each item."""
+        return self.previous.items if self.previous is not None else {}
+
     def record(
-        self, report: DeploymentReport, item_types: Sequence[str]
+        self,
+        report: DeploymentReport,
+        item_types: Sequence[str],
+        items: Sequence[SourceItem],
     ) -> None:
-        """Record HEAD as deployed for the run's types, if all succeeded."""
+        """
+        Record the run, if every item succeeded.
+
+        HEAD becomes the commit of the run's types, and each item of the run
+        gets the hash and folder it was deployed with; items deleted from
+        the source lose theirs.
+        """
         if not report.ok:
             logger.warning(
                 f"Deployment state '{self.environment}' not updated: not "
@@ -998,6 +1040,7 @@ class _StateTracker:
                 source_commit=self.head,
                 commits=commits,
                 deployed_at_utc=_utc_now(),
+                items=_deployed_after(self.deployed_items, items),
             ),
         )
         logger.info(
@@ -1029,15 +1072,14 @@ def _deploy_all(
     """
     types = _ordered_types(item_types)
     if state_backend is None:
-        return _deploy_selected(
-            workspace,
+        items = _select_items(
             path,
             dict.fromkeys(types, baseline_commit),
             start_path=start_path,
-            fail_fast=fail_fast,
             target_commit="HEAD",
             repository_path=repository_path,
         )
+        return _deploy_items(workspace, items, fail_fast=fail_fast)
 
     tracker = _StateTracker.open(
         state_backend,
@@ -1045,45 +1087,55 @@ def _deploy_all(
         workspace=workspace,
         repository_path=repository_path or path,
     )
-    report = _deploy_selected(
-        workspace,
-        path,
-        tracker.baselines(types, baseline_commit),
-        start_path=start_path,
-        fail_fast=fail_fast,
-        target_commit=tracker.head,
-        repository_path=repository_path,
+    items = _with_content_hashes(
+        _select_items(
+            path,
+            tracker.baselines(types, baseline_commit),
+            start_path=start_path,
+            target_commit=tracker.head,
+            repository_path=repository_path,
+        )
     )
-    tracker.record(report, types)
+    report = _deploy_items(
+        workspace,
+        items,
+        fail_fast=fail_fast,
+        deployed_items=tracker.deployed_items,
+    )
+    tracker.record(report, types, items)
     return report
 
 
-def _deploy_selected(
+def _with_content_hashes(items: list[SourceItem]) -> list[SourceItem]:
+    """Hash the definition of each item to deploy, when it can be read."""
+    hashed: list[SourceItem] = []
+    for item in items:
+        if item.error is None and item.change is not SourceChange.DELETED:
+            try:
+                definition = pack_item_definition(item.source_path)
+            except (PyFabricOpsError, OSError):
+                # The executor reads it again and reports the failure.
+                definition = None
+            if definition is not None:
+                item = replace(item, content_hash=definition_hash(definition))
+        hashed.append(item)
+    return hashed
+
+
+def _deploy_items(
     workspace: str,
-    path: str,
-    baselines: Mapping[str, str | None],
+    items: list[SourceItem],
     *,
-    start_path: str | None,
     fail_fast: bool,
-    target_commit: str,
-    repository_path: str | None,
+    deployed_items: Mapping[tuple[str, str], DeployedItem] | None = None,
 ) -> DeploymentReport:
     """
-    Plan, then apply, the deployment of the selected local items.
+    Plan, then apply, the deployment of the selected items.
 
-    Until the plan is built the run only reads: the local items, Git for
-    the types with a baseline, and one listing of the workspace. Every
-    change is made by the executor.
+    Until the plan is built the run only reads: one listing of the
+    workspace. Every change is made by the executor.
     """
     report = DeploymentReport(workspace=workspace)
-
-    items = _select_items(
-        path,
-        baselines,
-        start_path=start_path,
-        target_commit=target_commit,
-        repository_path=repository_path,
-    )
     if not items:
         return report
 
@@ -1101,7 +1153,9 @@ def _deploy_selected(
             f"'{workspace}'.",
         )
 
-    planner = DeploymentPlanner(existing_items=index.items.keys())
+    planner = DeploymentPlanner(
+        existing_items=index.items.keys(), deployed_items=deployed_items
+    )
     plan = planner.plan(items)
 
     executor = DeploymentExecutor(index, fail_fast=fail_fast)

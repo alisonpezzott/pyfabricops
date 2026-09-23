@@ -272,9 +272,12 @@ def deploy_all_items(
     With ``state_backend``, the baseline comes from the last successful
     deployment to ``environment``, kept per item type: a type deploys what
     changed since it was last deployed, or every item when it never was.
-    When every item succeeds, HEAD is recorded for the types of the run;
-    otherwise the state stays, and the next run compares from the same
-    commits.
+    An item whose definition and folder are those its last successful
+    deployment sent is skipped, even when Git lists it, since changes of
+    layout or line endings do not count. When every item succeeds, HEAD and
+    what was sent for each item are recorded; otherwise the state stays,
+    and the next run compares from the same commits. A run without
+    ``state_backend`` compares nothing and deploys every candidate.
 
     Args:
         workspace (str): The name or ID of the workspace.

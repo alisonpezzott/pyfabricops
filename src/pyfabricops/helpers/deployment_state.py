@@ -1,11 +1,12 @@
 """
 Deployment state: what was last deployed successfully to an environment.
 
-A ``DeploymentState`` records the workspace an environment targets and the
+A ``DeploymentState`` records the workspace an environment targets, the
 last commit deployed successfully for each item type, so the next
-deployment of a type compares only what changed since then. It is written
-only after a deployment in which every item succeeded, and it never holds
-secrets.
+deployment of a type compares only what changed since then, and the hash
+and folder last sent for each item, so an item sent unchanged needs
+nothing. It is written only after a deployment in which every item
+succeeded, and it never holds secrets.
 
 ``DeploymentStateBackend`` is where states are kept; the engine knows
 nothing more. ``LocalJsonStateBackend`` keeps them as JSON files in a local
@@ -20,11 +21,12 @@ import os
 import re
 import tempfile
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Protocol
 
+from ..helpers.deployment_plan import DeployedItem
 from ..utils.exceptions import ConfigurationError
 
 __all__ = [
@@ -61,6 +63,9 @@ class DeploymentState:
             Read-only.
         deployed_at_utc (str): When the last successful deployment finished,
             as ``YYYY-MM-DDTHH:MM:SSZ``.
+        items (Mapping[tuple[str, str], DeployedItem]): What was last sent
+            for each item, by ``(item_type, display_name)``: the hash of its
+            definition and its folder. Read-only.
         schema_version (int): The layout of the stored state.
     """
 
@@ -70,12 +75,14 @@ class DeploymentState:
     source_commit: str
     commits: Mapping[str, str]
     deployed_at_utc: str
+    items: Mapping[tuple[str, str], DeployedItem] = field(default_factory=dict)
     schema_version: int = _SCHEMA_VERSION
 
     def __post_init__(self) -> None:
         object.__setattr__(
             self, "commits", MappingProxyType(dict(self.commits))
         )
+        object.__setattr__(self, "items", MappingProxyType(dict(self.items)))
 
     def targets(self, workspace: str) -> bool:
         """
@@ -94,12 +101,22 @@ class DeploymentState:
         Return the state as JSON-ready data.
 
         Returns:
-            dict[str, Any]: The fields, with ``commits`` as a plain dict.
+            dict[str, Any]: The fields, with ``commits`` as a plain dict and
+                ``items`` keyed ``"<item_type>.<display_name>"``.
         """
         return {
             "schema_version": self.schema_version,
             **{name: getattr(self, name) for name in _TEXT_FIELDS},
             "commits": dict(self.commits),
+            "items": {
+                f"{item_type}.{display_name}": {
+                    "item_type": item_type,
+                    "display_name": display_name,
+                    "content_hash": deployed.content_hash,
+                    "folder_path": deployed.folder_path,
+                }
+                for (item_type, display_name), deployed in self.items.items()
+            },
         }
 
     @classmethod
@@ -148,7 +165,37 @@ class DeploymentState:
             source_commit=text["source_commit"],
             commits=commits,
             deployed_at_utc=text["deployed_at_utc"],
+            items=_read_items(data.get("items", {}), source),
         )
+
+
+def _read_items(raw: Any, source: str) -> dict[tuple[str, str], DeployedItem]:
+    """Read the per-item records of a state; an older state has none."""
+    if not isinstance(raw, dict):
+        raise ConfigurationError(f"{source} has no valid items.")
+
+    items: dict[tuple[str, str], DeployedItem] = {}
+    for record in raw.values():
+        if not isinstance(record, dict):
+            raise ConfigurationError(f"{source} has no valid items.")
+        item_type = record.get("item_type")
+        display_name = record.get("display_name")
+        content_hash = record.get("content_hash")
+        folder_path = record.get("folder_path")
+        if not (
+            isinstance(item_type, str)
+            and item_type
+            and isinstance(display_name, str)
+            and display_name
+            and isinstance(content_hash, str)
+            and content_hash
+            and (folder_path is None or isinstance(folder_path, str))
+        ):
+            raise ConfigurationError(f"{source} has no valid items.")
+        items[(item_type, display_name)] = DeployedItem(
+            content_hash, folder_path
+        )
+    return items
 
 
 class DeploymentStateBackend(Protocol):

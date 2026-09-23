@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 
+from pyfabricops.helpers.deployment_plan import DeployedItem
 from pyfabricops.helpers.deployment_state import (
     DeploymentState,
     LocalJsonStateBackend,
@@ -53,12 +54,14 @@ def test_a_state_targets_its_workspace_by_name_or_id() -> None:
     assert not state.targets("Sales-DEV")
 
 
-def test_the_commits_cannot_be_changed() -> None:
+def test_the_commits_and_items_cannot_be_changed() -> None:
     """A recorded deployment is a record, not a scratch pad."""
     state = _state()
 
     with pytest.raises(TypeError):
         state.commits["Notebook"] = _OLD  # type: ignore[index]
+    with pytest.raises(TypeError):
+        state.items[("Notebook", "Orders")] = DeployedItem("h")  # type: ignore[index]
 
 
 # ---------------------------------------------------------------------------
@@ -165,6 +168,54 @@ def test_an_invalid_state_file_is_a_configuration_error(
     (folder / "prod.json").write_text(content, encoding="utf-8")
 
     with pytest.raises(ConfigurationError, match=message):
+        LocalJsonStateBackend(folder).load("prod")
+
+
+def test_what_was_sent_for_each_item_survives_a_round_trip(
+    backend: LocalJsonStateBackend,
+) -> None:
+    """Per-item hashes and folders are kept, keyed Type.DisplayName."""
+    state = _state(
+        items={
+            ("Notebook", "Orders"): DeployedItem("h1", "Sales"),
+            ("Report", "Sales.Summary"): DeployedItem("h2"),
+        }
+    )
+
+    backend.save("prod", state)
+
+    assert backend.load("prod") == state
+    assert set(state.to_dict()["items"]) == {
+        "Notebook.Orders",
+        "Report.Sales.Summary",
+    }
+
+
+def test_a_state_without_items_still_loads(tmp_path: Path) -> None:
+    """A state written before per-item records has none, not an error."""
+    data = _state().to_dict()
+    del data["items"]
+    folder = tmp_path / "state"
+    folder.mkdir()
+    (folder / "prod.json").write_text(json.dumps(data), encoding="utf-8")
+
+    loaded = LocalJsonStateBackend(folder).load("prod")
+
+    assert loaded is not None
+    assert dict(loaded.items) == {}
+
+
+def test_an_item_record_without_a_hash_is_rejected(tmp_path: Path) -> None:
+    """A record that cannot be compared is not guessed at."""
+    data = _state().to_dict()
+    data["items"] = {
+        "Notebook.Orders": {"item_type": "Notebook", "display_name": "Orders"}
+    }
+    folder = tmp_path / "state"
+    folder.mkdir()
+    (folder / "prod.json").write_text(json.dumps(data), encoding="utf-8")
+
+    with pytest.raises(ConfigurationError, match="no valid items"):
         LocalJsonStateBackend(folder).load("prod")
 
 

@@ -15,6 +15,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from pyfabricops.api.api import ApiResult
+from pyfabricops.helpers.content_hash import definition_hash
 from pyfabricops.helpers.deployment import (
     DEPLOY_ORDER,
     DeploymentExecutor,
@@ -34,6 +35,7 @@ from pyfabricops.helpers.deployment_state import (
 )
 from pyfabricops.helpers.items import deploy_all_items
 from pyfabricops.utils.exceptions import ConfigurationError
+from pyfabricops.utils.utils import pack_item_definition
 from tests.helpers.git_repo import GitRepo
 
 _WORKSPACE_ID = "00000000-0000-0000-0000-000000000001"
@@ -1186,3 +1188,110 @@ def test_the_state_needs_the_items_in_a_git_repository(
         _deploy(root, state_backend=state, environment="dev")
 
     fabric.resolve_workspace.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Content hash: what the last successful deployment sent
+# ---------------------------------------------------------------------------
+
+
+def _reformat_platform(item_dir: Path) -> None:
+    """Rewrite .platform with another layout and the same content."""
+    platform_path = item_dir / ".platform"
+    platform = json.loads(platform_path.read_text(encoding="utf-8"))
+    platform_path.write_text(json.dumps(platform, indent=4), encoding="utf-8")
+
+
+def test_an_item_sent_unchanged_is_not_deployed_again(
+    git_repo: GitRepo,
+    root: Path,
+    fabric: SimpleNamespace,
+    state: LocalJsonStateBackend,
+) -> None:
+    """A layout-only change is a candidate in Git, but needs nothing."""
+    fabric.list_items.return_value = [
+        {"id": "nb-a", "type": "Notebook", "displayName": "A"},
+    ]
+    item = _write_item(root, "A.Notebook")
+    git_repo.commit("first")
+    _deploy(root, state_backend=state, environment="dev")
+
+    _reformat_platform(item)
+    head = git_repo.commit("reformat")
+    fabric.update.reset_mock()
+    report = _deploy(root, state_backend=state, environment="dev")
+
+    assert report.results == []
+    fabric.update.assert_not_called()
+    assert _recorded(state, "dev").source_commit == head
+
+
+def test_without_a_state_every_candidate_is_deployed(
+    git_repo: GitRepo, root: Path, fabric: SimpleNamespace
+) -> None:
+    """Nothing recorded, nothing to compare: the candidate goes."""
+    fabric.list_items.return_value = [
+        {"id": "nb-a", "type": "Notebook", "displayName": "A"},
+    ]
+    item = _write_item(root, "A.Notebook")
+    baseline = git_repo.commit("first")
+    _reformat_platform(item)
+    git_repo.commit("reformat")
+
+    report = _deploy(root, baseline_commit=baseline)
+
+    assert [(r.display_name, r.action) for r in report.results] == [
+        ("A", "updated")
+    ]
+
+
+def test_a_moved_item_is_moved_even_with_the_same_definition(
+    git_repo: GitRepo,
+    root: Path,
+    fabric: SimpleNamespace,
+    state: LocalJsonStateBackend,
+) -> None:
+    """The folder is part of what was sent."""
+    fabric.list_items.return_value = [
+        {"id": "nb-a", "type": "Notebook", "displayName": "A"},
+    ]
+    _write_item(root, "A.Notebook")
+    git_repo.commit("first")
+    _deploy(root, state_backend=state, environment="dev")
+
+    (root / "Sales").mkdir()
+    (root / "A.Notebook").rename(root / "Sales" / "A.Notebook")
+    git_repo.commit("move")
+    report = _deploy(root, state_backend=state, environment="dev")
+
+    assert [(r.display_name, r.action, r.moved) for r in report.results] == [
+        ("A", "updated", True)
+    ]
+    items = _recorded(state, "dev").items
+    assert items[("Notebook", "A")].folder_path == "Sales"
+
+
+def test_the_state_records_each_item_and_forgets_deleted_ones(
+    git_repo: GitRepo,
+    root: Path,
+    fabric: SimpleNamespace,
+    state: LocalJsonStateBackend,
+) -> None:
+    """Hash and folder per item; an item gone from source and workspace goes."""
+    a = _write_item(root, "A.Notebook")
+    _write_item(root, "Sales/B.Report")
+    git_repo.commit("first")
+    _deploy(root, state_backend=state, environment="dev")
+
+    items = _recorded(state, "dev").items
+    assert set(items) == {("Notebook", "A"), ("Report", "B")}
+    assert items[("Report", "B")].folder_path == "Sales"
+    assert items[("Notebook", "A")].content_hash == definition_hash(
+        pack_item_definition(str(a))
+    )
+
+    shutil.rmtree(a)
+    git_repo.commit("delete A")
+    _deploy(root, state_backend=state, environment="dev")
+
+    assert set(_recorded(state, "dev").items) == {("Report", "B")}

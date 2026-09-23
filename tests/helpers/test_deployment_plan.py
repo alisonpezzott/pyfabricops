@@ -12,6 +12,7 @@ import pytest
 
 from pyfabricops.helpers import deployment_plan
 from pyfabricops.helpers.deployment_plan import (
+    DeployedItem,
     DeploymentAction,
     DeploymentActionType,
     DeploymentPlan,
@@ -268,6 +269,72 @@ def test_a_deleted_item_with_an_unreadable_baseline_is_blocked() -> None:
         BLOCKED,
         DeploymentReason.ITEM_DELETED,
     )
+
+
+# ---------------------------------------------------------------------------
+# What the last successful deployment sent
+# ---------------------------------------------------------------------------
+
+
+def _sent(content_hash: str | None, folder: str | None = None) -> SourceItem:
+    """Orders.Notebook, changed in Git, with the hash of its definition."""
+    return dataclasses.replace(
+        _changed("Orders", SourceChange.MODIFIED, folder=folder),
+        content_hash=content_hash,
+    )
+
+
+def _plan_after(
+    item: SourceItem,
+    deployed: DeployedItem,
+    existing: Collection[tuple[str, str]] = (("Notebook", "Orders"),),
+) -> DeploymentAction:
+    """Plan one item against what its last deployment sent."""
+    planner = DeploymentPlanner(
+        existing_items=existing,
+        deployed_items={("Notebook", "Orders"): deployed},
+    )
+    (action,) = planner.plan([item]).actions
+    return action
+
+
+def test_an_item_sent_unchanged_needs_nothing() -> None:
+    """A candidate whose definition was already sent is a NOOP."""
+    action = _plan_after(_sent("h1"), DeployedItem("h1"))
+
+    assert action.action == NOOP
+    assert action.reason is DeploymentReason.SOURCE_CHANGED
+    assert action.detail == (
+        "Definition and folder unchanged since the last successful deployment."
+    )
+
+
+def test_a_changed_definition_is_updated() -> None:
+    """Another hash means another definition."""
+    action = _plan_after(_sent("h2"), DeployedItem("h1"))
+
+    assert action.action == UPDATE
+
+
+def test_a_moved_item_is_updated_even_with_the_same_definition() -> None:
+    """The same definition in another folder still needs the move."""
+    action = _plan_after(_sent("h1", folder="Sales"), DeployedItem("h1"))
+
+    assert action.action == UPDATE
+
+
+def test_an_item_missing_from_the_workspace_is_created_all_the_same() -> None:
+    """What was sent once does not help when the item is gone."""
+    action = _plan_after(_sent("h1"), DeployedItem("h1"), existing=())
+
+    assert action.action == CREATE
+
+
+def test_an_item_without_a_hash_is_deployed() -> None:
+    """Without a hash there is nothing to compare."""
+    action = _plan_after(_sent(None), DeployedItem("h1"))
+
+    assert action.action == UPDATE
 
 
 # ---------------------------------------------------------------------------

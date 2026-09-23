@@ -33,6 +33,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   states as JSON files in a folder; any object with `load(environment)` and
   `save(environment, state)` is a `DeploymentStateBackend`. States hold no
   secrets.
+- Content hash: with a deployment state, an item whose definition and
+  folder are those its last successful deployment sent is skipped, even
+  when Git lists it as changed. The hash is taken on what would be sent
+  (after placeholders are replaced, so it is per environment) and ignores
+  part order, UTF-8 byte order marks, Windows line endings and the layout
+  and key order of JSON files. The state records it per item; states
+  written without it still load. Without a state, nothing is skipped.
 - `set_lro_options()` — configures the long-running operation timeout
   (default 600 s) and the maximum polling interval (default 5 s).
 - `get_item_definition()` accepts an optional `format` (e.g. `"TMDL"`).

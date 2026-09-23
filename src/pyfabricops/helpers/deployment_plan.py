@@ -13,7 +13,7 @@ model may change while the deployment engine evolves.
 
 from __future__ import annotations
 
-from collections.abc import Collection, Iterable, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
 
@@ -23,6 +23,7 @@ __all__ = [
     "DeploymentPlan",
     "DeploymentPlanner",
     "DeploymentReason",
+    "DeployedItem",
     "SourceChange",
     "SourceItem",
 ]
@@ -109,6 +110,8 @@ class SourceItem:
             unreadable ``.platform``.
         change (SourceChange | None): How the item changed since the
             baseline commit, or None when the run deploys every item.
+        content_hash (str | None): The hash of the definition to deploy, or
+            None when no deployment state can use it.
     """
 
     item_type: str
@@ -117,6 +120,22 @@ class SourceItem:
     folder_path: str | None = None
     error: str | None = None
     change: SourceChange | None = None
+    content_hash: str | None = None
+
+
+@dataclass(frozen=True)
+class DeployedItem:
+    """
+    What the last successful deployment sent for an item.
+
+    Attributes:
+        content_hash (str): The hash of the item definition.
+        folder_path (str | None): The workspace folder the item was placed
+            in, or None for the workspace root.
+    """
+
+    content_hash: str
+    folder_path: str | None = None
 
 
 @dataclass(frozen=True)
@@ -186,6 +205,9 @@ class DeploymentPlanner:
     Args:
         existing_items (Collection[tuple[str, str]]): The ``(item_type,
             display_name)`` of every item already in the target workspace.
+        deployed_items (Mapping[tuple[str, str], DeployedItem], optional):
+            What the last successful deployment sent for each item, from the
+            deployment state. Defaults to nothing known.
 
     Examples:
         ```python
@@ -198,15 +220,22 @@ class DeploymentPlanner:
         ```
     """
 
-    def __init__(self, existing_items: Collection[tuple[str, str]]) -> None:
+    def __init__(
+        self,
+        existing_items: Collection[tuple[str, str]],
+        deployed_items: Mapping[tuple[str, str], DeployedItem] | None = None,
+    ) -> None:
         self._existing_items = frozenset(existing_items)
+        self._deployed_items = dict(deployed_items or {})
 
     def plan(self, items: Iterable[SourceItem]) -> DeploymentPlan:
         """
         Plan one action per item.
 
         An item already in the workspace is updated and any other is
-        created. An item deleted from the source is deleted from the
+        created, but an item whose definition and folder are those its last
+        successful deployment sent needs nothing. An item deleted from the
+        source is deleted from the
         workspace, or needs nothing when the workspace no longer has it or
         another item of the plan still defines it, as when its folder moved.
         An item whose display name is unknown is blocked, and so is an item
@@ -255,9 +284,23 @@ class DeploymentPlanner:
             )
         defined[identity] = item.source_path
 
-        if identity in self._existing_items:
-            return _action(item, DeploymentActionType.UPDATE)
-        return _action(item, DeploymentActionType.CREATE)
+        if identity not in self._existing_items:
+            return _action(item, DeploymentActionType.CREATE)
+        if self._unchanged(identity, item):
+            return _action(
+                item,
+                DeploymentActionType.NOOP,
+                "Definition and folder unchanged since the last successful "
+                "deployment.",
+            )
+        return _action(item, DeploymentActionType.UPDATE)
+
+    def _unchanged(self, identity: tuple[str, str], item: SourceItem) -> bool:
+        """Tell whether the last deployment sent exactly this item."""
+        if item.content_hash is None:
+            return False
+        deployed = DeployedItem(item.content_hash, item.folder_path)
+        return self._deployed_items.get(identity) == deployed
 
     def _plan_deletion(
         self,
