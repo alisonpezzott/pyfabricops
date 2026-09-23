@@ -65,12 +65,13 @@ class FakeWorkspace:
         parent_folder: str | None = None,
         df: bool | None = True,
     ) -> dict[str, Any]:
-        folder = {
-            "id": str(uuid.uuid4()),
+        folder_id = str(uuid.uuid4())
+        folder: dict[str, Any] = {
+            "id": folder_id,
             "displayName": name,
             "parentFolderId": parent_folder,
         }
-        self.folders[folder["id"]] = folder
+        self.folders[folder_id] = folder
         return folder
 
     def create_item(
@@ -156,6 +157,7 @@ def fake(
 
     workspace = FakeWorkspace()
     with (
+        patch("pyfabricops.clear_token_cache"),
         patch("pyfabricops.set_auth_provider"),
         patch("pyfabricops.setup_logging"),
         patch("pyfabricops.copy_to_staging", side_effect=_copy_to_staging),
@@ -228,6 +230,29 @@ def test_a_workspace_with_other_items_is_refused(
     assert code == 1
     assert "Sales.Report" in capsys.readouterr().err
     assert list(fake.items) == ["sales"]
+
+
+def test_a_token_cached_for_another_identity_is_dropped(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The cache is cleared before the service principal authenticates."""
+    for name in ("FAB_CLIENT_ID", "FAB_CLIENT_SECRET", "FAB_TENANT_ID"):
+        monkeypatch.setenv(name, "offline-test")
+    calls: list[str] = []
+
+    with (
+        patch(
+            "pyfabricops.clear_token_cache",
+            side_effect=lambda: calls.append("clear"),
+        ),
+        patch(
+            "pyfabricops.set_auth_provider",
+            side_effect=lambda *args, **kwargs: calls.append("provider"),
+        ),
+    ):
+        _load_script()._authenticate(str(tmp_path / "no.env"))
+
+    assert calls == ["clear", "provider"]
 
 
 def test_nothing_runs_without_an_explicit_workspace(

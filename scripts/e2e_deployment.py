@@ -31,7 +31,8 @@ Usage::
 
 It runs only with an explicit workspace (``--workspace`` or
 ``PYFABRICOPS_E2E_WORKSPACE``), so a CI job that has Fabric credentials
-never starts it by accident.
+never starts it by accident. It clears the pyfabricops token cache first,
+so a token cached for another service principal is never reused.
 """
 
 from __future__ import annotations
@@ -409,7 +410,7 @@ def _git(run: Run, *args: str) -> str:
 
 def _stage(run: Run) -> str:
     """Copy the items to staging and replace the placeholders there."""
-    staging = pf.copy_to_staging(str(run.items))
+    staging: str = pf.copy_to_staging(str(run.items))
     pf.find_and_replace(staging, {(r".*\.py$", r"#\{GREETING\}#"): _GREETING})
     return staging
 
@@ -477,6 +478,9 @@ def _authenticate(env_file: str) -> None:
             f"{', '.join(missing)} not set: put the service principal in "
             f"{env_file} or in the environment."
         )
+    # The token cache is shared and keyed by audience only: a token cached
+    # for another service principal, maybe of another tenant, would be used.
+    pf.clear_token_cache()
     pf.set_auth_provider("env")
 
 
