@@ -1,5 +1,5 @@
 from ._version import __version__
-from .api.api import ApiResult, api_request
+from .api.api import ApiResult, api_request, set_lro_options
 from .api.auth import clear_token_cache, set_auth_provider
 from .cd.support_files import create_support_files
 from .core.capacities import get_capacity_id, list_capacities, resolve_capacity
@@ -750,6 +750,7 @@ __all__ = [
     "set_auth_provider",
     "set_dmv_connection_string_spn",
     "set_dmv_connection_string_user",
+    "set_lro_options",
     "setup_logging",
     "takeover_dataflow_gen1",
     "unassign_all_domain_workspaces",
