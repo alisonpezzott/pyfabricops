@@ -40,6 +40,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   part order, UTF-8 byte order marks, Windows line endings and the layout
   and key order of JSON files. The state records it per item; states
   written without it still load. Without a state, nothing is skipped.
+- `plan_all_items()` shows what `deploy_all_items()` would do with the
+  same arguments, without doing it: it returns the `DeploymentPlan`, one
+  action per item saying what would happen and why (`plan.describe()` gives
+  it as text), and only reads the local items, Git and one listing of the
+  workspace. The deployment state is read, never updated.
+  `DeploymentPlan`, `DeploymentAction`, `DeploymentActionType` and
+  `DeploymentReason` are exported.
 - `set_lro_options()` — configures the long-running operation timeout
   (default 600 s) and the maximum polling interval (default 5 s).
 - `get_item_definition()` accepts an optional `format` (e.g. `"TMDL"`).

@@ -1064,22 +1064,111 @@ def _deploy_all(
     """
     Select, plan and apply; with a state backend, record the run.
 
-    Without a state backend every type compares from ``baseline_commit``, or
-    deploys every item without one. With a backend, each type compares from
-    its last successful deployment unless ``baseline_commit`` is given, and
-    the run is recorded when every item succeeded. See ``deploy_all_items``
-    for the public contract.
+    The run is recorded only when every item succeeded. See
+    ``deploy_all_items`` for the public contract.
     """
     types = _ordered_types(item_types)
+    items, tracker = _select_run(
+        workspace,
+        path,
+        types,
+        start_path=start_path,
+        baseline_commit=baseline_commit,
+        repository_path=repository_path,
+        state_backend=state_backend,
+        environment=environment,
+    )
+    report = _deploy_items(
+        workspace,
+        items,
+        fail_fast=fail_fast,
+        deployed_items=tracker.deployed_items if tracker else None,
+    )
+    if tracker is not None:
+        tracker.record(report, types, items)
+    return report
+
+
+def _plan_all(
+    workspace: str,
+    path: str,
+    *,
+    start_path: str | None = None,
+    item_types: Sequence[str] | None = None,
+    baseline_commit: str | None = None,
+    repository_path: str | None = None,
+    state_backend: DeploymentStateBackend | None = None,
+    environment: str | None = None,
+) -> DeploymentPlan:
+    """
+    Build the plan ``_deploy_all`` would apply, and stop there.
+
+    Only reads happen: the local items, Git and one listing of the
+    workspace. The state is read, never recorded. See ``plan_all_items``
+    for the public contract.
+
+    Raises:
+        ConfigurationError: If the workspace is not found.
+        RequestError: If its items and folders cannot be listed.
+    """
+    items, tracker = _select_run(
+        workspace,
+        path,
+        _ordered_types(item_types),
+        start_path=start_path,
+        baseline_commit=baseline_commit,
+        repository_path=repository_path,
+        state_backend=state_backend,
+        environment=environment,
+    )
+    if not items:
+        return DeploymentPlan()
+
+    workspace_id = resolve_workspace(workspace)
+    if workspace_id is None:
+        raise ConfigurationError(f"Workspace '{workspace}' not found.")
+    index = _WorkspaceIndex.load(workspace_id)
+    if index is None:
+        raise RequestError(
+            f"Could not list the items and folders of workspace '{workspace}'."
+        )
+
+    planner = DeploymentPlanner(
+        existing_items=index.items.keys(),
+        deployed_items=tracker.deployed_items if tracker else None,
+    )
+    return planner.plan(items)
+
+
+def _select_run(
+    workspace: str,
+    path: str,
+    item_types: Sequence[str],
+    *,
+    start_path: str | None,
+    baseline_commit: str | None,
+    repository_path: str | None,
+    state_backend: DeploymentStateBackend | None,
+    environment: str | None,
+) -> tuple[list[SourceItem], _StateTracker | None]:
+    """
+    Select the items of a run, the same way to plan it or to deploy it.
+
+    Without a state backend every type compares from ``baseline_commit``,
+    or deploys every item without one. With a backend, each type compares
+    from its last successful deployment unless ``baseline_commit`` is given,
+    and the items get the hash of their definition; the tracker returned
+    can record the run.
+    """
     if state_backend is None:
         items = _select_items(
             path,
-            dict.fromkeys(types, baseline_commit),
+            dict.fromkeys(item_types, baseline_commit),
             start_path=start_path,
             target_commit="HEAD",
             repository_path=repository_path,
         )
-        return _deploy_items(workspace, items, fail_fast=fail_fast)
+        return items, None
 
     tracker = _StateTracker.open(
         state_backend,
@@ -1090,20 +1179,13 @@ def _deploy_all(
     items = _with_content_hashes(
         _select_items(
             path,
-            tracker.baselines(types, baseline_commit),
+            tracker.baselines(item_types, baseline_commit),
             start_path=start_path,
             target_commit=tracker.head,
             repository_path=repository_path,
         )
     )
-    report = _deploy_items(
-        workspace,
-        items,
-        fail_fast=fail_fast,
-        deployed_items=tracker.deployed_items,
-    )
-    tracker.record(report, types, items)
-    return report
+    return items, tracker
 
 
 def _with_content_hashes(items: list[SourceItem]) -> list[SourceItem]:

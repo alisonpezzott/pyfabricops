@@ -196,6 +196,10 @@ def test_a_deleted_item_in_the_workspace_is_planned_for_deletion() -> None:
     ).actions
 
     assert action.action == DELETE
+    assert action.detail == (
+        "Refused until deletions are allowed: delete it from the workspace "
+        "by hand."
+    )
 
 
 def test_a_deleted_item_gone_from_the_workspace_needs_nothing() -> None:
@@ -335,6 +339,55 @@ def test_an_item_without_a_hash_is_deployed() -> None:
     action = _plan_after(_sent(None), DeployedItem("h1"))
 
     assert action.action == UPDATE
+
+
+# ---------------------------------------------------------------------------
+# A plan as text
+# ---------------------------------------------------------------------------
+
+
+def test_an_action_describes_itself_on_one_line() -> None:
+    """What, to which item, and why; the detail after a colon."""
+    update = _plan([_item("Orders")], existing={("Notebook", "Orders")})
+    blocked = _plan([_broken("Broken")])
+
+    assert update.actions[0].describe() == (
+        "UPDATE   Orders.Notebook  FULL_DEPLOYMENT"
+    )
+    assert blocked.actions[0].describe() == (
+        "BLOCKED  workspace/Broken.Notebook  FULL_DEPLOYMENT: "
+        "workspace/Broken.Notebook/.platform not found."
+    )
+
+
+def test_a_plan_counts_and_describes_its_actions() -> None:
+    """One line per action, then every action type counted."""
+    plan = _plan(
+        [_item("A"), _item("B"), _changed("Old", SourceChange.DELETED)],
+        existing={("Notebook", "B")},
+    )
+
+    assert plan.summary() == {
+        "CREATE": 1,
+        "UPDATE": 1,
+        "DELETE": 0,
+        "NOOP": 1,
+        "BLOCKED": 0,
+    }
+    assert plan.describe().splitlines() == [
+        "CREATE   A.Notebook  FULL_DEPLOYMENT",
+        "UPDATE   B.Notebook  FULL_DEPLOYMENT",
+        "NOOP     Old.Notebook  ITEM_DELETED: Deleted from the source and "
+        "not in the workspace.",
+        "1 create, 1 update, 0 delete, 1 noop, 0 blocked",
+    ]
+
+
+def test_an_empty_plan_says_so() -> None:
+    """Nothing to do is said, not left blank."""
+    assert DeploymentPlan().describe() == (
+        "No actions.\n0 create, 0 update, 0 delete, 0 noop, 0 blocked"
+    )
 
 
 # ---------------------------------------------------------------------------

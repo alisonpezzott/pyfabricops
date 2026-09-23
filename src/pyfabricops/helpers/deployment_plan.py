@@ -7,8 +7,9 @@ calls no Fabric API and reads no file, so the same input always gives the
 same plan. The engine in ``pyfabricops.helpers.deployment`` then applies the
 plan.
 
-Internal for now: nothing here is exported from ``pyfabricops``, and the
-model may change while the deployment engine evolves.
+``plan_all_items`` returns a plan, so ``DeploymentPlan``, ``DeploymentAction``,
+``DeploymentActionType`` and ``DeploymentReason`` are exported from
+``pyfabricops``; the planner itself stays internal.
 """
 
 from __future__ import annotations
@@ -177,6 +178,22 @@ class DeploymentAction:
                 f"({self.source_path})."
             )
 
+    def describe(self) -> str:
+        """
+        Describe the action on one line: what, to which item, and why.
+
+        Returns:
+            str: Such as ``UPDATE   Orders.Notebook  SOURCE_CHANGED``, with
+                the detail after a colon when there is one.
+        """
+        name = (
+            f"{self.display_name}.{self.item_type}"
+            if self.display_name
+            else self.source_path
+        )
+        line = f"{self.action.value:<8} {name}  {self.reason.value}"
+        return f"{line}: {self.detail}" if self.detail else line
+
 
 @dataclass(frozen=True)
 class DeploymentPlan:
@@ -192,6 +209,38 @@ class DeploymentPlan:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "actions", tuple(self.actions))
+
+    def summary(self) -> dict[str, int]:
+        """
+        Count the actions by type.
+
+        Returns:
+            dict[str, int]: The number of each action type, every type
+                included.
+        """
+        counts = {action_type.value: 0 for action_type in DeploymentActionType}
+        for action in self.actions:
+            counts[action.action.value] += 1
+        return counts
+
+    def describe(self) -> str:
+        """
+        Describe the plan: one line per action, then the counts.
+
+        Returns:
+            str: The plan as text, ready to print or log.
+
+        Examples:
+            ```python
+            print(plan_all_items('Sales-DEV', 'workspace').describe())
+            ```
+        """
+        lines = [action.describe() for action in self.actions]
+        counts = ", ".join(
+            f"{count} {action_type.lower()}"
+            for action_type, count in self.summary().items()
+        )
+        return "\n".join([*(lines or ["No actions."]), counts])
 
 
 class DeploymentPlanner:
@@ -329,7 +378,12 @@ class DeploymentPlanner:
         deleted[identity] = item.source_path
 
         if identity in self._existing_items:
-            return _action(item, DeploymentActionType.DELETE)
+            return _action(
+                item,
+                DeploymentActionType.DELETE,
+                "Refused until deletions are allowed: delete it from the "
+                "workspace by hand.",
+            )
         return _action(
             item,
             DeploymentActionType.NOOP,

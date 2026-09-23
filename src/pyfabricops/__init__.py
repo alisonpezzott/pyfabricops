@@ -167,6 +167,12 @@ from .helpers.deployment import (
     DeploymentReport,
     DeploymentResult,
 )
+from .helpers.deployment_plan import (
+    DeploymentAction,
+    DeploymentActionType,
+    DeploymentPlan,
+    DeploymentReason,
+)
 from .helpers.deployment_state import (
     DeploymentState,
     DeploymentStateBackend,
@@ -195,6 +201,7 @@ from .helpers.items import (
     deploy_item,
     export_all_items,
     export_item,
+    plan_all_items,
 )
 from .helpers.lakehouses import (
     export_all_lakehouses,
@@ -446,6 +453,10 @@ __all__ = [
     "AuthenticationError",
     "ConfigurationError",
     "DEPLOY_ORDER",
+    "DeploymentAction",
+    "DeploymentActionType",
+    "DeploymentPlan",
+    "DeploymentReason",
     "DeploymentReport",
     "DeploymentResult",
     "DeploymentState",
@@ -727,6 +738,7 @@ __all__ = [
     "pack_item_definition",
     "parse_definition_report",
     "parse_tmdl_parameters",
+    "plan_all_items",
     "publish_environment",
     "read_json",
     "refresh_dataflow_gen1",

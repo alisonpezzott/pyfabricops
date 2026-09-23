@@ -6,7 +6,8 @@ from typing import Any
 from pandas import DataFrame
 
 from ..core.workspaces import resolve_workspace
-from ..helpers.deployment import DeploymentReport, _deploy_all
+from ..helpers.deployment import DeploymentReport, _deploy_all, _plan_all
+from ..helpers.deployment_plan import DeploymentPlan
 from ..helpers.deployment_state import DeploymentStateBackend
 from ..helpers.folders import (
     create_folders_from_path_string,
@@ -352,6 +353,77 @@ def deploy_all_items(
         start_path=start_path,
         item_types=item_types,
         fail_fast=fail_fast,
+        baseline_commit=baseline_commit,
+        repository_path=repository_path,
+        state_backend=state_backend,
+        environment=environment,
+    )
+
+
+def plan_all_items(
+    workspace: str,
+    path: str,
+    start_path: str | None = None,
+    *,
+    item_types: Sequence[str] | None = None,
+    baseline_commit: str | None = None,
+    repository_path: str | None = None,
+    state_backend: DeploymentStateBackend | None = None,
+    environment: str | None = None,
+) -> DeploymentPlan:
+    """
+    Show what ``deploy_all_items`` would do, without doing it.
+
+    The plan is built as ``deploy_all_items`` builds it with the same
+    arguments: same items, baselines, hashes and decisions. It is not
+    applied, and the deployment state is read but never updated. Only reads
+    happen: the local items, Git, and one listing of the workspace items and
+    folders.
+
+    Args:
+        workspace (str): The name or ID of the workspace.
+        path (str): The path to the items.
+        start_path (Optional[str]): The local path that maps to the
+            workspace root, used to derive each item's folder.
+        item_types (Sequence[str], optional): The item types to plan.
+            Defaults to every type in ``DEPLOY_ORDER``.
+        baseline_commit (str, optional): Plan only the items changed since
+            this commit. Defaults to None: every item.
+        repository_path (str, optional): The folder of the Git repository
+            that ``path`` was copied from. Defaults to ``path``.
+        state_backend (DeploymentStateBackend, optional): Where the
+            deployment state is kept. Defaults to None: no state.
+        environment (str, optional): The name the state is kept under.
+            Defaults to ``workspace``.
+
+    Returns:
+        DeploymentPlan: One action per selected item, saying what would
+            happen and why; ``plan.describe()`` gives it as text.
+
+    Raises:
+        ConfigurationError: If the workspace is not found, or, with
+            ``baseline_commit`` or ``state_backend``, for the Git and state
+            errors ``deploy_all_items`` raises.
+        RequestError: If the workspace items and folders cannot be listed.
+
+    Examples:
+        ```python
+        plan = plan_all_items(
+            'Sales-PRD',
+            staging,
+            start_path=staging,
+            repository_path='workspace',
+            state_backend=LocalJsonStateBackend('.pyfabricops/state'),
+            environment='prod',
+        )
+        print(plan.describe())
+        ```
+    """
+    return _plan_all(
+        workspace,
+        path,
+        start_path=start_path,
+        item_types=item_types,
         baseline_commit=baseline_commit,
         repository_path=repository_path,
         state_backend=state_backend,

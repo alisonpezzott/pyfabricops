@@ -33,8 +33,8 @@ from pyfabricops.helpers.deployment_state import (
     DeploymentState,
     LocalJsonStateBackend,
 )
-from pyfabricops.helpers.items import deploy_all_items
-from pyfabricops.utils.exceptions import ConfigurationError
+from pyfabricops.helpers.items import deploy_all_items, plan_all_items
+from pyfabricops.utils.exceptions import ConfigurationError, RequestError
 from pyfabricops.utils.utils import pack_item_definition
 from tests.helpers.git_repo import GitRepo
 
@@ -1295,3 +1295,124 @@ def test_the_state_records_each_item_and_forgets_deleted_ones(
     _deploy(root, state_backend=state, environment="dev")
 
     assert set(_recorded(state, "dev").items) == {("Report", "B")}
+
+
+# ---------------------------------------------------------------------------
+# plan_all_items: see the plan without applying it
+# ---------------------------------------------------------------------------
+
+
+def _plan(root: Path, **kwargs: Any) -> DeploymentPlan:
+    return plan_all_items(
+        "Sales-DEV", str(root), start_path=str(root), **kwargs
+    )
+
+
+def test_plan_all_items_changes_nothing(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """The plan comes from reads only; nothing is created or updated."""
+    fabric.list_items.return_value = [
+        {"id": "nb-a", "type": "Notebook", "displayName": "A"},
+    ]
+    _write_item(root, "A.Notebook")
+    _write_item(root, "Sales/B.Notebook")
+
+    plan = _plan(root)
+
+    assert [
+        (a.action, a.display_name, a.folder_path) for a in plan.actions
+    ] == [
+        (DeploymentActionType.UPDATE, "A", None),
+        (DeploymentActionType.CREATE, "B", "Sales"),
+    ]
+    _assert_no_change(fabric)
+
+
+def test_the_plan_is_what_deploy_all_items_then_does(
+    git_repo: GitRepo,
+    root: Path,
+    fabric: SimpleNamespace,
+    state: LocalJsonStateBackend,
+) -> None:
+    """Planning reads the state and leaves it; deploying records it."""
+    fabric.list_items.return_value = [
+        {"id": "nb-a", "type": "Notebook", "displayName": "A"},
+        {"id": "nb-b", "type": "Notebook", "displayName": "B"},
+    ]
+    a = _write_item(root, "A.Notebook")
+    _write_item(root, "B.Notebook")
+    first = git_repo.commit("first")
+    _deploy(root, state_backend=state, environment="dev")
+
+    _change(a)
+    head = git_repo.commit("second")
+    fabric.update.reset_mock()
+    plan = _plan(root, state_backend=state, environment="dev")
+
+    assert [action.describe() for action in plan.actions] == [
+        "UPDATE   A.Notebook  SOURCE_CHANGED"
+    ]
+    assert _recorded(state, "dev").source_commit == first
+    fabric.update.assert_not_called()
+
+    report = _deploy(root, state_backend=state, environment="dev")
+
+    assert [(r.display_name, r.action) for r in report.results] == [
+        ("A", "updated")
+    ]
+    assert _recorded(state, "dev").source_commit == head
+
+
+def test_plan_all_items_with_nothing_selected_calls_nothing(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """An empty selection is an empty plan, without a Fabric call."""
+    assert _plan(root) == DeploymentPlan()
+    fabric.resolve_workspace.assert_not_called()
+
+
+def test_plan_all_items_needs_the_workspace(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """No workspace or no listing, no plan: the call raises."""
+    _write_item(root, "A.Notebook")
+
+    fabric.resolve_workspace.return_value = None
+    with pytest.raises(ConfigurationError, match="not found"):
+        _plan(root)
+
+    fabric.resolve_workspace.return_value = _WORKSPACE_ID
+    fabric.list_items.return_value = None
+    with pytest.raises(RequestError, match="Could not list"):
+        _plan(root)
+
+
+def test_plan_all_items_delegates_to_the_engine() -> None:
+    """The public function forwards every argument to the engine."""
+    backend = MagicMock()
+    with patch(
+        "pyfabricops.helpers.items._plan_all",
+        return_value=DeploymentPlan(),
+    ) as engine:
+        plan_all_items(
+            "Sales-DEV",
+            "stg",
+            "stg",
+            item_types=["Notebook"],
+            baseline_commit="abc123",
+            repository_path="src",
+            state_backend=backend,
+            environment="dev",
+        )
+
+    engine.assert_called_once_with(
+        "Sales-DEV",
+        "stg",
+        start_path="stg",
+        item_types=["Notebook"],
+        baseline_commit="abc123",
+        repository_path="src",
+        state_backend=backend,
+        environment="dev",
+    )
