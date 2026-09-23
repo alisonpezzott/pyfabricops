@@ -38,6 +38,7 @@ so a token cached for another service principal is never reused.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import shutil
@@ -99,6 +100,7 @@ class Run:
     workspace_id: str
     prefix: str
     root: Path
+    staging: Path | None = None
 
     @property
     def repository(self) -> Path:
@@ -411,6 +413,7 @@ def _git(run: Run, *args: str) -> str:
 def _stage(run: Run) -> str:
     """Copy the items to staging and replace the placeholders there."""
     staging: str = pf.copy_to_staging(str(run.items))
+    run.staging = Path(staging)
     pf.find_and_replace(staging, {(r".*\.py$", r"#\{GREETING\}#"): _GREETING})
     return staging
 
@@ -562,6 +565,20 @@ def _list_items(workspace_id: str) -> list[dict[str, Any]]:
     return list(items)
 
 
+def _remove_staging(run: Run) -> None:
+    """
+    Remove the staging copy, and its parent if nothing else is there.
+
+    ``copy_to_staging`` writes inside the pyfabricops package, so the copy
+    would outlive the run.
+    """
+    if run.staging is None or not run.staging.exists():
+        return
+    _remove_tree(run.staging)
+    with contextlib.suppress(OSError):
+        run.staging.parent.rmdir()
+
+
 def _remove_tree(path: Path) -> None:
     """Remove a folder, including the read-only files git leaves."""
 
@@ -681,10 +698,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     finally:
         if args.keep:
             print(f"\nKept the items and the local repository at {run.root}.")
+            if run.staging is not None:
+                print(f"Kept the staging copy at {run.staging}.")
         else:
             print()
             _remove_what_the_run_created(run)
             _remove_tree(run.root)
+            _remove_staging(run)
             if args.delete_workspace and created:
                 pf.delete_workspace(workspace_id)
                 print(f"Deleted workspace '{args.workspace}'.")

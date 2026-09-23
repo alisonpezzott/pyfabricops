@@ -212,6 +212,7 @@ def test_every_step_passes_and_the_run_cleans_up(
     assert "[FAIL]" not in captured.err
     assert fake.items == {}
     assert fake.folders == {}
+    assert not (tmp_path / "stg").exists(), "the staging copy is left"
 
 
 def test_a_workspace_with_other_items_is_refused(
