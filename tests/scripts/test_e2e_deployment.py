@@ -127,6 +127,45 @@ class FakeWorkspace:
         stored = self.items.get(item)
         return None if stored is None else {"definition": stored["definition"]}
 
+    def read_definition(self, workspace_id: str, item_id: str) -> ApiResult:
+        """What the engine gets when it reads a definition."""
+        return ApiResult(
+            True, 200, data=self.get_item_definition(workspace_id, item_id)
+        )
+
+    # What a person does by hand, through the functions pyfabricops exports.
+
+    def edit_item(
+        self,
+        workspace: str,
+        item: str,
+        item_definition: dict[str, Any],
+        df: bool | None = True,
+    ) -> None:
+        self.items[item]["definition"] = item_definition
+
+    def move_by_hand(
+        self, workspace: str, item: str, target_folder: str | None = None
+    ) -> None:
+        self.items[item]["folderId"] = target_folder
+
+    def create_by_hand(
+        self,
+        workspace: str,
+        display_name: str,
+        item_definition: dict[str, Any],
+        *,
+        item_type: str | None = None,
+        df: bool | None = True,
+    ) -> None:
+        self.create_item(
+            workspace,
+            display_name=display_name,
+            item_type=str(item_type),
+            item_definition=item_definition,
+            folder_id=None,
+        )
+
     @staticmethod
     def _reject(
         item_type: str, definition: dict[str, Any]
@@ -187,6 +226,16 @@ def fake(
         patch(
             "pyfabricops.get_item_definition",
             side_effect=workspace.get_item_definition,
+        ),
+        patch(
+            "pyfabricops.update_item_definition",
+            side_effect=workspace.edit_item,
+        ),
+        patch("pyfabricops.move_item", side_effect=workspace.move_by_hand),
+        patch("pyfabricops.create_item", side_effect=workspace.create_by_hand),
+        patch(
+            f"{_ENGINE}._request_item_definition",
+            side_effect=workspace.read_definition,
         ),
         patch(
             f"{_ENGINE}.resolve_workspace",
