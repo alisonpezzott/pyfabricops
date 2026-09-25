@@ -22,6 +22,7 @@ from pyfabricops.helpers.deployment import (
     DeploymentExecutor,
     DeploymentReport,
     DeploymentResult,
+    _request_delete_item,
     _WorkspaceIndex,
 )
 from pyfabricops.helpers.deployment_plan import (
@@ -106,6 +107,10 @@ def fabric() -> Iterator[SimpleNamespace]:
             f"{_ENGINE}._request_move_item",
             return_value=ApiResult(True, 200),
         ) as move,
+        patch(
+            f"{_ENGINE}._request_delete_item",
+            return_value=ApiResult(True, 200),
+        ) as delete,
     ):
         yield SimpleNamespace(
             resolve_workspace=resolve_workspace,
@@ -115,6 +120,7 @@ def fabric() -> Iterator[SimpleNamespace]:
             create=create,
             update=update,
             move=move,
+            delete=delete,
         )
 
 
@@ -486,6 +492,7 @@ def test_missing_platform_file_is_reported(
         "created": 1,
         "updated": 0,
         "moved": 0,
+        "deleted": 0,
         "failed": 1,
         "skipped": 0,
     }
@@ -553,6 +560,7 @@ def test_report_helpers() -> None:
         "created": 1,
         "updated": 1,
         "moved": 0,
+        "deleted": 0,
         "failed": 1,
         "skipped": 0,
     }
@@ -595,7 +603,8 @@ def test_a_report_describes_each_item_then_the_counts() -> None:
             "created  A.Notebook  (1.5s)",
             "failed   S.SemanticModel: Create failed.",
             "skipped  S.Report: Needs S.SemanticModel, which failed.",
-            "1 created, 0 updated, 0 moved, 1 failed, 1 skipped in 1.5s",
+            "1 created, 0 updated, 0 moved, 0 deleted, 1 failed, 1 skipped "
+            "in 1.5s",
         ]
     )
 
@@ -605,7 +614,7 @@ def test_an_empty_report_describes_its_counts() -> None:
     report = DeploymentReport(workspace="Sales-DEV")
 
     assert report.describe() == (
-        "0 created, 0 updated, 0 moved, 0 failed, 0 skipped in 0.0s"
+        "0 created, 0 updated, 0 moved, 0 deleted, 0 failed, 0 skipped in 0.0s"
     )
 
 
@@ -626,6 +635,17 @@ def test_a_moved_item_is_a_success() -> None:
 
     assert report.ok
     assert report.summary()["moved"] == 1
+
+
+def test_a_deleted_item_is_a_success() -> None:
+    """Deleting is what the plan asked for, so the run is still ok."""
+    report = DeploymentReport(
+        workspace="Sales-DEV",
+        results=[DeploymentResult("Notebook", "Old", "old", "deleted")],
+    )
+
+    assert report.ok
+    assert report.summary()["deleted"] == 1
 
 
 # ---------------------------------------------------------------------------
@@ -731,12 +751,13 @@ def _index(
 
 
 def _assert_no_change(fabric: SimpleNamespace) -> None:
-    """No folder or item was created, updated or moved."""
+    """No folder or item was created, updated, moved or deleted."""
     for mutation in (
         fabric.create_folder,
         fabric.create,
         fabric.update,
         fabric.move,
+        fabric.delete,
     ):
         mutation.assert_not_called()
 
@@ -945,10 +966,10 @@ def test_move_missing_from_the_workspace_fails_before_any_change(
     _assert_no_change(fabric)
 
 
-def test_executor_refuses_to_delete(
+def test_executor_refuses_to_delete_unless_allowed(
     root: Path, fabric: SimpleNamespace
 ) -> None:
-    """No policy allows deletions yet: the item is reported, not deleted."""
+    """Without allow_deletions the item is reported, not deleted."""
     index = _index({("Notebook", "Old"): {"id": "nb-old", "folderId": None}})
     plan = DeploymentPlan(
         actions=[_planned(DeploymentActionType.DELETE, root / "Old.Notebook")]
@@ -958,10 +979,162 @@ def test_executor_refuses_to_delete(
 
     assert result.action == "failed"
     assert result.error == (
-        "Deleting items is not supported yet; delete Old.Notebook from the "
-        "workspace by hand."
+        "Deletions are not allowed in this run: Old.Notebook stays in the "
+        "workspace."
     )
     _assert_no_change(fabric)
+
+
+def test_executor_deletes_when_deletions_are_allowed(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """A planned DELETE deletes the workspace item and drops it."""
+    index = _index({("Notebook", "Old"): {"id": "nb-old", "folderId": None}})
+    plan = DeploymentPlan(
+        actions=[_planned(DeploymentActionType.DELETE, root / "Old.Notebook")]
+    )
+
+    (result,) = DeploymentExecutor(index, allow_deletions=True).apply(plan)
+
+    assert (result.action, result.item_id, result.error) == (
+        "deleted",
+        "nb-old",
+        None,
+    )
+    fabric.delete.assert_called_once_with(_WORKSPACE_ID, "nb-old")
+    assert ("Notebook", "Old") not in index.items
+
+
+def test_a_deletion_is_sent_as_safe_to_repeat() -> None:
+    """Deleting twice leaves the same workspace, so it is retried."""
+    with patch(
+        f"{_ENGINE}.api_request", return_value=ApiResult(True, 200)
+    ) as api_request:
+        _request_delete_item(_WORKSPACE_ID, "nb-old")
+
+    assert api_request.call_args.kwargs == {
+        "endpoint": f"/workspaces/{_WORKSPACE_ID}/items/nb-old",
+        "method": "delete",
+        "return_result": True,
+        "retry": True,
+    }
+
+
+def test_an_item_already_gone_counts_as_deleted(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """Someone deleted it since the listing: the plan is met."""
+    fabric.delete.return_value = ApiResult(
+        success=False,
+        status_code=404,
+        error=json.dumps({"errorCode": "ItemNotFound", "message": "Gone."}),
+    )
+    index = _index({("Notebook", "Old"): {"id": "nb-old", "folderId": None}})
+    plan = DeploymentPlan(
+        actions=[_planned(DeploymentActionType.DELETE, root / "Old.Notebook")]
+    )
+
+    (result,) = DeploymentExecutor(index, allow_deletions=True).apply(plan)
+
+    assert result.action == "deleted"
+
+
+def test_a_failed_deletion_gives_the_details_of_the_error(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """Fabric's reason reaches the report, and the item stays listed."""
+    fabric.delete.return_value = _failure("InsufficientWorkspaceRole")
+    index = _index({("Notebook", "Old"): {"id": "nb-old", "folderId": None}})
+    plan = DeploymentPlan(
+        actions=[_planned(DeploymentActionType.DELETE, root / "Old.Notebook")]
+    )
+
+    (result,) = DeploymentExecutor(index, allow_deletions=True).apply(plan)
+
+    assert (result.action, result.error) == (
+        "failed",
+        "Delete failed with 400: InsufficientWorkspaceRole - Something went "
+        "wrong.",
+    )
+    assert ("Notebook", "Old") in index.items
+
+
+def test_a_deletion_missing_from_the_workspace_fails_before_any_change(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """Nothing to delete: the plan does not match the workspace."""
+    plan = DeploymentPlan(
+        actions=[_planned(DeploymentActionType.DELETE, root / "Old.Notebook")]
+    )
+
+    (result,) = DeploymentExecutor(_index(), allow_deletions=True).apply(plan)
+
+    assert result.action == "failed"
+    assert result.error == (
+        "Old.Notebook is planned as a deletion but is not in the workspace."
+    )
+    _assert_no_change(fabric)
+
+
+def test_a_deletion_is_skipped_when_an_item_before_it_failed(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """Deletions go only when every action before them succeeded."""
+    fabric.create.return_value = _failure("InvalidDefinition")
+    index = _index(
+        {
+            ("Report", "Old"): {"id": "rp-old", "folderId": None},
+            ("SemanticModel", "Old"): {"id": "sm-old", "folderId": None},
+        }
+    )
+    plan = DeploymentPlan(
+        actions=[
+            _planned(
+                DeploymentActionType.CREATE, _write_item(root, "A.Notebook")
+            ),
+            _planned(DeploymentActionType.DELETE, root / "Old.Report"),
+            _planned(DeploymentActionType.DELETE, root / "Old.SemanticModel"),
+        ]
+    )
+
+    results = DeploymentExecutor(index, allow_deletions=True).apply(plan)
+
+    assert [(r.display_name, r.item_type, r.action) for r in results] == [
+        ("A", "Notebook", "failed"),
+        ("Old", "Report", "skipped"),
+        ("Old", "SemanticModel", "skipped"),
+    ]
+    assert results[1].error == (
+        "Not deleted: an item before it failed or was skipped."
+    )
+    fabric.delete.assert_not_called()
+
+
+def test_a_refused_deletion_holds_back_the_next_ones(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """A deletion that failed stops the deletions after it."""
+    fabric.delete.side_effect = [_failure("InsufficientWorkspaceRole")]
+    index = _index(
+        {
+            ("Report", "Old"): {"id": "rp-old", "folderId": None},
+            ("SemanticModel", "Old"): {"id": "sm-old", "folderId": None},
+        }
+    )
+    plan = DeploymentPlan(
+        actions=[
+            _planned(DeploymentActionType.DELETE, root / "Old.Report"),
+            _planned(DeploymentActionType.DELETE, root / "Old.SemanticModel"),
+        ]
+    )
+
+    results = DeploymentExecutor(index, allow_deletions=True).apply(plan)
+
+    assert [(r.item_type, r.action) for r in results] == [
+        ("Report", "failed"),
+        ("SemanticModel", "skipped"),
+    ]
+    fabric.delete.assert_called_once_with(_WORKSPACE_ID, "rp-old")
 
 
 def test_noop_actions_get_no_result(
@@ -1170,7 +1343,7 @@ def test_selective_reports_a_deleted_item_still_in_the_workspace(
     assert [(r.display_name, r.action) for r in report.results] == [
         ("Old", "failed")
     ]
-    assert "delete Old.Notebook from the workspace by hand" in (
+    assert "Deletions are not allowed in this run" in (
         report.results[0].error or ""
     )
     _assert_no_change(fabric)
