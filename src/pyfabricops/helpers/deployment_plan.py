@@ -170,6 +170,9 @@ class DeploymentAction:
             or None for the workspace root.
         detail (str | None): More about the action, such as why it is
             blocked.
+        needs (Sequence[ItemKey]): The ``(item_type, display_name)`` of
+            the items of the plan that this one needs. When one of them
+            fails or is skipped, this one is skipped. Stored as a tuple.
 
     Raises:
         ValueError: If an action other than BLOCKED has no display name.
@@ -182,8 +185,10 @@ class DeploymentAction:
     reason: DeploymentReason
     folder_path: str | None = None
     detail: str | None = None
+    needs: Sequence[ItemKey] = ()
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "needs", tuple(self.needs))
         if (
             self.display_name is None
             and self.action is not DeploymentActionType.BLOCKED
@@ -346,7 +351,9 @@ class DeploymentPlanner:
         validated (NOOP) if the workspace has it, and created otherwise from
         ``available``. An item is blocked when a reference of its definition
         is broken, when it is part of a dependency cycle, or when something
-        it needs is blocked or cannot be created.
+        it needs is blocked or cannot be created. Each action lists in
+        ``needs`` the items of the plan it needs, so that it is skipped when
+        one of them is not deployed.
 
         Args:
             items (Iterable[SourceItem]): The selected items, in deployment
@@ -500,9 +507,19 @@ class DeploymentPlanner:
             )
             if key in needed
         ]
+        planned_keys = {*selected, *needed}
         resolved = list(head)
         for key in graph.order([*selected, *needed_in_order]):
             planned = groups.get(key, [needed[key]] if key in needed else [])
+            needs = tuple(
+                dict.fromkeys(
+                    dependency.target
+                    for dependency in graph.dependencies_of(key)
+                    if dependency.target in planned_keys
+                )
+            )
+            if planned and needs:
+                planned = [replace(planned[0], needs=needs), *planned[1:]]
             if key in blocked:
                 planned = [_block(planned[0], blocked[key]), *planned[1:]]
             resolved.extend(planned)

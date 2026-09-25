@@ -50,6 +50,22 @@ when it is part of a dependency cycle, such as two notebooks that `%run`
 each other. What needs a blocked item is blocked in turn. A blocked item is
 reported as failed, so the deployment state does not move.
 
+## When an item fails
+
+The plan lists in each action's `needs` the items of the plan it needs.
+When one of them fails to deploy, the item is not sent without it: it is
+reported as skipped, and so is what needs a skipped item.
+
+```python
+report = deploy_all_items("Sales-PRD", "stg/workspace", ...)
+[(r.display_name, r.action, r.error) for r in report.results]
+# [('Bronze', 'failed', 'Create failed with 400: ...'),
+#  ('Orders', 'skipped', 'Needs Bronze.Lakehouse, which failed.')]
+```
+
+The rest of the run goes on, and the deployment state does not move, so
+the next run tries both again.
+
 ## Data pipelines
 
 A data pipeline refers to notebooks, pipelines, dataflows and other items
@@ -68,7 +84,8 @@ only when it is created. References to other workspaces are not checked.
 ## Turning it off
 
 `resolve_dependencies=False` deploys the selected items in `DEPLOY_ORDER`
-without reading their references, as before.
+without reading their references, as before: no item needs another, so a
+failure skips nothing.
 
 ## Reference
 

@@ -99,6 +99,18 @@ _ACTIONS: tuple[DeploymentOutcome, ...] = (
     "skipped",
 )
 
+# The planned actions that change the workspace.
+_APPLIED = frozenset(
+    {
+        DeploymentActionType.CREATE,
+        DeploymentActionType.UPDATE,
+        DeploymentActionType.MOVE,
+    }
+)
+
+# How an outcome that deployed nothing is told to the items that need it.
+_NOT_DEPLOYED: dict[str, str] = {"failed": "failed", "skipped": "was skipped"}
+
 
 @dataclass(frozen=True)
 class DeploymentResult:
@@ -112,12 +124,14 @@ class DeploymentResult:
         path (str): The local item folder.
         action (str): ``"created"``, ``"updated"``, ``"moved"`` (only its
             folder changed, so its definition was not sent), ``"failed"``,
-            or ``"skipped"`` when the item was not attempted because an
-            earlier one failed with ``fail_fast=True``.
+            or ``"skipped"`` when the item was not attempted: an item it
+            needs was not deployed, or an earlier one failed with
+            ``fail_fast=True``.
         item_id (str | None): The item ID in the workspace, when known.
         moved (bool): Whether the item was moved to another folder.
         duration_seconds (float): Wall-clock time spent on the item.
-        error (str | None): Why the item failed.
+        error (str | None): Why the item failed, or which item it needs
+            was not deployed.
     """
 
     item_type: str
@@ -161,7 +175,12 @@ class DeploymentReport:
 
     @property
     def skipped(self) -> list[DeploymentResult]:
-        """The items not attempted after a failure with ``fail_fast``."""
+        """
+        The items not attempted.
+
+        An item they need was not deployed, or an earlier item failed with
+        ``fail_fast``.
+        """
         return [r for r in self.results if r.action == "skipped"]
 
     @property
@@ -822,6 +841,9 @@ def _log_result(result: DeploymentResult) -> None:
     """Log the outcome of one item."""
     if result.action == "failed":
         logger.error(f"{_label(result)} failed: {result.error}")
+    elif result.action == "skipped":
+        why = f": {result.error}" if result.error else "."
+        logger.warning(f"{_label(result)} skipped{why}")
     else:
         logger.info(
             f"{_label(result)} {result.action} "
@@ -887,8 +909,11 @@ class DeploymentExecutor:
     differs), moves the items planned as MOVE without sending their
     definition, and reports BLOCKED items as failed, creating missing
     folders on the way. It refuses DELETE, which no policy allows yet,
-    reporting it as failed, and a NOOP gets a log line but no result. Used
-    by ``deploy_all_items``; not exported from ``pyfabricops`` yet.
+    reporting it as failed, and a NOOP gets a log line but no result. An
+    item to create, update or move is skipped when an item of its
+    ``needs`` failed or was skipped, so nothing is deployed without what it
+    needs. Used by ``deploy_all_items``; not exported from ``pyfabricops``
+    yet.
 
     Args:
         index (_WorkspaceIndex): The workspace items and folders the plan was
@@ -915,14 +940,28 @@ class DeploymentExecutor:
                 in plan order.
         """
         results: list[DeploymentResult] = []
+        # Each item of the run that was not deployed, as a detail for what
+        # needs it: "Name.Type, which failed".
+        not_deployed: dict[tuple[str, str], str] = {}
         for position, action in enumerate(plan.actions):
             if action.action is DeploymentActionType.NOOP:
                 _log_noop(action)
                 continue
 
-            result = _apply_action(self._index, action)
+            unmet = [key for key in action.needs if key in not_deployed]
+            if unmet and action.action in _APPLIED:
+                result = _action_result(
+                    action, "skipped", error=f"Needs {not_deployed[unmet[0]]}."
+                )
+            else:
+                result = _apply_action(self._index, action)
             results.append(result)
             _log_result(result)
+            which = _NOT_DEPLOYED.get(result.action)
+            if which is not None and action.display_name:
+                not_deployed[_identity(action)] = (
+                    f"{_label(result)}, which {which}"
+                )
 
             if result.action == "failed" and self._fail_fast:
                 results.extend(

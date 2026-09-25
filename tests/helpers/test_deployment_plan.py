@@ -493,6 +493,20 @@ def test_a_plan_cannot_be_changed_once_built() -> None:
         plan.actions[0].action = UPDATE  # type: ignore[misc]
 
 
+def test_what_an_action_needs_cannot_be_changed_either() -> None:
+    """The items it needs are kept as a tuple, whatever was given."""
+    action = DeploymentAction(
+        action=UPDATE,
+        item_type="Report",
+        display_name="Sales",
+        source_path="workspace/Sales.Report",
+        reason=DeploymentReason.FULL_DEPLOYMENT,
+        needs=[("SemanticModel", "Sales")],
+    )
+
+    assert action.needs == (("SemanticModel", "Sales"),)
+
+
 def test_create_and_update_actions_need_a_display_name() -> None:
     """Only a blocked action may name no workspace item."""
     with pytest.raises(ValueError, match="needs a display name"):

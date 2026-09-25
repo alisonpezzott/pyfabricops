@@ -7,6 +7,7 @@ import importlib
 import json
 import shutil
 from collections.abc import Iterator
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -615,6 +616,7 @@ def _planned(
     item_dir: Path,
     *,
     folder_path: str | None = None,
+    needs: tuple[tuple[str, str], ...] = (),
 ) -> DeploymentAction:
     """A planned action for an item folder written by _write_item."""
     name, item_type = item_dir.name.rsplit(".", 1)
@@ -625,6 +627,7 @@ def _planned(
         source_path=str(item_dir),
         reason=DeploymentReason.FULL_DEPLOYMENT,
         folder_path=folder_path,
+        needs=needs,
     )
 
 
@@ -893,6 +896,85 @@ def test_noop_actions_get_no_result(
         ("Old", "failed"),
         ("A", "skipped"),
     ]
+
+
+def test_executor_skips_what_needs_an_item_not_deployed(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """Nothing goes without what it needs; the rest of the run goes on."""
+    fabric.create.side_effect = [
+        _failure("InvalidDefinition"),
+        ApiResult(True, 201, data={"id": "nb-other"}),
+    ]
+    gold, clean = ("Lakehouse", "Gold"), ("Notebook", "Clean")
+    plan = DeploymentPlan(
+        actions=[
+            _planned(
+                DeploymentActionType.CREATE,
+                _write_item(root, "Gold.Lakehouse"),
+            ),
+            _planned(
+                DeploymentActionType.CREATE,
+                _write_item(root, "Clean.Notebook"),
+                needs=(gold,),
+            ),
+            _planned(
+                DeploymentActionType.CREATE,
+                _write_item(root, "Load.Notebook"),
+                needs=(clean,),
+            ),
+            _planned(
+                DeploymentActionType.CREATE,
+                _write_item(root, "Other.Notebook"),
+            ),
+        ]
+    )
+
+    results = DeploymentExecutor(_index()).apply(plan)
+
+    assert [(r.display_name, r.action) for r in results] == [
+        ("Gold", "failed"),
+        ("Clean", "skipped"),
+        ("Load", "skipped"),
+        ("Other", "created"),
+    ]
+    assert [r.error for r in results[1:3]] == [
+        "Needs Gold.Lakehouse, which failed.",
+        "Needs Clean.Notebook, which was skipped.",
+    ]
+    assert fabric.create.call_count == 2
+
+
+def test_a_blocked_action_keeps_its_reason_when_what_it_needs_failed(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """The planner's reason says more than the failure before it."""
+    fabric.create.return_value = _failure("InvalidDefinition")
+    blocked = replace(
+        _planned(
+            DeploymentActionType.BLOCKED,
+            _write_item(root, "Load.Notebook"),
+            needs=(("Lakehouse", "Gold"),),
+        ),
+        detail="Part of a dependency cycle: Load.Notebook, Clean.Notebook.",
+    )
+    plan = DeploymentPlan(
+        actions=[
+            _planned(
+                DeploymentActionType.CREATE,
+                _write_item(root, "Gold.Lakehouse"),
+            ),
+            blocked,
+        ]
+    )
+
+    gold, load = DeploymentExecutor(_index()).apply(plan)
+
+    assert gold.action == "failed"
+    assert (load.action, load.error) == (
+        "failed",
+        "Part of a dependency cycle: Load.Notebook, Clean.Notebook.",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1677,6 +1759,41 @@ def test_without_dependency_resolution_only_the_selection_goes(
         ("Sales", "updated")
     ]
     fabric.create.assert_not_called()
+
+
+def test_a_report_whose_model_failed_is_skipped(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """The model fails to be created: the report is not sent without it."""
+    fabric.create.return_value = _failure("InvalidDefinition")
+    _sales(root)
+
+    report = _deploy(root)
+
+    assert [(r.item_type, r.action, r.error) for r in report.results] == [
+        (
+            "SemanticModel",
+            "failed",
+            "Create failed with 400: InvalidDefinition - Something went "
+            "wrong.",
+        ),
+        ("Report", "skipped", "Needs Sales.SemanticModel, which failed."),
+    ]
+    assert fabric.create.call_count == 1
+    assert not report.ok
+
+
+def test_without_dependency_resolution_a_failure_skips_nothing(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """resolve_dependencies=False tries every item, as before."""
+    fabric.create.return_value = _failure("InvalidDefinition")
+    _sales(root)
+
+    report = _deploy(root, resolve_dependencies=False)
+
+    assert [r.action for r in report.results] == ["failed", "failed"]
+    assert fabric.create.call_count == 2
 
 
 def test_the_state_records_a_model_created_for_its_report(

@@ -255,6 +255,7 @@ def test_without_a_graph_nothing_is_added_or_reordered() -> None:
         ("UPDATE", "Sales.Report", "SOURCE_CHANGED"),
         ("UPDATE", "Sales.SemanticModel", "SOURCE_CHANGED"),
     ]
+    assert all(action.needs == () for action in plan.actions)
 
 
 def test_deletions_and_unreadable_items_keep_their_places() -> None:
@@ -299,3 +300,54 @@ def test_warnings_are_added_to_the_detail_without_blocking() -> None:
         "UPDATE",
         f"Warning: {warning}",
     )
+
+
+# ---------------------------------------------------------------------------
+# What each action needs
+# ---------------------------------------------------------------------------
+
+
+def test_an_action_needs_its_dependencies_deployed_or_validated() -> None:
+    """The report needs its model, whether the plan deploys it or not."""
+    deployed = _plan(
+        [_item(REPORT), _item(MODEL)],
+        edges=[(REPORT, MODEL)],
+        existing={REPORT, MODEL},
+    )
+    validated = _plan(
+        [_item(REPORT)],
+        edges=[(REPORT, MODEL)],
+        existing={REPORT, MODEL},
+        available=[MODEL],
+    )
+
+    assert [a.needs for a in deployed.actions] == [(), (MODEL,)]
+    assert [a.needs for a in validated.actions] == [(), (MODEL,)]
+
+
+def test_each_created_dependency_needs_the_next_one() -> None:
+    """A chain of missing items: each action needs only its own link."""
+    plan = _plan(
+        [_item(LOAD)],
+        edges=[(LOAD, CLEAN), (CLEAN, LAKEHOUSE)],
+        existing={LOAD},
+        available=[LAKEHOUSE, CLEAN],
+    )
+
+    assert [(a.action.value, a.needs) for a in plan.actions] == [
+        ("CREATE", ()),
+        ("CREATE", (LAKEHOUSE,)),
+        ("UPDATE", (CLEAN,)),
+    ]
+
+
+def test_an_item_outside_the_plan_is_not_needed() -> None:
+    """A model the workspace has but the source lacks has no action."""
+    plan = _plan(
+        [_item(REPORT)],
+        edges=[(REPORT, MODEL)],
+        existing={REPORT, MODEL},
+    )
+
+    assert _lines(plan) == [("UPDATE", "Sales.Report", "SOURCE_CHANGED")]
+    assert plan.actions[0].needs == ()

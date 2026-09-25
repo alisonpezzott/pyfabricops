@@ -79,6 +79,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - An item is blocked when a reference of its definition is broken, when it
     is part of a dependency cycle, or when something it needs is blocked or
     cannot be created.
+  - Each action lists in `DeploymentAction.needs` the items of the plan it
+    needs. When one of them fails to deploy, the item is skipped, and so is
+    what needs a skipped item; the rest of the run goes on, and since the
+    deployment state does not move, the next run tries them again.
   - A data pipeline's references by ID (notebooks, pipelines, dataflows,
     lakehouses and other items, nested activities included) are checked
     against the workspace after staging. An ID the workspace lacks, or a
