@@ -63,6 +63,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Without it the copy still goes to `_stg` inside the installed package,
   which every run using the installation shares and which cannot be
   written on a read-only install.
+- Dependency resolution: `deploy_all_items()` and `plan_all_items()` read
+  the references between local items:
+  - a report's semantic model;
+  - a notebook's default lakehouse, by logical ID or else by name;
+  - a notebook's environment, by logical ID;
+  - the notebooks a notebook runs with `%run`.
+
+  With `resolve_dependencies=True`, the default, each item is deployed
+  after what it needs.
+  - A needed item that is not selected is validated when the workspace has
+    it (`DeploymentReason.DEPENDENCY_REQUIRED`).
+  - Otherwise it is created, when it is in the source and among
+    `item_types`.
+  - An item is blocked when a reference of its definition is broken, when it
+    is part of a dependency cycle, or when something it needs is blocked or
+    cannot be created.
+  - Each action lists in `DeploymentAction.needs` the items of the plan it
+    needs. When one of them fails to deploy, the item is skipped, and so is
+    what needs a skipped item; the rest of the run goes on, and since the
+    deployment state does not move, the next run tries them again.
+  - A data pipeline's references by ID (notebooks, pipelines, dataflows,
+    lakehouses and other items, nested activities included) are checked
+    against the workspace after staging. An ID the workspace lacks, or a
+    value that is no ID (a placeholder left unreplaced), gives a warning in
+    the plan and in the log, without blocking, since an item created in the
+    same run gets its ID when created. References to other workspaces are
+    not checked.
+
+  `resolve_dependencies=False` keeps the earlier behavior. The Dependencies
+  page of the documentation shows what the plan does in each case.
 
 ### Changed
 - `deploy_all_items()` and the `deploy_all_*` helpers for notebooks, semantic
@@ -89,6 +119,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   service returns, up to 3 times and for waits of up to 60 s.
 - Pagination follows the `continuationUri` returned by the service, which
   keeps the original query parameters.
+- The error of a failed item in a `DeploymentReport`, and of a failed
+  long-running operation, goes on with the messages of the service's
+  `moreDetails`, which often hold the cause: `InvalidInput - The request has
+  an invalid input` is followed by, say, `DisplayName is Invalid for
+  ArtifactType. DisplayName: Bronze-Raw`.
 
 ### Fixed
 - `copy_to_staging()` refuses a staging folder that is the source folder,

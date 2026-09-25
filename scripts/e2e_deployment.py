@@ -12,7 +12,10 @@ only the layout of a file changed (content hash); a notebook moved to a
 folder, then back to the root, without sending its definition; a run
 limited to notebooks, then a full one; a broken pipeline that fails and
 leaves the state alone; a notebook deleted from Git (refused, then deleted
-by hand).
+by hand); a notebook and its default lakehouse: the lakehouse created
+first, then only checked when the notebook changes, and once deleted by
+hand, the notebook blocked in a run limited to notebooks and the lakehouse
+created again, before it, by the full run.
 
 Prerequisites:
 
@@ -41,6 +44,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -64,16 +68,18 @@ _PLATFORM_SCHEMA = (
     "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/"
     "platformProperties/2.0.0/schema.json"
 )
+# The workspace ID Fabric writes for an item of the same workspace.
+_SAME_WORKSPACE = "00000000-0000-0000-0000-000000000000"
+# Items Fabric creates along with a lakehouse, and deletes with it.
+_CHILD_TYPES = frozenset({"SQLEndpoint"})
+# Fabric frees the name of a deleted item only minutes later.
+_NAME_ATTEMPTS = 10
+_NAME_WAIT_SECONDS = 30
 _NOTEBOOK = """# Fabric notebook source
 
 # METADATA ********************
 
-# META {
-# META   "kernel_info": {
-# META     "name": "synapse_pyspark"
-# META   },
-# META   "dependencies": {}
-# META }
+__METADATA__
 
 # CELL ********************
 
@@ -119,11 +125,11 @@ class Run:
     @property
     def folder(self) -> str:
         """The workspace folder the move step uses."""
-        return f"{self.prefix}-folder"
+        return f"{self.prefix}_folder"
 
     def name(self, letter: str) -> str:
         """The display name of an item of the run."""
-        return f"{self.prefix}-{letter}"
+        return f"{self.prefix}_{letter}"
 
 
 # ---------------------------------------------------------------------------
@@ -322,6 +328,61 @@ def _step_deletion(run: Run) -> None:
     )
 
 
+def _step_dependency(run: Run) -> None:
+    _write_lakehouse(run, "L")
+    _write_notebook(run, "N", version=1, lakehouse="L")
+    _commit(run, "Add lakehouse L and notebook N, which uses it")
+
+    _deploy_step(
+        run,
+        "A notebook and its default lakehouse: the lakehouse goes first",
+        plan=[("CREATE", "L"), ("CREATE", "N")],
+        results=[("L", "created"), ("N", "created")],
+    )
+
+
+def _step_dependency_in_place(run: Run) -> None:
+    _write_notebook(run, "N", version=2, lakehouse="L")
+    _commit(run, "Change notebook N")
+
+    _deploy_step(
+        run,
+        "The notebook changed: its lakehouse is checked, not deployed",
+        plan=[("NOOP", "L"), ("UPDATE", "N")],
+        results=[("N", "updated")],
+        required=["L"],
+    )
+
+
+def _step_dependency_missing(run: Run) -> None:
+    before = _state(run).source_commit
+    _write_notebook(run, "N", version=3, lakehouse="L")
+    head = _commit(run, "Change notebook N again")
+    _delete_by_hand(run, "Lakehouse", run.name("L"))
+
+    report = _deploy_step(
+        run,
+        "Its lakehouse deleted by hand, and only notebooks: blocked",
+        plan=[("BLOCKED", "N")],
+        results=[("N", "failed")],
+        item_types=["Notebook"],
+    )
+    _check(
+        run.name("L") in (report.results[0].error or ""),
+        "the notebook is blocked by its missing lakehouse",
+    )
+    _check(_state(run).source_commit == before, "the state did not move")
+
+    _deploy_step(
+        run,
+        "The full run creates the lakehouse again, before the notebook",
+        plan=[("CREATE", "L"), ("UPDATE", "N")],
+        results=[("L", "created"), ("N", "updated")],
+        required=["L"],
+    )
+    _check(_state(run).source_commit == head, "the state moves to HEAD")
+
+
 _STEPS: tuple[Callable[[Run], None], ...] = (
     _step_bootstrap,
     _step_nothing_changed,
@@ -332,6 +393,9 @@ _STEPS: tuple[Callable[[Run], None], ...] = (
     _step_partial_run,
     _step_failure,
     _step_deletion,
+    _step_dependency,
+    _step_dependency_in_place,
+    _step_dependency_missing,
 )
 
 
@@ -347,8 +411,14 @@ def _deploy_step(
     plan: list[tuple[str, str]],
     results: list[tuple[str, str]],
     item_types: list[str] | None = None,
+    required: Sequence[str] = (),
 ) -> pf.DeploymentReport:
-    """Plan, check the plan, deploy, check the report."""
+    """
+    Plan, check the plan, deploy, check the report.
+
+    ``required`` names the items the plan has only because another item
+    needs them.
+    """
     print(f"\n== {title}")
     staging = _stage(run)
     arguments: dict[str, Any] = {
@@ -366,8 +436,18 @@ def _deploy_step(
         == [(action, run.name(letter)) for action, letter in plan],
         "the plan is as expected",
     )
+    if required:
+        _check(
+            [
+                a.display_name
+                for a in planned.actions
+                if a.reason is pf.DeploymentReason.DEPENDENCY_REQUIRED
+            ]
+            == [run.name(letter) for letter in required],
+            "the plan has what the items need",
+        )
 
-    report = pf.deploy_all_items(run.workspace, staging, **arguments)
+    report = _deploy(run, staging, arguments)
     for result in report.results:
         error = f": {result.error}" if result.error else ""
         print(f"    {result.display_name} {result.action}{error}")
@@ -377,6 +457,37 @@ def _deploy_step(
         "the deployment did what the plan said",
     )
     return report
+
+
+def _deploy(
+    run: Run, staging: str, arguments: dict[str, Any]
+) -> pf.DeploymentReport:
+    """
+    Deploy, and again while an item waits for Fabric to free its name.
+
+    A run with a failed item records no state, so every attempt plans the
+    same actions.
+    """
+    for _ in range(_NAME_ATTEMPTS - 1):
+        report: pf.DeploymentReport = pf.deploy_all_items(
+            run.workspace, staging, **arguments
+        )
+        waiting = [
+            f"{r.display_name}.{r.item_type}"
+            for r in report.failed
+            if "ItemDisplayNameNotAvailableYet" in (r.error or "")
+        ]
+        if not waiting:
+            return report
+        print(
+            f"    {', '.join(waiting)}: Fabric has not freed the name yet; "
+            f"trying again in {_NAME_WAIT_SECONDS}s"
+        )
+        time.sleep(_NAME_WAIT_SECONDS)
+    last: pf.DeploymentReport = pf.deploy_all_items(
+        run.workspace, staging, **arguments
+    )
+    return last
 
 
 def _check(condition: bool, what: str) -> None:
@@ -441,12 +552,39 @@ def _stage(run: Run) -> str:
     return staging
 
 
-def _write_notebook(run: Run, letter: str, *, version: int) -> None:
+def _write_notebook(
+    run: Run, letter: str, *, version: int, lakehouse: str | None = None
+) -> None:
+    """Write a notebook, with a default lakehouse of the run if given."""
     item = _item_folder(run, letter, "Notebook")
-    content = _NOTEBOOK.replace("__LETTER__", letter).replace(
-        "__VERSION__", str(version)
+    dependencies: dict[str, Any] = {}
+    if lakehouse is not None:
+        # As Fabric writes a lakehouse of the same workspace: by logical ID.
+        dependencies["lakehouse"] = {
+            "default_lakehouse": _logical_id(run, lakehouse, "Lakehouse"),
+            "default_lakehouse_name": run.name(lakehouse),
+            "default_lakehouse_workspace_id": _SAME_WORKSPACE,
+        }
+    metadata = {
+        "kernel_info": {"name": "synapse_pyspark"},
+        "dependencies": dependencies,
+    }
+    meta = "\n".join(
+        f"# META {line}"
+        for line in json.dumps(metadata, indent=2).splitlines()
+    )
+    content = (
+        _NOTEBOOK.replace("__METADATA__", meta)
+        .replace("__LETTER__", letter)
+        .replace("__VERSION__", str(version))
     )
     (item / "notebook-content.py").write_text(content, encoding="utf-8")
+
+
+def _write_lakehouse(run: Run, letter: str) -> None:
+    """Write a lakehouse without schemas, shortcuts or tables."""
+    item = _item_folder(run, letter, "Lakehouse")
+    (item / "lakehouse.metadata.json").write_text("{}\n", encoding="utf-8")
 
 
 def _write_pipeline(
@@ -487,6 +625,14 @@ def _item_folder(run: Run, letter: str, item_type: str) -> Path:
         json.dumps(platform, indent=2), encoding="utf-8"
     )
     return item
+
+
+def _logical_id(run: Run, letter: str, item_type: str) -> str:
+    """The logical ID in the .platform of an item of the run."""
+    platform = _item_folder(run, letter, item_type) / ".platform"
+    content = json.loads(platform.read_text(encoding="utf-8"))
+    logical_id: str = content["config"]["logicalId"]
+    return logical_id
 
 
 # ---------------------------------------------------------------------------
@@ -542,7 +688,7 @@ def _open_sandbox(args: argparse.Namespace) -> tuple[str, bool]:
     others = [
         f"{item['displayName']}.{item['type']}"
         for item in _list_items(workspace_id)
-        if not item["displayName"].startswith(f"{args.prefix}-")
+        if not item["displayName"].startswith(f"{args.prefix}_")
     ]
     if others and not args.allow_non_empty:
         raise E2EFailure(
@@ -556,7 +702,10 @@ def _open_sandbox(args: argparse.Namespace) -> tuple[str, bool]:
 def _remove_what_the_run_created(run: Run) -> None:
     """Delete the run's items and folder from the workspace."""
     for item in _list_items(run.workspace_id):
-        if item["displayName"].startswith(f"{run.prefix}-"):
+        if (
+            item["displayName"].startswith(f"{run.prefix}_")
+            and item["type"] not in _CHILD_TYPES
+        ):
             pf.delete_item(run.workspace_id, item["id"])
             print(f"Deleted {item['displayName']}.{item['type']}.")
     for folder in pf.list_folders(run.workspace_id, df=False) or []:
@@ -615,6 +764,18 @@ def _remove_tree(path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
+def _prefix(value: str) -> str:
+    """Accept a prefix that keeps every name of the run valid."""
+    # Lakehouse names are the strictest: a letter, then letters, digits and
+    # underscores.
+    if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", value):
+        raise argparse.ArgumentTypeError(
+            "use a letter, then letters, digits or underscores, as lakehouse "
+            "names must"
+        )
+    return value
+
+
 def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Check the deployment engine against a sandbox workspace."
@@ -631,8 +792,9 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--prefix",
-        default="pfo-e2e",
-        help="Prefix of the items the run creates. Default: pfo-e2e",
+        type=_prefix,
+        default="pfo_e2e",
+        help="Prefix of the items the run creates. Default: pfo_e2e",
     )
     parser.add_argument(
         "--create",

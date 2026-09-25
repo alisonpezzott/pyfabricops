@@ -493,6 +493,20 @@ def test_a_plan_cannot_be_changed_once_built() -> None:
         plan.actions[0].action = UPDATE  # type: ignore[misc]
 
 
+def test_what_an_action_needs_cannot_be_changed_either() -> None:
+    """The items it needs are kept as a tuple, whatever was given."""
+    action = DeploymentAction(
+        action=UPDATE,
+        item_type="Report",
+        display_name="Sales",
+        source_path="workspace/Sales.Report",
+        reason=DeploymentReason.FULL_DEPLOYMENT,
+        needs=[("SemanticModel", "Sales")],
+    )
+
+    assert action.needs == (("SemanticModel", "Sales"),)
+
+
 def test_create_and_update_actions_need_a_display_name() -> None:
     """Only a blocked action may name no workspace item."""
     with pytest.raises(ValueError, match="needs a display name"):
@@ -513,7 +527,8 @@ def test_types_and_reasons_compare_equal_to_their_names() -> None:
 
 def test_the_planner_cannot_reach_the_fabric_api() -> None:
     """
-    The planning module imports only the standard library.
+    The planning module imports only the standard library, and the
+    dependency graph, which imports only the standard library itself.
 
     Nothing that talks to Fabric (the API client, requests, the other
     helpers) can be reached from it, so planning cannot create, update,
@@ -525,7 +540,11 @@ def test_the_planner_cannot_reach_the_fabric_api() -> None:
         if isinstance(node, ast.Import):
             imported.update(alias.name for alias in node.names)
         elif isinstance(node, ast.ImportFrom):
-            assert node.level == 0, "relative import in the planning module"
+            if node.level:
+                assert (node.level, node.module) == (1, "dependency_graph"), (
+                    "relative import in the planning module"
+                )
+                continue
             imported.add(node.module or "")
 
     assert {name.split(".")[0] for name in imported} <= sys.stdlib_module_names

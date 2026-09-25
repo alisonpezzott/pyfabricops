@@ -189,6 +189,34 @@ def test_failed_lro_result_describes_the_error(
     assert "CorruptedPayload - Bad part." in (result.error or "")
 
 
+def test_failed_lro_result_gives_the_details_of_the_error(
+    http: MagicMock, clock: MagicMock
+) -> None:
+    """The moreDetails messages follow, without Fabric's <pi> markers."""
+    state = {
+        "status": "Failed",
+        "error": {
+            "errorCode": "InvalidInput",
+            "message": "The request has an invalid input",
+            "moreDetails": [
+                {
+                    "errorCode": "InvalidParameter",
+                    "message": "Bad <pi>A</pi>.",
+                },
+                {"errorCode": "NoMessage"},
+            ],
+        },
+    }
+    http.side_effect = [_accepted(), _response(200, state)]
+
+    result = _api_result("/items", method="post", support_lro=True)
+
+    assert result.error == (
+        "LRO failed with status: Failed (InvalidInput - The request has an "
+        "invalid input - Bad A.)"
+    )
+
+
 def test_lro_times_out(http: MagicMock, clock: MagicMock) -> None:
     """An operation still running at the deadline is reported as failed."""
     set_lro_options(timeout=10)

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import time
+import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field, fields, replace
 from datetime import datetime, timezone
@@ -23,10 +24,17 @@ from typing import Any, Literal, TypeAlias, cast
 
 from pandas import DataFrame
 
-from ..api.api import ApiResult, api_request
+from ..api.api import ApiResult, _error_detail, api_request
 from ..core.folders import create_folder, list_folders
 from ..core.workspaces import resolve_workspace
 from ..helpers.content_hash import definition_hash
+from ..helpers.dependencies import (
+    IdReference,
+    LocalCatalog,
+    pipeline_references,
+    scan_references,
+)
+from ..helpers.dependency_graph import DependencyGraph, ItemKey
 from ..helpers.deployment_plan import (
     DeployedItem,
     DeploymentAction,
@@ -91,6 +99,18 @@ _ACTIONS: tuple[DeploymentOutcome, ...] = (
     "skipped",
 )
 
+# The planned actions that change the workspace.
+_APPLIED = frozenset(
+    {
+        DeploymentActionType.CREATE,
+        DeploymentActionType.UPDATE,
+        DeploymentActionType.MOVE,
+    }
+)
+
+# How an outcome that deployed nothing is told to the items that need it.
+_NOT_DEPLOYED: dict[str, str] = {"failed": "failed", "skipped": "was skipped"}
+
 
 @dataclass(frozen=True)
 class DeploymentResult:
@@ -104,12 +124,14 @@ class DeploymentResult:
         path (str): The local item folder.
         action (str): ``"created"``, ``"updated"``, ``"moved"`` (only its
             folder changed, so its definition was not sent), ``"failed"``,
-            or ``"skipped"`` when the item was not attempted because an
-            earlier one failed with ``fail_fast=True``.
+            or ``"skipped"`` when the item was not attempted: an item it
+            needs was not deployed, or an earlier one failed with
+            ``fail_fast=True``.
         item_id (str | None): The item ID in the workspace, when known.
         moved (bool): Whether the item was moved to another folder.
         duration_seconds (float): Wall-clock time spent on the item.
-        error (str | None): Why the item failed.
+        error (str | None): Why the item failed, or which item it needs
+            was not deployed.
     """
 
     item_type: str
@@ -153,7 +175,12 @@ class DeploymentReport:
 
     @property
     def skipped(self) -> list[DeploymentResult]:
-        """The items not attempted after a failure with ``fail_fast``."""
+        """
+        The items not attempted.
+
+        An item they need was not deployed, or an earlier item failed with
+        ``fail_fast``.
+        """
         return [r for r in self.results if r.action == "skipped"]
 
     @property
@@ -534,18 +561,18 @@ def _select_items(
 
 
 def _describe_error(result: ApiResult) -> str:
-    """Summarize a failed API result as ``status: errorCode - message``."""
+    """
+    Summarize a failed API result as ``status: errorCode - message``.
+
+    The messages of the error's ``moreDetails`` follow, when it has any.
+    """
     detail = result.error or ""
     try:
         body = json.loads(detail)
     except ValueError:
         body = None
     if isinstance(body, dict):
-        parts = [
-            str(body[key]) for key in ("errorCode", "message") if body.get(key)
-        ]
-        if parts:
-            detail = " - ".join(parts)
+        detail = _error_detail(body) or detail
     return (
         f"{result.status_code}: {detail}"
         if detail
@@ -814,6 +841,9 @@ def _log_result(result: DeploymentResult) -> None:
     """Log the outcome of one item."""
     if result.action == "failed":
         logger.error(f"{_label(result)} failed: {result.error}")
+    elif result.action == "skipped":
+        why = f": {result.error}" if result.error else "."
+        logger.warning(f"{_label(result)} skipped{why}")
     else:
         logger.info(
             f"{_label(result)} {result.action} "
@@ -879,8 +909,11 @@ class DeploymentExecutor:
     differs), moves the items planned as MOVE without sending their
     definition, and reports BLOCKED items as failed, creating missing
     folders on the way. It refuses DELETE, which no policy allows yet,
-    reporting it as failed, and a NOOP gets a log line but no result. Used
-    by ``deploy_all_items``; not exported from ``pyfabricops`` yet.
+    reporting it as failed, and a NOOP gets a log line but no result. An
+    item to create, update or move is skipped when an item of its
+    ``needs`` failed or was skipped, so nothing is deployed without what it
+    needs. Used by ``deploy_all_items``; not exported from ``pyfabricops``
+    yet.
 
     Args:
         index (_WorkspaceIndex): The workspace items and folders the plan was
@@ -907,14 +940,28 @@ class DeploymentExecutor:
                 in plan order.
         """
         results: list[DeploymentResult] = []
+        # Each item of the run that was not deployed, as a detail for what
+        # needs it: "Name.Type, which failed".
+        not_deployed: dict[tuple[str, str], str] = {}
         for position, action in enumerate(plan.actions):
             if action.action is DeploymentActionType.NOOP:
                 _log_noop(action)
                 continue
 
-            result = _apply_action(self._index, action)
+            unmet = [key for key in action.needs if key in not_deployed]
+            if unmet and action.action in _APPLIED:
+                result = _action_result(
+                    action, "skipped", error=f"Needs {not_deployed[unmet[0]]}."
+                )
+            else:
+                result = _apply_action(self._index, action)
             results.append(result)
             _log_result(result)
+            which = _NOT_DEPLOYED.get(result.action)
+            if which is not None and action.display_name:
+                not_deployed[_identity(action)] = (
+                    f"{_label(result)}, which {which}"
+                )
 
             if result.action == "failed" and self._fail_fast:
                 results.extend(
@@ -1093,12 +1140,14 @@ def _deploy_all(
     repository_path: str | None = None,
     state_backend: DeploymentStateBackend | None = None,
     environment: str | None = None,
+    resolve_dependencies: bool = True,
 ) -> DeploymentReport:
     """
     Select, plan and apply; with a state backend, record the run.
 
-    The run is recorded only when every item succeeded. See
-    ``deploy_all_items`` for the public contract.
+    The run is recorded only when every item succeeded, with the items it
+    created to meet dependencies. See ``deploy_all_items`` for the public
+    contract.
     """
     types = _ordered_types(item_types)
     items, tracker = _select_run(
@@ -1111,15 +1160,26 @@ def _deploy_all(
         state_backend=state_backend,
         environment=environment,
     )
+    dependencies = (
+        _read_dependencies(
+            path, items, start_path=start_path, hashes=tracker is not None
+        )
+        if resolve_dependencies and items
+        else None
+    )
     report = _deploy_items(
         workspace,
         items,
         fail_fast=fail_fast,
         deployed_items=tracker.deployed_items if tracker else None,
         root=path,
+        dependencies=dependencies,
+        item_types=types,
     )
     if tracker is not None:
-        tracker.record(report, types, items)
+        tracker.record(
+            report, types, [*items, *_created(report, dependencies)]
+        )
     return report
 
 
@@ -1133,6 +1193,7 @@ def _plan_all(
     repository_path: str | None = None,
     state_backend: DeploymentStateBackend | None = None,
     environment: str | None = None,
+    resolve_dependencies: bool = True,
 ) -> DeploymentPlan:
     """
     Build the plan ``_deploy_all`` would apply, and stop there.
@@ -1145,10 +1206,11 @@ def _plan_all(
         ConfigurationError: If the workspace is not found.
         RequestError: If its items and folders cannot be listed.
     """
+    types = _ordered_types(item_types)
     items, tracker = _select_run(
         workspace,
         path,
-        _ordered_types(item_types),
+        types,
         start_path=start_path,
         baseline_commit=baseline_commit,
         repository_path=repository_path,
@@ -1167,12 +1229,24 @@ def _plan_all(
             f"Could not list the items and folders of workspace '{workspace}'."
         )
 
-    planner = DeploymentPlanner(
-        existing_items=index.items.keys(),
-        deployed_items=tracker.deployed_items if tracker else None,
-        root=path,
+    dependencies = (
+        _read_dependencies(
+            path, items, start_path=start_path, hashes=tracker is not None
+        )
+        if resolve_dependencies
+        else None
     )
-    return planner.plan(items)
+    planner = _planner(
+        index,
+        tracker.deployed_items if tracker else None,
+        root=path,
+        dependencies=dependencies,
+        item_types=types,
+        warnings=_id_warnings(dependencies, index),
+    )
+    return planner.plan(
+        items, available=dependencies.available if dependencies else ()
+    )
 
 
 def _select_run(
@@ -1239,6 +1313,164 @@ def _with_content_hashes(items: list[SourceItem]) -> list[SourceItem]:
     return hashed
 
 
+@dataclass(frozen=True)
+class _Dependencies:
+    """The references of a run's items, and the local items they need."""
+
+    graph: DependencyGraph
+    broken: Mapping[ItemKey, tuple[str, ...]]
+    available: list[SourceItem]
+    # What the selected pipelines refer to by ID, checked against the
+    # workspace once it is listed.
+    id_references: Mapping[ItemKey, tuple[IdReference, ...]] = field(
+        default_factory=dict
+    )
+
+
+def _read_dependencies(
+    path: str,
+    items: Sequence[SourceItem],
+    *,
+    start_path: str | None,
+    hashes: bool,
+) -> _Dependencies:
+    """
+    Read what the selected items refer to, and the local items they need.
+
+    A local item of any known type can be needed, whatever the item types
+    of the run: the planner decides what to do with it. Needed items get
+    the hash of their definition when the run keeps a state.
+    """
+    catalog = LocalCatalog.read(path, DEPLOY_ORDER)
+    keys: list[ItemKey] = [
+        (item.item_type, item.display_name)
+        for item in items
+        if item.display_name is not None
+        and item.change is not SourceChange.DELETED
+    ]
+    scan = scan_references(catalog, keys)
+    graph = DependencyGraph(scan.dependencies)
+
+    selected = set(keys)
+    available: list[SourceItem] = []
+    for key in graph.required_by(keys):
+        entry = catalog.get(key)
+        if key not in selected and entry is not None:
+            available.append(
+                _read_source_item(key[0], entry.path, start_path=start_path)
+            )
+    available = _in_deployment_order(available, DEPLOY_ORDER)
+    if hashes:
+        available = _with_content_hashes(available)
+
+    id_references: dict[ItemKey, tuple[IdReference, ...]] = {}
+    for item in items:
+        if (
+            item.item_type == "DataPipeline"
+            and item.display_name is not None
+            and item.error is None
+            and item.change is not SourceChange.DELETED
+        ):
+            references = pipeline_references(item.source_path)
+            if references:
+                id_references[(item.item_type, item.display_name)] = references
+    return _Dependencies(graph, scan.broken, available, id_references)
+
+
+def _id_warnings(
+    dependencies: _Dependencies | None, index: _WorkspaceIndex
+) -> dict[ItemKey, tuple[str, ...]]:
+    """
+    Warn about pipeline references by ID that the workspace cannot meet.
+
+    A reference to the workspace itself (or to no workspace in particular)
+    is checked against its items; one to another workspace is not. A value
+    that is no ID at all is most likely a placeholder left unreplaced. Only
+    warnings: an item created in the same run gets its ID when created.
+    """
+    if dependencies is None:
+        return {}
+    workspace_id = _normal_id(index.workspace_id)
+    item_ids = {_normal_id(str(item["id"])) for item in index.items.values()}
+    warnings: dict[ItemKey, tuple[str, ...]] = {}
+    for key, references in dependencies.id_references.items():
+        texts: list[str] = []
+        for reference in references:
+            if reference.workspace_id is not None:
+                in_workspace = _normal_id(reference.workspace_id)
+                if in_workspace is None:
+                    texts.append(
+                        f"{reference.where} refers to workspace "
+                        f"'{reference.workspace_id}', which is not an ID "
+                        "(a placeholder left unreplaced?)."
+                    )
+                    continue
+                if in_workspace != workspace_id:
+                    continue
+            item_id = _normal_id(reference.item_id)
+            if item_id is None:
+                texts.append(
+                    f"{reference.where} refers to {reference.kind} "
+                    f"'{reference.item_id}', which is not an ID (a "
+                    "placeholder left unreplaced?)."
+                )
+            elif item_id not in item_ids:
+                texts.append(
+                    f"{reference.where} refers to {reference.kind} "
+                    f"{reference.item_id}, which is not in the workspace."
+                )
+        if texts:
+            warnings[key] = tuple(dict.fromkeys(texts))
+    return warnings
+
+
+def _normal_id(value: str) -> str | None:
+    """Return an ID in its canonical form, or None if it is not one."""
+    try:
+        return str(uuid.UUID(value))
+    except ValueError:
+        return None
+
+
+def _created(
+    report: DeploymentReport, dependencies: _Dependencies | None
+) -> list[SourceItem]:
+    """Return the items a run created to meet dependencies."""
+    if dependencies is None:
+        return []
+    created = {
+        (result.item_type, result.display_name)
+        for result in report.results
+        if result.action == "created"
+    }
+    return [
+        item
+        for item in dependencies.available
+        if (item.item_type, item.display_name) in created
+    ]
+
+
+def _planner(
+    index: _WorkspaceIndex,
+    deployed_items: Mapping[tuple[str, str], DeployedItem] | None,
+    *,
+    root: str | None,
+    dependencies: _Dependencies | None,
+    item_types: Sequence[str] | None,
+    warnings: Mapping[ItemKey, tuple[str, ...]] | None = None,
+) -> DeploymentPlanner:
+    """Return the planner of a run, resolving dependencies when given."""
+    return DeploymentPlanner(
+        existing_items=index.items.keys(),
+        deployed_items=deployed_items,
+        root=root,
+        dependencies=dependencies.graph if dependencies else None,
+        broken=dependencies.broken if dependencies else None,
+        item_types=item_types if dependencies else None,
+        warnings=warnings,
+    )
+
+
 def _deploy_items(
     workspace: str,
     items: list[SourceItem],
@@ -1246,13 +1478,16 @@ def _deploy_items(
     fail_fast: bool,
     deployed_items: Mapping[tuple[str, str], DeployedItem] | None = None,
     root: str | None = None,
+    dependencies: _Dependencies | None = None,
+    item_types: Sequence[str] | None = None,
 ) -> DeploymentReport:
     """
     Plan, then apply, the deployment of the selected items.
 
     Until the plan is built the run only reads: one listing of the
     workspace. Every change is made by the executor. ``root`` is the folder
-    the items were read from, for the plan details.
+    the items were read from, for the plan details; with ``dependencies``,
+    the plan meets what the items need, within ``item_types``.
     """
     report = DeploymentReport(workspace=workspace)
     if not items:
@@ -1272,12 +1507,21 @@ def _deploy_items(
             f"'{workspace}'.",
         )
 
-    planner = DeploymentPlanner(
-        existing_items=index.items.keys(),
-        deployed_items=deployed_items,
+    warnings = _id_warnings(dependencies, index)
+    for (item_type, display_name), texts in warnings.items():
+        for text in texts:
+            logger.warning(f"{display_name}.{item_type}: {text}")
+    planner = _planner(
+        index,
+        deployed_items,
         root=root,
+        dependencies=dependencies,
+        item_types=item_types,
+        warnings=warnings,
     )
-    plan = planner.plan(items)
+    plan = planner.plan(
+        items, available=dependencies.available if dependencies else ()
+    )
 
     executor = DeploymentExecutor(index, fail_fast=fail_fast)
     report.results.extend(executor.apply(plan))

@@ -7,6 +7,7 @@ import importlib
 import json
 import shutil
 from collections.abc import Iterator
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -350,6 +351,35 @@ def test_a_failure_does_not_stop_the_run(
     assert not report.ok
 
 
+def test_a_failure_gives_the_details_of_the_error(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """The cause, often only in moreDetails, is in the error."""
+    body = {
+        "errorCode": "InvalidInput",
+        "message": "The request has an invalid input",
+        "moreDetails": [
+            {
+                "errorCode": "InvalidParameter",
+                "message": "DisplayName is Invalid for ArtifactType. "
+                "DisplayName: <pi>Bronze-Raw</pi>",
+            }
+        ],
+    }
+    fabric.create.return_value = ApiResult(
+        success=False, status_code=400, error=json.dumps(body)
+    )
+    _write_item(root, "Bronze-Raw.Lakehouse")
+
+    report = _deploy(root)
+
+    assert report.results[0].error == (
+        "Create failed with 400: InvalidInput - The request has an invalid "
+        "input - DisplayName is Invalid for ArtifactType. DisplayName: "
+        "Bronze-Raw"
+    )
+
+
 def test_fail_fast_skips_the_remaining_items(
     root: Path, fabric: SimpleNamespace
 ) -> None:
@@ -559,6 +589,7 @@ def test_deploy_all_items_delegates_to_the_engine() -> None:
             repository_path="src",
             state_backend=backend,
             environment="dev",
+            resolve_dependencies=False,
         )
 
     engine.assert_called_once_with(
@@ -571,6 +602,7 @@ def test_deploy_all_items_delegates_to_the_engine() -> None:
         repository_path="src",
         state_backend=backend,
         environment="dev",
+        resolve_dependencies=False,
     )
 
 
@@ -584,6 +616,7 @@ def _planned(
     item_dir: Path,
     *,
     folder_path: str | None = None,
+    needs: tuple[tuple[str, str], ...] = (),
 ) -> DeploymentAction:
     """A planned action for an item folder written by _write_item."""
     name, item_type = item_dir.name.rsplit(".", 1)
@@ -594,6 +627,7 @@ def _planned(
         source_path=str(item_dir),
         reason=DeploymentReason.FULL_DEPLOYMENT,
         folder_path=folder_path,
+        needs=needs,
     )
 
 
@@ -862,6 +896,85 @@ def test_noop_actions_get_no_result(
         ("Old", "failed"),
         ("A", "skipped"),
     ]
+
+
+def test_executor_skips_what_needs_an_item_not_deployed(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """Nothing goes without what it needs; the rest of the run goes on."""
+    fabric.create.side_effect = [
+        _failure("InvalidDefinition"),
+        ApiResult(True, 201, data={"id": "nb-other"}),
+    ]
+    gold, clean = ("Lakehouse", "Gold"), ("Notebook", "Clean")
+    plan = DeploymentPlan(
+        actions=[
+            _planned(
+                DeploymentActionType.CREATE,
+                _write_item(root, "Gold.Lakehouse"),
+            ),
+            _planned(
+                DeploymentActionType.CREATE,
+                _write_item(root, "Clean.Notebook"),
+                needs=(gold,),
+            ),
+            _planned(
+                DeploymentActionType.CREATE,
+                _write_item(root, "Load.Notebook"),
+                needs=(clean,),
+            ),
+            _planned(
+                DeploymentActionType.CREATE,
+                _write_item(root, "Other.Notebook"),
+            ),
+        ]
+    )
+
+    results = DeploymentExecutor(_index()).apply(plan)
+
+    assert [(r.display_name, r.action) for r in results] == [
+        ("Gold", "failed"),
+        ("Clean", "skipped"),
+        ("Load", "skipped"),
+        ("Other", "created"),
+    ]
+    assert [r.error for r in results[1:3]] == [
+        "Needs Gold.Lakehouse, which failed.",
+        "Needs Clean.Notebook, which was skipped.",
+    ]
+    assert fabric.create.call_count == 2
+
+
+def test_a_blocked_action_keeps_its_reason_when_what_it_needs_failed(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """The planner's reason says more than the failure before it."""
+    fabric.create.return_value = _failure("InvalidDefinition")
+    blocked = replace(
+        _planned(
+            DeploymentActionType.BLOCKED,
+            _write_item(root, "Load.Notebook"),
+            needs=(("Lakehouse", "Gold"),),
+        ),
+        detail="Part of a dependency cycle: Load.Notebook, Clean.Notebook.",
+    )
+    plan = DeploymentPlan(
+        actions=[
+            _planned(
+                DeploymentActionType.CREATE,
+                _write_item(root, "Gold.Lakehouse"),
+            ),
+            blocked,
+        ]
+    )
+
+    gold, load = DeploymentExecutor(_index()).apply(plan)
+
+    assert gold.action == "failed"
+    assert (load.action, load.error) == (
+        "failed",
+        "Part of a dependency cycle: Load.Notebook, Clean.Notebook.",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1564,6 +1677,7 @@ def test_plan_all_items_delegates_to_the_engine() -> None:
             repository_path="src",
             state_backend=backend,
             environment="dev",
+            resolve_dependencies=False,
         )
 
     engine.assert_called_once_with(
@@ -1575,4 +1689,327 @@ def test_plan_all_items_delegates_to_the_engine() -> None:
         repository_path="src",
         state_backend=backend,
         environment="dev",
+        resolve_dependencies=False,
     )
+
+
+# ---------------------------------------------------------------------------
+# Dependencies
+# ---------------------------------------------------------------------------
+
+
+def _write_report(root: Path, relative: str, model_path: str) -> Path:
+    """A report whose definition.pbir points to a semantic model by path."""
+    report = _write_item(root, relative)
+    pbir = {
+        "version": "4.0",
+        "datasetReference": {"byPath": {"path": model_path}},
+    }
+    (report / "definition.pbir").write_text(json.dumps(pbir), encoding="utf-8")
+    return report
+
+
+def _sales(root: Path) -> Path:
+    """The Sales model and the Sales report that reads it."""
+    _write_item(root, "Sales.SemanticModel")
+    return _write_report(root, "Sales.Report", "../Sales.SemanticModel")
+
+
+def test_a_model_missing_from_the_workspace_is_created_before_its_report(
+    git_repo: GitRepo, root: Path, fabric: SimpleNamespace
+) -> None:
+    """Only the report changed, but the workspace lacks its model."""
+    fabric.list_items.return_value = [
+        {"id": "rp-sales", "type": "Report", "displayName": "Sales"},
+    ]
+    report_dir = _sales(root)
+    baseline = git_repo.commit("baseline")
+    _change(report_dir)
+    git_repo.commit("change the report")
+
+    report = _deploy(root, baseline_commit=baseline)
+
+    assert [
+        (r.item_type, r.display_name, r.action) for r in report.results
+    ] == [
+        ("SemanticModel", "Sales", "created"),
+        ("Report", "Sales", "updated"),
+    ]
+    assert fabric.create.call_args.kwargs["item_type"] == "SemanticModel"
+    assert fabric.update.call_args.args[:2] == (_WORKSPACE_ID, "rp-sales")
+
+
+def test_without_dependency_resolution_only_the_selection_goes(
+    git_repo: GitRepo, root: Path, fabric: SimpleNamespace
+) -> None:
+    """resolve_dependencies=False deploys as before: the report alone."""
+    fabric.list_items.return_value = [
+        {"id": "rp-sales", "type": "Report", "displayName": "Sales"},
+    ]
+    report_dir = _sales(root)
+    baseline = git_repo.commit("baseline")
+    _change(report_dir)
+    git_repo.commit("change the report")
+
+    report = _deploy(
+        root, baseline_commit=baseline, resolve_dependencies=False
+    )
+
+    assert [(r.display_name, r.action) for r in report.results] == [
+        ("Sales", "updated")
+    ]
+    fabric.create.assert_not_called()
+
+
+def test_a_report_whose_model_failed_is_skipped(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """The model fails to be created: the report is not sent without it."""
+    fabric.create.return_value = _failure("InvalidDefinition")
+    _sales(root)
+
+    report = _deploy(root)
+
+    assert [(r.item_type, r.action, r.error) for r in report.results] == [
+        (
+            "SemanticModel",
+            "failed",
+            "Create failed with 400: InvalidDefinition - Something went "
+            "wrong.",
+        ),
+        ("Report", "skipped", "Needs Sales.SemanticModel, which failed."),
+    ]
+    assert fabric.create.call_count == 1
+    assert not report.ok
+
+
+def test_without_dependency_resolution_a_failure_skips_nothing(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """resolve_dependencies=False tries every item, as before."""
+    fabric.create.return_value = _failure("InvalidDefinition")
+    _sales(root)
+
+    report = _deploy(root, resolve_dependencies=False)
+
+    assert [r.action for r in report.results] == ["failed", "failed"]
+    assert fabric.create.call_count == 2
+
+
+def test_the_state_records_a_model_created_for_its_report(
+    git_repo: GitRepo,
+    root: Path,
+    fabric: SimpleNamespace,
+    state: LocalJsonStateBackend,
+) -> None:
+    """What was sent to meet a dependency is what was sent, too."""
+    report_dir = _sales(root)
+    git_repo.commit("first")
+    _deploy(root, state_backend=state, environment="dev")
+
+    # The model is deleted from the workspace by hand; the report changes.
+    fabric.list_items.return_value = [
+        {"id": "rp-sales", "type": "Report", "displayName": "Sales"},
+    ]
+    _change(report_dir)
+    git_repo.commit("change the report")
+    with patch(f"{_ENGINE}._StateTracker.record", autospec=True) as record:
+        report = _deploy(root, state_backend=state, environment="dev")
+
+    assert [(r.item_type, r.action) for r in report.results] == [
+        ("SemanticModel", "created"),
+        ("Report", "updated"),
+    ]
+    recorded = record.call_args.args[3]
+    assert {(i.item_type, i.display_name) for i in recorded} == {
+        ("Report", "Sales"),
+        ("SemanticModel", "Sales"),
+    }
+    assert all(i.content_hash for i in recorded)
+
+
+def test_plan_all_items_validates_a_needed_item_in_the_workspace(
+    git_repo: GitRepo, root: Path, fabric: SimpleNamespace
+) -> None:
+    """The model is in the workspace: validated, not deployed."""
+    fabric.list_items.return_value = [
+        {"id": "rp-sales", "type": "Report", "displayName": "Sales"},
+        {"id": "sm-sales", "type": "SemanticModel", "displayName": "Sales"},
+    ]
+    report_dir = _sales(root)
+    baseline = git_repo.commit("baseline")
+    _change(report_dir)
+    git_repo.commit("change the report")
+
+    plan = _plan(root, baseline_commit=baseline)
+
+    assert [a.describe() for a in plan.actions] == [
+        "NOOP     Sales.SemanticModel  DEPENDENCY_REQUIRED: Required by "
+        "Sales.Report (definition.pbir byPath); already in the workspace.",
+        "UPDATE   Sales.Report  SOURCE_CHANGED",
+    ]
+    _assert_no_change(fabric)
+
+
+def test_a_report_pointing_to_no_model_is_blocked(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """A report without its data is not deployed."""
+    _write_report(root, "Sales.Report", "../Gone.SemanticModel")
+
+    report = _deploy(root)
+
+    assert [(r.display_name, r.action) for r in report.results] == [
+        ("Sales", "failed")
+    ]
+    assert report.results[0].error == (
+        "definition.pbir points to ../Gone.SemanticModel, which is not a "
+        "semantic model of the source."
+    )
+    _assert_no_change(fabric)
+
+
+def test_a_lakehouse_missing_from_the_workspace_is_created_before_its_notebook(
+    git_repo: GitRepo, root: Path, fabric: SimpleNamespace
+) -> None:
+    """The notebook's default lakehouse, found by name, is created first."""
+    fabric.list_items.return_value = [
+        {"id": "nb-load", "type": "Notebook", "displayName": "Load"},
+    ]
+    _write_item(root, "Gold.Lakehouse")
+    notebook = _write_item(root, "Load.Notebook")
+    lakehouse = {
+        "default_lakehouse": "<lakehouse-id>",
+        "default_lakehouse_name": "Gold",
+    }
+    meta = json.dumps({"dependencies": {"lakehouse": lakehouse}}, indent=2)
+    (notebook / "notebook-content.py").write_text(
+        "# Fabric notebook source\n\n# METADATA ********************\n\n"
+        + "\n".join(f"# META {line}" for line in meta.splitlines())
+        + "\n",
+        encoding="utf-8",
+    )
+    baseline = git_repo.commit("baseline")
+    _change(notebook)
+    git_repo.commit("change the notebook")
+
+    report = _deploy(root, baseline_commit=baseline)
+
+    assert [
+        (r.item_type, r.display_name, r.action) for r in report.results
+    ] == [
+        ("Lakehouse", "Gold", "created"),
+        ("Notebook", "Load", "updated"),
+    ]
+
+
+_NOTEBOOK_ID = "00000000-0000-0000-0000-0000000000aa"
+_OTHER_WORKSPACE_ID = "00000000-0000-0000-0000-0000000000bb"
+
+
+def _write_pipeline(root: Path, notebook_id: str, workspace_id: str) -> Path:
+    """A pipeline that runs a notebook by ID."""
+    pipeline = _write_item(root, "Daily.DataPipeline")
+    activity = {
+        "name": "Run Load",
+        "type": "TridentNotebook",
+        "typeProperties": {
+            "notebookId": notebook_id,
+            "workspaceId": workspace_id,
+        },
+    }
+    content = {"properties": {"activities": [activity]}}
+    (pipeline / "pipeline-content.json").write_text(
+        json.dumps(content), encoding="utf-8"
+    )
+    return pipeline
+
+
+@pytest.mark.parametrize(
+    ("notebook_listed", "notebook_id", "workspace_id", "warning"),
+    [
+        pytest.param(
+            True, _NOTEBOOK_ID, _WORKSPACE_ID, None, id="notebook there"
+        ),
+        pytest.param(
+            False,
+            _NOTEBOOK_ID,
+            _WORKSPACE_ID,
+            f"refers to notebook {_NOTEBOOK_ID}, which is not in the "
+            "workspace.",
+            id="notebook missing",
+        ),
+        pytest.param(
+            False,
+            _NOTEBOOK_ID,
+            _OTHER_WORKSPACE_ID,
+            None,
+            id="other workspace",
+        ),
+        pytest.param(
+            False,
+            "#{load_notebook_id}#",
+            _WORKSPACE_ID,
+            "refers to notebook '#{load_notebook_id}#', which is not an ID "
+            "(a placeholder left unreplaced?).",
+            id="placeholder left",
+        ),
+    ],
+)
+def test_pipeline_references_by_id_are_checked_against_the_workspace(
+    root: Path,
+    fabric: SimpleNamespace,
+    notebook_listed: bool,
+    notebook_id: str,
+    workspace_id: str,
+    warning: str | None,
+) -> None:
+    """Only a reference to this workspace is checked, and only warned about."""
+    notebook = {"id": _NOTEBOOK_ID, "type": "Notebook", "displayName": "Load"}
+    fabric.list_items.return_value = [
+        {"id": "pl-daily", "type": "DataPipeline", "displayName": "Daily"},
+        *([notebook] if notebook_listed else []),
+    ]
+    _write_pipeline(root, notebook_id, workspace_id)
+
+    (action,) = _plan(root).actions
+
+    assert action.action == DeploymentActionType.UPDATE
+    assert action.detail == (
+        None if warning is None else f"Warning: Activity 'Run Load' {warning}"
+    )
+
+
+def test_a_pipeline_warning_is_logged_and_the_pipeline_still_goes(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """The first deployment of an environment may create what it refers to."""
+    fabric.list_items.return_value = [
+        {"id": "pl-daily", "type": "DataPipeline", "displayName": "Daily"},
+    ]
+    _write_pipeline(root, _NOTEBOOK_ID, _WORKSPACE_ID)
+
+    with patch(f"{_ENGINE}.logger") as logger:
+        report = _deploy(root)
+
+    assert [(r.display_name, r.action) for r in report.results] == [
+        ("Daily", "updated")
+    ]
+    logger.warning.assert_any_call(
+        f"Daily.DataPipeline: Activity 'Run Load' refers to notebook "
+        f"{_NOTEBOOK_ID}, which is not in the workspace."
+    )
+
+
+def test_without_dependency_resolution_pipelines_are_not_checked(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """resolve_dependencies=False checks nothing, as before."""
+    fabric.list_items.return_value = [
+        {"id": "pl-daily", "type": "DataPipeline", "displayName": "Daily"},
+    ]
+    _write_pipeline(root, _NOTEBOOK_ID, _WORKSPACE_ID)
+
+    (action,) = _plan(root, resolve_dependencies=False).actions
+
+    assert action.detail is None

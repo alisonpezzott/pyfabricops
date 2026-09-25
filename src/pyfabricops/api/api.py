@@ -1,3 +1,4 @@
+import re
 import time
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -26,6 +27,10 @@ _THROTTLE_DEFAULT_WAIT_SECONDS = 10.0
 # Consecutive failed LRO status checks (network errors, 5xx) tolerated
 # before the operation is reported as failed.
 _LRO_MAX_CHECK_FAILURES = 3
+
+# Fabric wraps values given by the caller, such as a display name, in <pi>
+# markers inside error messages.
+_PI_MARKERS = re.compile(r"</?pi>")
 
 
 @dataclass
@@ -352,14 +357,31 @@ def _pagination_handler(api_result: ApiResult) -> ApiResult:
     )
 
 
+def _error_detail(error: Mapping[str, Any]) -> str:
+    """
+    Describe a Fabric error payload as ``errorCode - message``.
+
+    The messages of ``moreDetails`` follow, as they often hold the cause
+    that a generic error such as ``InvalidInput`` leaves out. Returns an
+    empty string when the payload has none of those.
+    """
+    parts = [
+        str(error[key]) for key in ("errorCode", "message") if error.get(key)
+    ]
+    more = error.get("moreDetails")
+    if isinstance(more, list):
+        parts.extend(
+            str(entry["message"])
+            for entry in more
+            if isinstance(entry, Mapping) and entry.get("message")
+        )
+    return _PI_MARKERS.sub("", " - ".join(parts))
+
+
 def _lro_error(status: str, state: dict[str, Any]) -> str:
     """Describe a failed LRO from its state payload."""
-    error = state.get("error") or {}
-    detail = " - ".join(
-        str(part)
-        for part in (error.get("errorCode"), error.get("message"))
-        if part
-    )
+    error = state.get("error")
+    detail = _error_detail(error) if isinstance(error, Mapping) else ""
     message = f"LRO failed with status: {status}"
     return f"{message} ({detail})" if detail else message
 

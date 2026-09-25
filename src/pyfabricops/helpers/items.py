@@ -253,6 +253,7 @@ def deploy_all_items(
     repository_path: str | None = None,
     state_backend: DeploymentStateBackend | None = None,
     environment: str | None = None,
+    resolve_dependencies: bool = True,
 ) -> DeploymentReport:
     """
     Deploy all items found under a local path to a workspace.
@@ -282,6 +283,15 @@ def deploy_all_items(
     and the next run compares from the same commits. A run without
     ``state_backend`` compares nothing and deploys every candidate.
 
+    With ``resolve_dependencies`` (the default), the references between
+    local items are read, such as a report's semantic model. Each item
+    is deployed after what it needs. What an item to deploy needs, when
+    not selected, is validated if the workspace has it, and created
+    otherwise when it is in the source and among ``item_types``. An item
+    is blocked when a reference of its definition is broken, when it is
+    part of a dependency cycle, or when something it needs is blocked or
+    cannot be created.
+
     Args:
         workspace (str): The name or ID of the workspace.
         path (str): The path to the items.
@@ -306,6 +316,9 @@ def deploy_all_items(
             Defaults to None: no state.
         environment (str, optional): The name the state is kept under, such
             as ``'prod'``. Defaults to ``workspace``.
+        resolve_dependencies (bool, optional): Order, meet and check the
+            dependencies of the items. Defaults to True; False keeps the
+            type and path order and deploys only the selected items.
 
     Returns:
         DeploymentReport: The outcome of each item; ``report.failed`` lists
@@ -359,6 +372,7 @@ def deploy_all_items(
         repository_path=repository_path,
         state_backend=state_backend,
         environment=environment,
+        resolve_dependencies=resolve_dependencies,
     )
 
 
@@ -372,6 +386,7 @@ def plan_all_items(
     repository_path: str | None = None,
     state_backend: DeploymentStateBackend | None = None,
     environment: str | None = None,
+    resolve_dependencies: bool = True,
 ) -> DeploymentPlan:
     """
     Show what ``deploy_all_items`` would do, without doing it.
@@ -397,10 +412,14 @@ def plan_all_items(
             deployment state is kept. Defaults to None: no state.
         environment (str, optional): The name the state is kept under.
             Defaults to ``workspace``.
+        resolve_dependencies (bool, optional): Order, meet and check the
+            dependencies of the items, as ``deploy_all_items`` does.
+            Defaults to True.
 
     Returns:
-        DeploymentPlan: One action per selected item, saying what would
-            happen and why; ``plan.describe()`` gives it as text.
+        DeploymentPlan: One action per selected item, and per dependency
+            met, saying what would happen and why; ``plan.describe()``
+            gives it as text.
 
     Raises:
         ConfigurationError: If the workspace is not found, or, with
@@ -430,4 +449,5 @@ def plan_all_items(
         repository_path=repository_path,
         state_backend=state_backend,
         environment=environment,
+        resolve_dependencies=resolve_dependencies,
     )
