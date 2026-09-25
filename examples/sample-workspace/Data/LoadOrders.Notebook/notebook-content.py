@@ -18,7 +18,6 @@
 # MARKDOWN ********************
 
 # # Load orders
-#
 # Writes the sample orders to the `orders` Delta table of the default
 # lakehouse, Bronze. The DailyLoad pipeline runs this notebook.
 
