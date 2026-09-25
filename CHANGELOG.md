@@ -100,13 +100,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the Fabric API accepts, using the model created earlier in the run or the
   one already there. The file is unchanged. Without such a model the report
   fails with the reason, and nothing is sent.
+- `reconcile_items()` tells how a workspace stands against the source,
+  changing nothing. It returns a `Reconciliation`:
+  - a plan of what would bring the workspace back: `CREATE` for an item it
+    lacks, with the new reason `TARGET_MISSING`; `UPDATE` for one whose
+    definition differs, with the new reason `WORKSPACE_DRIFT`, or
+    `SOURCE_CHANGED` when the deployment state shows the source changed
+    since the last deployment; `MOVE` for one in another folder;
+  - the items the workspace holds and the source does not
+    (`UnmanagedItem`), of any type but the SQL endpoint of a lakehouse;
+  - the items whose definition could not be compared, and the items in
+    sync.
+
+  Each definition is compared with the one the workspace returns, leaving
+  out what Fabric rewrites by itself: layout, the logical ID in
+  `.platform`, a report's reference to its model, the `ref` lines of
+  `model.tmdl`, and the empty parts it adds, such as a lakehouse's
+  `shortcuts.metadata.json`. A difference names the parts that differ.
+  `Reconciliation` and `UnmanagedItem` are exported. The Reconciliation
+  page of the documentation explains each finding.
 - An `examples/` folder, in the repository but not in the package:
   - a sample workspace in Fabric's Git format, with a lakehouse, notebooks,
     a pipeline, a semantic model and a report that refer to one another;
   - scripts that authenticate, export a workspace, and deploy the sample
     fully or only what changed since the last deployment;
   - Azure DevOps and GitHub Actions definitions that run the selective
-    deployment.
+    deployment;
+  - a reconciliation that reports drift, with scheduled Azure DevOps and
+    GitHub Actions definitions that fail when anything differs.
 
   `tests/test_examples.py` checks the plan the sample gives, and that no
   ID other than its own made-up ones gets into the folder.

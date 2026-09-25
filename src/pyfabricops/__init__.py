@@ -202,6 +202,7 @@ from .helpers.items import (
     export_all_items,
     export_item,
     plan_all_items,
+    reconcile_items,
 )
 from .helpers.lakehouses import (
     export_all_lakehouses,
@@ -223,6 +224,7 @@ from .helpers.notebooks import (
     replace_notebook_parameters_with_placeholders,
     replace_notebook_placeholders_with_parameters,
 )
+from .helpers.reconciliation import Reconciliation, UnmanagedItem
 from .helpers.reports import (
     convert_report_definition_to_by_connection,
     convert_report_definition_to_by_path,
@@ -462,6 +464,8 @@ __all__ = [
     "DeploymentState",
     "DeploymentStateBackend",
     "LocalJsonStateBackend",
+    "Reconciliation",
+    "UnmanagedItem",
     "PyFabricOpsFileNotFoundError",
     "InvalidParameterError",
     "OptionNotAvailableError",
@@ -741,6 +745,7 @@ __all__ = [
     "plan_all_items",
     "publish_environment",
     "read_json",
+    "reconcile_items",
     "refresh_dataflow_gen1",
     "refresh_semantic_model",
     "replace_data_pipeline_placeholders_with_variables",

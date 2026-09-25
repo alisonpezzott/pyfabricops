@@ -1,0 +1,51 @@
+# Reports drift on weekday mornings: compares main with the Fabric
+# workspace and fails when anything differs, so that someone looks. It
+# never changes the workspace.
+#
+# Before using it:
+# - It uses the "fabric-prd" variable group of 05-ci-azure-devops.
+# - In Azure DevOps a cache belongs to one pipeline, so this pipeline has no
+#   deployment state, and every difference counts as drift. To tell drift
+#   from a deployment still to run, add this schedule and the Reconcile step
+#   to the pipeline of 05-ci-azure-devops, which caches the state, and pass
+#   --state-dir "$(STATE_DIR)".
+# - Until the next pyfabricops release, install it from the repository, as
+#   below; then pin the release instead: pip install "pyfabricops==<version>".
+
+trigger: none
+
+schedules:
+  - cron: "0 6 * * 1-5"
+    displayName: Weekdays at 06:00 UTC
+    branches:
+      include:
+        - main
+    # Run even when main did not change: drift happens in the workspace.
+    always: true
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  - group: fabric-prd
+
+steps:
+  - checkout: self
+
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: "3.13"
+
+  - script: pip install "pyfabricops @ git+https://github.com/alisonpezzott/pyfabricops"
+    displayName: Install pyfabricops
+
+  - script: >
+      python examples/07-reconcile/reconcile.py
+      --workspace "$(FABRIC_WORKSPACE)"
+      --environment PRD
+    displayName: Reconcile
+    env:
+      # Secret variables reach a script only when mapped.
+      FAB_CLIENT_ID: $(FAB_CLIENT_ID)
+      FAB_TENANT_ID: $(FAB_TENANT_ID)
+      FAB_CLIENT_SECRET: $(FAB_CLIENT_SECRET)

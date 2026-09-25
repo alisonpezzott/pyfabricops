@@ -6,13 +6,19 @@ from typing import Any
 from pandas import DataFrame
 
 from ..core.workspaces import resolve_workspace
-from ..helpers.deployment import DeploymentReport, _deploy_all, _plan_all
+from ..helpers.deployment import (
+    DeploymentReport,
+    _deploy_all,
+    _plan_all,
+    _reconcile_all,
+)
 from ..helpers.deployment_plan import DeploymentPlan
 from ..helpers.deployment_state import DeploymentStateBackend
 from ..helpers.folders import (
     create_folders_from_path_string,
     resolve_folder_from_id_to_path,
 )
+from ..helpers.reconciliation import Reconciliation
 from ..items.items import (
     create_item,
     get_item,
@@ -454,4 +460,83 @@ def plan_all_items(
         state_backend=state_backend,
         environment=environment,
         resolve_dependencies=resolve_dependencies,
+    )
+
+
+def reconcile_items(
+    workspace: str,
+    path: str,
+    start_path: str | None = None,
+    *,
+    item_types: Sequence[str] | None = None,
+    state_backend: DeploymentStateBackend | None = None,
+    environment: str | None = None,
+) -> Reconciliation:
+    """
+    Tell how a workspace stands against the source, changing nothing.
+
+    Every local item in scope is compared with the workspace: an item the
+    workspace lacks, one whose definition differs, one in another folder.
+    Each definition is compared with the one the workspace returns,
+    leaving out what Fabric rewrites by itself, such as the logical ID it
+    assigns or a report's connection to its model. The items the workspace
+    holds and the source does not are listed as unmanaged, of any type but
+    the SQL endpoint that comes with a lakehouse.
+
+    With ``state_backend``, a difference tells where it comes from:
+    changed in the workspace since the last successful deployment
+    (``WORKSPACE_DRIFT``), or in the source, a deployment still to run
+    (``SOURCE_CHANGED``). Without it, every difference counts as drift.
+
+    Nothing in the workspace changes, and the state is only read. It reads
+    the definition of every item found on both sides, so it suits a
+    scheduled run, or a check before a release, more than every
+    deployment.
+
+    Args:
+        workspace (str): The name or ID of the workspace.
+        path (str): The path to the items, such as a staging copy with the
+            placeholders of the environment replaced.
+        start_path (Optional[str]): The local path that maps to the
+            workspace root, used to derive each item's folder.
+        item_types (Sequence[str], optional): The item types to compare.
+            Defaults to every type in ``DEPLOY_ORDER``. An item of the
+            source of another type is still never unmanaged.
+        state_backend (DeploymentStateBackend, optional): Where the
+            deployment state is kept. Defaults to None: no state.
+        environment (str, optional): The name the state is kept under.
+            Defaults to ``workspace``.
+
+    Returns:
+        Reconciliation: The plan that would bring the workspace back to the
+            source, the unmanaged items, the items whose definition could
+            not be compared, and the items in sync; ``describe()`` gives it
+            as text, and ``ok`` tells whether anything differs.
+
+    Raises:
+        ConfigurationError: If the workspace is not found, or the state is
+            invalid.
+        RequestError: If the workspace items and folders cannot be listed.
+
+    Examples:
+        ```python
+        reconciliation = reconcile_items(
+            'Sales-PRD',
+            staging,
+            start_path=staging,
+            state_backend=LocalJsonStateBackend('.pyfabricops/state'),
+            environment='prod',
+        )
+        print(reconciliation.describe())
+        if not reconciliation.ok:
+            raise SystemExit(1)
+        ```
+    """
+    return _reconcile_all(
+        workspace,
+        path,
+        start_path=start_path,
+        item_types=item_types,
+        state_backend=state_backend,
+        environment=environment,
     )

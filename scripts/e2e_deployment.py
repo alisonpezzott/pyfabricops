@@ -18,7 +18,10 @@ hand, the notebook blocked in a run limited to notebooks and the lakehouse
 created again, before it, by the full run; a report and its semantic
 model: the report, which points to the model by path in Git, reaches the
 workspace bound to the model's ID, when both are created and when only the
-report changes.
+report changes; a reconciliation: in sync after the deployments, then,
+after a notebook edited, another moved, the report deleted and a notebook
+created by hand, each change found with its reason, while a selective
+deployment has nothing to do, as Git did not change.
 
 Prerequisites:
 
@@ -456,6 +459,56 @@ def _step_report_in_place(run: Run) -> None:
     _check_bound(run, "R", model="M")
 
 
+def _step_reconcile(run: Run) -> None:
+    result = _reconcile(run, "Reconciled after the deployments: in sync")
+    _check(result.ok, "the workspace matches the source")
+    _check(
+        set(result.in_sync) == set(_state(run).items),
+        "every item deployed is in sync",
+    )
+
+
+def _step_reconcile_drift(run: Run) -> None:
+    print("\n== Changes by hand in the workspace")
+    _edit_by_hand(run, "Notebook", "A")
+    _move_by_hand(run, "Notebook", "B", run.folder)
+    _delete_by_hand(run, "Report", run.name("R"))
+    _create_by_hand(run, "X")
+
+    result = _reconcile(run, "Reconciled: each change by hand is found")
+    _check(
+        [
+            (a.action.value, a.display_name, a.reason.value)
+            for a in result.plan.actions
+        ]
+        == [
+            ("UPDATE", run.name("A"), "WORKSPACE_DRIFT"),
+            ("MOVE", run.name("B"), "WORKSPACE_DRIFT"),
+            ("CREATE", run.name("R"), "TARGET_MISSING"),
+        ],
+        "the edit, the move and the deletion are found, as drift",
+    )
+    _check(
+        [(u.item_type, u.display_name) for u in result.unmanaged]
+        == [("Notebook", run.name("X"))],
+        "the notebook created by hand is unmanaged",
+    )
+    _check(
+        all(
+            item["displayName"] != run.name("R")
+            for item in _list_items(run.workspace_id)
+        ),
+        "the reconciliation changed nothing",
+    )
+
+    _deploy_step(
+        run,
+        "A selective deployment after that: nothing to do, Git is unchanged",
+        plan=[],
+        results=[],
+    )
+
+
 _STEPS: tuple[Callable[[Run], None], ...] = (
     _step_bootstrap,
     _step_nothing_changed,
@@ -471,6 +524,8 @@ _STEPS: tuple[Callable[[Run], None], ...] = (
     _step_dependency_missing,
     _step_report,
     _step_report_in_place,
+    _step_reconcile,
+    _step_reconcile_drift,
 )
 
 
@@ -565,6 +620,21 @@ def _deploy(
     return last
 
 
+def _reconcile(run: Run, title: str) -> pf.Reconciliation:
+    """Reconcile the staged source with the workspace, and print it."""
+    print(f"\n== {title}")
+    staging = _stage(run)
+    result: pf.Reconciliation = pf.reconcile_items(
+        run.workspace,
+        staging,
+        start_path=staging,
+        state_backend=run.state,
+        environment=_ENVIRONMENT,
+    )
+    print(_indent(result.describe()))
+    return result
+
+
 def _check(condition: bool, what: str) -> None:
     """Print a passed check, or stop the run on a failed one."""
     if not condition:
@@ -632,6 +702,16 @@ def _write_notebook(
 ) -> None:
     """Write a notebook, with a default lakehouse of the run if given."""
     item = _item_folder(run, letter, "Notebook")
+    (item / "notebook-content.py").write_text(
+        _notebook_text(run, letter, version=version, lakehouse=lakehouse),
+        encoding="utf-8",
+    )
+
+
+def _notebook_text(
+    run: Run, letter: str, *, version: int, lakehouse: str | None = None
+) -> str:
+    """The source of a notebook of the run."""
     dependencies: dict[str, Any] = {}
     if lakehouse is not None:
         # As Fabric writes a lakehouse of the same workspace: by logical ID.
@@ -648,12 +728,11 @@ def _write_notebook(
         f"# META {line}"
         for line in json.dumps(metadata, indent=2).splitlines()
     )
-    content = (
+    return (
         _NOTEBOOK.replace("__METADATA__", meta)
         .replace("__LETTER__", letter)
         .replace("__VERSION__", str(version))
     )
-    (item / "notebook-content.py").write_text(content, encoding="utf-8")
 
 
 def _write_lakehouse(run: Run, letter: str) -> None:
@@ -874,6 +953,60 @@ def _remove_what_the_run_created(run: Run) -> None:
         if folder["displayName"] == run.folder:
             pf.delete_folder(run.workspace_id, folder["id"])
             print(f"Deleted folder {run.folder}.")
+
+
+def _edit_by_hand(run: Run, item_type: str, letter: str) -> None:
+    """Change a notebook in the workspace, as a person would."""
+    item_id = _item_id(run, item_type, run.name(letter))
+    response = pf.get_item_definition(run.workspace_id, item_id) or {}
+    definition = response.get("definition")
+    if not isinstance(definition, dict):
+        raise E2EFailure(f"no definition read back for {letter}")
+    for part in definition["parts"]:
+        if part["path"] == "notebook-content.py":
+            text = base64.b64decode(part["payload"]).decode("utf-8")
+            text = text.replace("print(", "print('edited by hand')\nprint(")
+            part["payload"] = base64.b64encode(text.encode("utf-8")).decode()
+    pf.update_item_definition(run.workspace_id, item_id, definition, df=False)
+    print(f"    {run.name(letter)}.{item_type} edited by hand")
+
+
+def _move_by_hand(run: Run, item_type: str, letter: str, folder: str) -> None:
+    """Move an item to a workspace folder, as a person would."""
+    folder_ids = {
+        entry["displayName"]: entry["id"]
+        for entry in pf.list_folders(run.workspace_id, df=False) or []
+    }
+    if folder not in folder_ids:
+        raise E2EFailure(f"folder {folder} is not in the workspace")
+    pf.move_item(
+        run.workspace_id,
+        _item_id(run, item_type, run.name(letter)),
+        target_folder=folder_ids[folder],
+    )
+    print(f"    {run.name(letter)}.{item_type} moved to {folder} by hand")
+
+
+def _create_by_hand(run: Run, letter: str) -> None:
+    """Create a notebook that is in no commit, as a person would."""
+    content = _notebook_text(run, letter, version=1)
+    definition = {
+        "parts": [
+            {
+                "path": "notebook-content.py",
+                "payload": base64.b64encode(content.encode("utf-8")).decode(),
+                "payloadType": "InlineBase64",
+            }
+        ]
+    }
+    pf.create_item(
+        run.workspace_id,
+        run.name(letter),
+        definition,
+        item_type="Notebook",
+        df=False,
+    )
+    print(f"    {run.name(letter)}.Notebook created by hand")
 
 
 def _delete_by_hand(run: Run, item_type: str, name: str) -> None:
