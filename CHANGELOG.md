@@ -103,6 +103,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the same item, the last one silently winning. `deploy_all_items()` now
   reports the second one as failed.
 - `pack_item_definition()` return annotation is now `dict[str, Any]`.
+- Cached access tokens are kept per identity (tenant, client ID and, for
+  `credential_type="user"`, the username), so switching credentials no
+  longer reuses the previous identity's token. The cache moved from the
+  shared temporary folder to `pyfabricops/token_cache.json` in the user's
+  cache folder, in a folder and a file only that user can read, and it is
+  no longer created on import. `set_auth_provider()` and
+  `clear_token_cache()` are unchanged.
 - `docs/functions/items/environments.md` referenced the removed
   `pyfabricops.items.environments_gen2` module (renamed to `environments` in
   an earlier refactor), which made `mkdocs build` fail outright and broke
