@@ -27,28 +27,40 @@ from .logging import get_logger
 logger = get_logger(__name__)
 
 
-def copy_to_staging(path: str) -> str:
+def copy_to_staging(path: str, *, staging_dir: str | None = None) -> str:
     """
     Copies the contents of the specified directory to a staging folder.
     This function ensures that a staging folder exists, and if it already exists,
     it removes the existing staging folder and creates a new one. It then copies
     all files and directories from the specified path to the staging folder.
 
+    By default the staging folder is ``_stg/<folder name>`` inside the
+    installed pyfabricops package: every run using the installation shares
+    it, it cannot be written where the package folder is read-only, and it
+    outlives the run. In CI, pass ``staging_dir``, such as a temporary
+    folder of the run.
+
     Args:
         path (str): The path of the directory to be copied to the staging folder.
+        staging_dir (str, optional): The folder to copy into, as
+            ``<staging_dir>/<folder name>``; created when missing. Defaults
+            to ``_stg`` inside the pyfabricops package.
 
     Returns:
         str: The path to the staging folder where the contents have been copied.
 
+    Raises:
+        ValueError: If the staging folder and ``path`` contain one another,
+            since replacing the staging folder would then delete the source
+            or copy it into itself.
+
     Examples:
         ```python
         copy_to_staging('/path/to/directory')
+        copy_to_staging('workspace', staging_dir=tempfile.mkdtemp())
         ```
     """
-    current_folder = os.path.dirname(__file__)
-
-    # ensure staging folder exists
-    path_staging = os.path.join(current_folder, "_stg", os.path.basename(path))
+    path_staging = _staging_path(path, staging_dir)
 
     if os.path.exists(path_staging):
         shutil.rmtree(path_staging)
@@ -58,6 +70,35 @@ def copy_to_staging(path: str) -> str:
     # copy files to staging folder
     shutil.copytree(path, path_staging, dirs_exist_ok=True)
 
+    return path_staging
+
+
+def _staging_path(path: str, staging_dir: str | None) -> str:
+    """
+    Return the staging folder of ``path``, refusing one that overlaps it.
+
+    Raises:
+        ValueError: If the staging folder and ``path`` contain one another.
+    """
+    parent = staging_dir or os.path.join(os.path.dirname(__file__), "_stg")
+    # normpath drops a trailing separator, which would otherwise make the
+    # parent folder itself the staging folder.
+    path_staging = os.path.join(
+        parent, os.path.basename(os.path.normpath(path))
+    )
+
+    source = os.path.normcase(os.path.abspath(path))
+    target = os.path.normcase(os.path.abspath(path_staging))
+    try:
+        shared = os.path.commonpath([source, target])
+    except ValueError:
+        # On different drives, neither can contain the other.
+        return path_staging
+    if shared in (source, target):
+        raise ValueError(
+            f"The staging folder {path_staging} and {path} contain one "
+            "another."
+        )
     return path_staging
 
 

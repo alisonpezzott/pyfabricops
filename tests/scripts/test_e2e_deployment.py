@@ -16,9 +16,11 @@ from unittest.mock import patch
 
 import pytest
 
+import pyfabricops
 from pyfabricops.api.api import ApiResult
 
 _SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "e2e_deployment.py"
+_PACKAGE = Path(pyfabricops.__file__).resolve().parent
 _ENGINE = "pyfabricops.helpers.deployment"
 _WORKSPACE_ID = "00000000-0000-0000-0000-0000000000e2"
 
@@ -148,19 +150,11 @@ def fake(
     for name in ("FAB_CLIENT_ID", "FAB_CLIENT_SECRET", "FAB_TENANT_ID"):
         monkeypatch.setenv(name, "offline-test")
 
-    def _copy_to_staging(path: str) -> str:
-        staging = tmp_path / "stg" / Path(path).name
-        if staging.exists():
-            shutil.rmtree(staging)
-        shutil.copytree(path, staging)
-        return str(staging)
-
     workspace = FakeWorkspace()
     with (
         patch("pyfabricops.clear_token_cache"),
         patch("pyfabricops.set_auth_provider"),
         patch("pyfabricops.setup_logging"),
-        patch("pyfabricops.copy_to_staging", side_effect=_copy_to_staging),
         patch(
             "pyfabricops.resolve_workspace",
             side_effect=workspace.resolve_workspace,
@@ -193,6 +187,13 @@ def fake(
         yield workspace
 
 
+def _listing(folder: Path) -> list[str]:
+    """Every path under a folder, to tell whether something was written."""
+    if not folder.exists():
+        return []
+    return sorted(str(p.relative_to(folder)) for p in folder.rglob("*"))
+
+
 def _run_script(tmp_path: Path, *args: str) -> int:
     code: int = _load_script().main(
         ["--env-file", str(tmp_path / "no.env"), *args]
@@ -203,7 +204,10 @@ def _run_script(tmp_path: Path, *args: str) -> int:
 def test_every_step_passes_and_the_run_cleans_up(
     fake: FakeWorkspace, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Against a workspace that behaves, all eight steps pass."""
+    """Against a workspace that behaves, every step passes."""
+    package_staging = _PACKAGE / "utils" / "_stg"
+    before = _listing(package_staging)
+
     code = _run_script(tmp_path, "--workspace", "Sandbox")
 
     captured = capsys.readouterr()
@@ -212,7 +216,7 @@ def test_every_step_passes_and_the_run_cleans_up(
     assert "[FAIL]" not in captured.err
     assert fake.items == {}
     assert fake.folders == {}
-    assert not (tmp_path / "stg").exists(), "the staging copy is left"
+    assert _listing(package_staging) == before, "the run staged in the package"
 
 
 def test_a_workspace_with_other_items_is_refused(
