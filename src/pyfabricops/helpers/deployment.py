@@ -13,7 +13,9 @@ only when every item succeeded. Nothing is ever deleted.
 
 from __future__ import annotations
 
+import base64
 import json
+import os
 import time
 import uuid
 from collections.abc import Mapping, Sequence
@@ -699,6 +701,96 @@ def _planned_target(
     return existing
 
 
+def _definition_to_send(
+    index: _WorkspaceIndex, action: DeploymentAction
+) -> dict[str, Any]:
+    """Pack an item's definition, with a report bound to its model."""
+    definition = pack_item_definition(action.source_path)
+    if action.item_type == "Report":
+        definition = _bind_report(index, action, definition)
+    return definition
+
+
+def _bind_report(
+    index: _WorkspaceIndex,
+    action: DeploymentAction,
+    definition: dict[str, Any],
+) -> dict[str, Any]:
+    """
+    Point a report's definition to its semantic model by ID.
+
+    In Git, ``definition.pbir`` refers to the semantic model by the path of
+    its folder (``byPath``), which the Fabric API does not accept. Such a
+    reference is sent as a connection to the ID of that model in the
+    workspace, created earlier in the run or already there. The file itself
+    is left alone, and any other reference goes as it is.
+
+    Raises:
+        ConfigurationError: If the path does not lead to a semantic model
+            of the source, or the workspace has no such model.
+    """
+    parts: list[dict[str, Any]] = definition.get("parts", [])
+    position = next(
+        (
+            n
+            for n, part in enumerate(parts)
+            if part["path"] == "definition.pbir"
+        ),
+        None,
+    )
+    if position is None:
+        return definition
+    try:
+        pbir = json.loads(base64.b64decode(parts[position]["payload"]))
+    except (KeyError, TypeError, ValueError):
+        # Fabric refuses it with a reason of its own.
+        return definition
+    reference = (
+        pbir.get("datasetReference") if isinstance(pbir, dict) else None
+    )
+    by_path = reference.get("byPath") if isinstance(reference, dict) else None
+    path = by_path.get("path") if isinstance(by_path, dict) else None
+    if not isinstance(path, str):
+        return definition
+
+    folder = os.path.normpath(os.path.join(action.source_path, path))
+    if Path(folder).suffix != ".SemanticModel":
+        raise ConfigurationError(
+            f"definition.pbir points to {path}, which is not a semantic "
+            "model folder."
+        )
+    try:
+        model_name = _read_display_name(folder)
+    except ConfigurationError as e:
+        raise ConfigurationError(
+            f"definition.pbir points to {path}: {e}"
+        ) from e
+    model_id = (index.items.get(("SemanticModel", model_name)) or {}).get("id")
+    if not model_id:
+        raise ConfigurationError(
+            f"definition.pbir points to {path}, but the workspace has no "
+            f"semantic model {model_name}."
+        )
+
+    pbir["datasetReference"] = {
+        "byConnection": {"connectionString": f"semanticmodelid={model_id}"}
+    }
+    bound = {
+        **parts[position],
+        "payload": base64.b64encode(
+            json.dumps(pbir, indent=2).encode("utf-8")
+        ).decode("ascii"),
+    }
+    logger.info(
+        f"{action.display_name}.Report: definition.pbir points to {path}, "
+        f"sent as a connection to semantic model {model_name}."
+    )
+    return {
+        **definition,
+        "parts": [*parts[:position], bound, *parts[position + 1 :]],
+    }
+
+
 def _create_planned_item(
     index: _WorkspaceIndex,
     action: DeploymentAction,
@@ -781,7 +873,7 @@ def _apply_action(
 
     try:
         if action.action is DeploymentActionType.CREATE:
-            definition = pack_item_definition(action.source_path)
+            definition = _definition_to_send(index, action)
             folder_id = index.ensure_folder(action.folder_path)
             item_id = _create_planned_item(
                 index, action, definition, folder_id
@@ -790,7 +882,7 @@ def _apply_action(
         elif action.action is DeploymentActionType.UPDATE:
             # Check the target before the first change to the workspace.
             existing = _planned_target(index, action)
-            definition = pack_item_definition(action.source_path)
+            definition = _definition_to_send(index, action)
             folder_id = index.ensure_folder(action.folder_path)
             item_id = cast(str, existing["id"])
             moved = _move_if_needed(index, item_id, existing, folder_id)
@@ -912,8 +1004,10 @@ class DeploymentExecutor:
     reporting it as failed, and a NOOP gets a log line but no result. An
     item to create, update or move is skipped when an item of its
     ``needs`` failed or was skipped, so nothing is deployed without what it
-    needs. Used by ``deploy_all_items``; not exported from ``pyfabricops``
-    yet.
+    needs. A report that points to its semantic model by path is sent with
+    a connection to the model's ID in the workspace instead, since the
+    Fabric API accepts no path. Used by ``deploy_all_items``; not exported
+    from ``pyfabricops`` yet.
 
     Args:
         index (_WorkspaceIndex): The workspace items and folders the plan was
