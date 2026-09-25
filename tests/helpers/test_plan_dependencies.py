@@ -282,3 +282,20 @@ def test_deletions_and_unreadable_items_keep_their_places() -> None:
         ("BLOCKED", "ws/Broken.Notebook"),
         ("DELETE", "ws/Load.Notebook"),
     ]
+
+
+def test_warnings_are_added_to_the_detail_without_blocking() -> None:
+    """A pipeline pointing to a missing notebook still goes, with a note."""
+    pipeline = ("DataPipeline", "Daily")
+    warning = (
+        "Activity 'Run Load' refers to notebook <id>, which is not in the "
+        "workspace."
+    )
+    planner = DeploymentPlanner({pipeline}, warnings={pipeline: [warning]})
+
+    (action,) = planner.plan([_item(pipeline)]).actions
+
+    assert (action.action.value, action.detail) == (
+        "UPDATE",
+        f"Warning: {warning}",
+    )

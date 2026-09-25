@@ -79,6 +79,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - An item is blocked when a reference of its definition is broken, when it
     is part of a dependency cycle, or when something it needs is blocked or
     cannot be created.
+  - A data pipeline's references by ID (notebooks, pipelines, dataflows,
+    lakehouses and other items, nested activities included) are checked
+    against the workspace after staging. An ID the workspace lacks, or a
+    value that is no ID (a placeholder left unreplaced), gives a warning in
+    the plan and in the log, without blocking, since an item created in the
+    same run gets its ID when created. References to other workspaces are
+    not checked.
 
   `resolve_dependencies=False` keeps the earlier behavior.
 

@@ -21,6 +21,11 @@ References read:
 - Notebook → Environment: the attached environment, by logical ID.
 - Notebook → Notebook: ``%run <notebook>``; ``%run -b`` runs a script of
   the notebook's resources, not a notebook.
+
+``pipeline_references`` reads what a data pipeline refers to by ID
+(notebooks, pipelines, dataflows, lakehouses and other items): those IDs
+are the workspace's own, so they are checked against it rather than
+resolved to local items.
 """
 
 from __future__ import annotations
@@ -38,7 +43,14 @@ from typing import Any, TypeAlias
 from ..utils.utils import list_paths_of_type
 from .dependency_graph import Dependency, ItemKey
 
-__all__ = ["CatalogItem", "LocalCatalog", "ReferenceScan", "scan_references"]
+__all__ = [
+    "CatalogItem",
+    "IdReference",
+    "LocalCatalog",
+    "ReferenceScan",
+    "pipeline_references",
+    "scan_references",
+]
 
 
 @dataclass(frozen=True)
@@ -398,6 +410,93 @@ def _with_logical_id(
         return None
     item = catalog.with_logical_id(value)
     return item if item is not None and item.key[0] == item_type else None
+
+
+@dataclass(frozen=True)
+class IdReference:
+    """
+    A reference by ID from a data pipeline to an item of a workspace.
+
+    Attributes:
+        kind (str): What is referred to: ``"notebook"``, ``"pipeline"``,
+            ``"dataflow"``, or ``"item"`` for any other, such as the
+            lakehouse a copy writes to.
+        item_id (str): The ID, which may be a placeholder left unreplaced.
+        workspace_id (str | None): The workspace of the item, or None when
+            the definition does not say, which means the pipeline's own.
+        where (str): Where the reference is, such as
+            ``"Activity 'Load sales'"``.
+    """
+
+    kind: str
+    item_id: str
+    workspace_id: str | None
+    where: str
+
+
+# The keys holding an item ID in pipeline activities, and what they name.
+_ID_KEYS = {
+    "notebookId": "notebook",
+    "pipelineId": "pipeline",
+    "dataflowId": "dataflow",
+    "artifactId": "item",
+}
+
+
+def pipeline_references(folder: str) -> tuple[IdReference, ...]:
+    """
+    Read what a data pipeline refers to by ID.
+
+    Every activity is read, those nested in ForEach, If Condition, Switch
+    and Until included.
+
+    Args:
+        folder (str): The folder of the pipeline, with its
+            ``pipeline-content.json``.
+
+    Returns:
+        tuple[IdReference, ...]: The references, each once, in the order
+            found; none when the content cannot be read.
+    """
+    found: list[IdReference] = []
+    _walk_pipeline(
+        _read_json(Path(folder) / "pipeline-content.json"),
+        "The pipeline",
+        found,
+    )
+    return tuple(dict.fromkeys(found))
+
+
+def _walk_pipeline(node: object, where: str, found: list[IdReference]) -> None:
+    """Collect the ID references under a node of a pipeline definition."""
+    if isinstance(node, list):
+        for child in node:
+            _walk_pipeline(child, where, found)
+        return
+    if not isinstance(node, dict):
+        return
+    if isinstance(node.get("name"), str) and "typeProperties" in node:
+        where = f"Activity '{node['name']}'"
+
+    workspace = node.get("workspaceId")
+    workspace_id = workspace if isinstance(workspace, str) else None
+    for key, kind in _ID_KEYS.items():
+        value = node.get(key)
+        if isinstance(value, str) and value:
+            found.append(IdReference(kind, value, workspace_id, where))
+    # Invoke pipeline (legacy) names the pipeline in a PipelineReference.
+    pipeline = node.get("pipeline")
+    if (
+        isinstance(pipeline, dict)
+        and pipeline.get("type") == "PipelineReference"
+        and isinstance(pipeline.get("referenceName"), str)
+    ):
+        found.append(
+            IdReference("pipeline", pipeline["referenceName"], None, where)
+        )
+
+    for child in node.values():
+        _walk_pipeline(child, where, found)
 
 
 def _read_platform(item_path: str) -> tuple[str, str | None] | None:

@@ -284,6 +284,10 @@ class DeploymentPlanner:
         item_types (Collection[str], optional): The item types the run
             deploys; a missing dependency of another type is not created,
             and what needs it is blocked. Defaults to any type.
+        warnings (Mapping[ItemKey, Sequence[str]], optional): For each item,
+            what to warn about, such as a reference by ID the workspace
+            lacks. Added to the detail of the item's action; nothing is
+            blocked for it.
 
     Examples:
         ```python
@@ -305,6 +309,7 @@ class DeploymentPlanner:
         dependencies: DependencyGraph | None = None,
         broken: Mapping[ItemKey, Sequence[str]] | None = None,
         item_types: Collection[str] | None = None,
+        warnings: Mapping[ItemKey, Sequence[str]] | None = None,
     ) -> None:
         self._existing_items = frozenset(existing_items)
         self._deployed_items = dict(deployed_items or {})
@@ -314,6 +319,9 @@ class DeploymentPlanner:
             key: tuple(problems) for key, problems in (broken or {}).items()
         }
         self._item_types = None if item_types is None else set(item_types)
+        self._warnings = {
+            key: tuple(texts) for key, texts in (warnings or {}).items()
+        }
 
     def plan(
         self,
@@ -361,6 +369,8 @@ class DeploymentPlanner:
         ]
         if self._graph is not None:
             actions = self._resolve(self._graph, actions, list(available))
+        if self._warnings:
+            actions = [self._with_warnings(action) for action in actions]
         deleted: dict[tuple[str, str], str] = {}
         actions += [
             self._plan_deletion(item, defined, deleted)
@@ -614,6 +624,21 @@ class DeploymentPlanner:
                     changed = True
                     break
         return blocked
+
+    def _with_warnings(self, action: DeploymentAction) -> DeploymentAction:
+        """Add what to warn about an item to the detail of its action."""
+        if action.display_name is None:
+            return action
+        warnings = self._warnings.get(_key(action), ())
+        if not warnings:
+            return action
+        notes = [f"Warning: {warning}" for warning in warnings]
+        return replace(
+            action,
+            detail=" ".join(
+                [action.detail, *notes] if action.detail else notes
+            ),
+        )
 
     def _where(self, source_path: str) -> str:
         """Show an item folder relative to the root, when it is inside it."""

@@ -7,8 +7,10 @@ from pathlib import Path
 from typing import Any
 
 from pyfabricops.helpers.dependencies import (
+    IdReference,
     LocalCatalog,
     ReferenceScan,
+    pipeline_references,
     scan_references,
 )
 from pyfabricops.helpers.dependency_graph import Dependency
@@ -395,3 +397,93 @@ def test_a_notebook_without_dependencies_needs_nothing(
     )
 
     assert _scan(tmp_path, LOAD).dependencies == ()
+
+
+# ---------------------------------------------------------------------------
+# DataPipeline references by ID
+# ---------------------------------------------------------------------------
+
+
+def _pipeline(root: Path, relative: str, activities: list[Any]) -> Path:
+    """Write a pipeline with its activities."""
+    folder = _item(root, relative)
+    content = {"properties": {"activities": activities}}
+    (folder / "pipeline-content.json").write_text(
+        json.dumps(content), encoding="utf-8"
+    )
+    return folder
+
+
+def test_a_pipeline_refers_to_items_by_id_in_every_activity(
+    tmp_path: Path,
+) -> None:
+    """Nested activities count, and each reference names its activity."""
+    sink = {"typeProperties": {"workspaceId": "ws-1", "artifactId": "lh-1"}}
+    folder = _pipeline(
+        tmp_path,
+        "Daily.DataPipeline",
+        [
+            {
+                "name": "Run Load",
+                "type": "TridentNotebook",
+                "typeProperties": {
+                    "notebookId": "nb-1",
+                    "workspaceId": "ws-1",
+                },
+            },
+            {
+                "name": "Each table",
+                "type": "ForEach",
+                "typeProperties": {
+                    "activities": [
+                        {
+                            "name": "Refresh",
+                            "type": "RefreshDataflow",
+                            "typeProperties": {
+                                "dataflowId": "df-1",
+                                "workspaceId": "ws-1",
+                            },
+                        }
+                    ]
+                },
+            },
+            {
+                "name": "Call child",
+                "type": "ExecutePipeline",
+                "typeProperties": {
+                    "pipeline": {
+                        "referenceName": "pl-1",
+                        "type": "PipelineReference",
+                    }
+                },
+            },
+            {
+                "name": "Copy",
+                "type": "Copy",
+                "typeProperties": {
+                    "sink": {
+                        "datasetSettings": {
+                            "linkedService": {"properties": sink}
+                        }
+                    }
+                },
+            },
+        ],
+    )
+
+    assert pipeline_references(str(folder)) == (
+        IdReference("notebook", "nb-1", "ws-1", "Activity 'Run Load'"),
+        IdReference("dataflow", "df-1", "ws-1", "Activity 'Refresh'"),
+        IdReference("pipeline", "pl-1", None, "Activity 'Call child'"),
+        IdReference("item", "lh-1", "ws-1", "Activity 'Copy'"),
+    )
+
+
+def test_an_unreadable_pipeline_refers_to_nothing(tmp_path: Path) -> None:
+    """Its deployment reports the problem."""
+    folder = _item(tmp_path, "Daily.DataPipeline")
+    (folder / "pipeline-content.json").write_text(
+        "{not json", encoding="utf-8"
+    )
+
+    assert pipeline_references(str(folder)) == ()

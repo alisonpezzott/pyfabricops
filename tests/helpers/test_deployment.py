@@ -1755,3 +1755,115 @@ def test_a_lakehouse_missing_from_the_workspace_is_created_before_its_notebook(
         ("Lakehouse", "Gold", "created"),
         ("Notebook", "Load", "updated"),
     ]
+
+
+_NOTEBOOK_ID = "00000000-0000-0000-0000-0000000000aa"
+_OTHER_WORKSPACE_ID = "00000000-0000-0000-0000-0000000000bb"
+
+
+def _write_pipeline(root: Path, notebook_id: str, workspace_id: str) -> Path:
+    """A pipeline that runs a notebook by ID."""
+    pipeline = _write_item(root, "Daily.DataPipeline")
+    activity = {
+        "name": "Run Load",
+        "type": "TridentNotebook",
+        "typeProperties": {
+            "notebookId": notebook_id,
+            "workspaceId": workspace_id,
+        },
+    }
+    content = {"properties": {"activities": [activity]}}
+    (pipeline / "pipeline-content.json").write_text(
+        json.dumps(content), encoding="utf-8"
+    )
+    return pipeline
+
+
+@pytest.mark.parametrize(
+    ("notebook_listed", "notebook_id", "workspace_id", "warning"),
+    [
+        pytest.param(
+            True, _NOTEBOOK_ID, _WORKSPACE_ID, None, id="notebook there"
+        ),
+        pytest.param(
+            False,
+            _NOTEBOOK_ID,
+            _WORKSPACE_ID,
+            f"refers to notebook {_NOTEBOOK_ID}, which is not in the "
+            "workspace.",
+            id="notebook missing",
+        ),
+        pytest.param(
+            False,
+            _NOTEBOOK_ID,
+            _OTHER_WORKSPACE_ID,
+            None,
+            id="other workspace",
+        ),
+        pytest.param(
+            False,
+            "#{load_notebook_id}#",
+            _WORKSPACE_ID,
+            "refers to notebook '#{load_notebook_id}#', which is not an ID "
+            "(a placeholder left unreplaced?).",
+            id="placeholder left",
+        ),
+    ],
+)
+def test_pipeline_references_by_id_are_checked_against_the_workspace(
+    root: Path,
+    fabric: SimpleNamespace,
+    notebook_listed: bool,
+    notebook_id: str,
+    workspace_id: str,
+    warning: str | None,
+) -> None:
+    """Only a reference to this workspace is checked, and only warned about."""
+    notebook = {"id": _NOTEBOOK_ID, "type": "Notebook", "displayName": "Load"}
+    fabric.list_items.return_value = [
+        {"id": "pl-daily", "type": "DataPipeline", "displayName": "Daily"},
+        *([notebook] if notebook_listed else []),
+    ]
+    _write_pipeline(root, notebook_id, workspace_id)
+
+    (action,) = _plan(root).actions
+
+    assert action.action == DeploymentActionType.UPDATE
+    assert action.detail == (
+        None if warning is None else f"Warning: Activity 'Run Load' {warning}"
+    )
+
+
+def test_a_pipeline_warning_is_logged_and_the_pipeline_still_goes(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """The first deployment of an environment may create what it refers to."""
+    fabric.list_items.return_value = [
+        {"id": "pl-daily", "type": "DataPipeline", "displayName": "Daily"},
+    ]
+    _write_pipeline(root, _NOTEBOOK_ID, _WORKSPACE_ID)
+
+    with patch(f"{_ENGINE}.logger") as logger:
+        report = _deploy(root)
+
+    assert [(r.display_name, r.action) for r in report.results] == [
+        ("Daily", "updated")
+    ]
+    logger.warning.assert_any_call(
+        f"Daily.DataPipeline: Activity 'Run Load' refers to notebook "
+        f"{_NOTEBOOK_ID}, which is not in the workspace."
+    )
+
+
+def test_without_dependency_resolution_pipelines_are_not_checked(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """resolve_dependencies=False checks nothing, as before."""
+    fabric.list_items.return_value = [
+        {"id": "pl-daily", "type": "DataPipeline", "displayName": "Daily"},
+    ]
+    _write_pipeline(root, _NOTEBOOK_ID, _WORKSPACE_ID)
+
+    (action,) = _plan(root, resolve_dependencies=False).actions
+
+    assert action.detail is None

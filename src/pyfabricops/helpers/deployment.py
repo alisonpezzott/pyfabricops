@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import time
+import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field, fields, replace
 from datetime import datetime, timezone
@@ -27,7 +28,12 @@ from ..api.api import ApiResult, api_request
 from ..core.folders import create_folder, list_folders
 from ..core.workspaces import resolve_workspace
 from ..helpers.content_hash import definition_hash
-from ..helpers.dependencies import LocalCatalog, scan_references
+from ..helpers.dependencies import (
+    IdReference,
+    LocalCatalog,
+    pipeline_references,
+    scan_references,
+)
 from ..helpers.dependency_graph import DependencyGraph, ItemKey
 from ..helpers.deployment_plan import (
     DeployedItem,
@@ -1197,6 +1203,7 @@ def _plan_all(
         root=path,
         dependencies=dependencies,
         item_types=types,
+        warnings=_id_warnings(dependencies, index),
     )
     return planner.plan(
         items, available=dependencies.available if dependencies else ()
@@ -1274,6 +1281,11 @@ class _Dependencies:
     graph: DependencyGraph
     broken: Mapping[ItemKey, tuple[str, ...]]
     available: list[SourceItem]
+    # What the selected pipelines refer to by ID, checked against the
+    # workspace once it is listed.
+    id_references: Mapping[ItemKey, tuple[IdReference, ...]] = field(
+        default_factory=dict
+    )
 
 
 def _read_dependencies(
@@ -1311,7 +1323,74 @@ def _read_dependencies(
     available = _in_deployment_order(available, DEPLOY_ORDER)
     if hashes:
         available = _with_content_hashes(available)
-    return _Dependencies(graph, scan.broken, available)
+
+    id_references: dict[ItemKey, tuple[IdReference, ...]] = {}
+    for item in items:
+        if (
+            item.item_type == "DataPipeline"
+            and item.display_name is not None
+            and item.error is None
+            and item.change is not SourceChange.DELETED
+        ):
+            references = pipeline_references(item.source_path)
+            if references:
+                id_references[(item.item_type, item.display_name)] = references
+    return _Dependencies(graph, scan.broken, available, id_references)
+
+
+def _id_warnings(
+    dependencies: _Dependencies | None, index: _WorkspaceIndex
+) -> dict[ItemKey, tuple[str, ...]]:
+    """
+    Warn about pipeline references by ID that the workspace cannot meet.
+
+    A reference to the workspace itself (or to no workspace in particular)
+    is checked against its items; one to another workspace is not. A value
+    that is no ID at all is most likely a placeholder left unreplaced. Only
+    warnings: an item created in the same run gets its ID when created.
+    """
+    if dependencies is None:
+        return {}
+    workspace_id = _normal_id(index.workspace_id)
+    item_ids = {_normal_id(str(item["id"])) for item in index.items.values()}
+    warnings: dict[ItemKey, tuple[str, ...]] = {}
+    for key, references in dependencies.id_references.items():
+        texts: list[str] = []
+        for reference in references:
+            if reference.workspace_id is not None:
+                in_workspace = _normal_id(reference.workspace_id)
+                if in_workspace is None:
+                    texts.append(
+                        f"{reference.where} refers to workspace "
+                        f"'{reference.workspace_id}', which is not an ID "
+                        "(a placeholder left unreplaced?)."
+                    )
+                    continue
+                if in_workspace != workspace_id:
+                    continue
+            item_id = _normal_id(reference.item_id)
+            if item_id is None:
+                texts.append(
+                    f"{reference.where} refers to {reference.kind} "
+                    f"'{reference.item_id}', which is not an ID (a "
+                    "placeholder left unreplaced?)."
+                )
+            elif item_id not in item_ids:
+                texts.append(
+                    f"{reference.where} refers to {reference.kind} "
+                    f"{reference.item_id}, which is not in the workspace."
+                )
+        if texts:
+            warnings[key] = tuple(dict.fromkeys(texts))
+    return warnings
+
+
+def _normal_id(value: str) -> str | None:
+    """Return an ID in its canonical form, or None if it is not one."""
+    try:
+        return str(uuid.UUID(value))
+    except ValueError:
+        return None
 
 
 def _created(
@@ -1339,6 +1418,7 @@ def _planner(
     root: str | None,
     dependencies: _Dependencies | None,
     item_types: Sequence[str] | None,
+    warnings: Mapping[ItemKey, tuple[str, ...]] | None = None,
 ) -> DeploymentPlanner:
     """Return the planner of a run, resolving dependencies when given."""
     return DeploymentPlanner(
@@ -1348,6 +1428,7 @@ def _planner(
         dependencies=dependencies.graph if dependencies else None,
         broken=dependencies.broken if dependencies else None,
         item_types=item_types if dependencies else None,
+        warnings=warnings,
     )
 
 
@@ -1387,12 +1468,17 @@ def _deploy_items(
             f"'{workspace}'.",
         )
 
+    warnings = _id_warnings(dependencies, index)
+    for (item_type, display_name), texts in warnings.items():
+        for text in texts:
+            logger.warning(f"{display_name}.{item_type}: {text}")
     planner = _planner(
         index,
         deployed_items,
         root=root,
         dependencies=dependencies,
         item_types=item_types,
+        warnings=warnings,
     )
     plan = planner.plan(
         items, available=dependencies.available if dependencies else ()
