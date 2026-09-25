@@ -12,7 +12,6 @@
 # MARKDOWN ********************
 
 # # Utils
-#
 # Helpers shared by the notebooks of this workspace. A notebook loads them
 # with `%run Utils`.
 
