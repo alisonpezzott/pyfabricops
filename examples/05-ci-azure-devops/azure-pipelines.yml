@@ -1,0 +1,60 @@
+# Deploys examples/sample-workspace to a Fabric workspace on every push to
+# main that changes it, deploying only what changed since the last
+# successful run.
+#
+# Before using it:
+# - Create a variable group named "fabric-prd" with FAB_CLIENT_ID,
+#   FAB_TENANT_ID, FAB_CLIENT_SECRET (as a secret) and FABRIC_WORKSPACE.
+# - Run one deployment at a time per workspace: for example, deploy to an
+#   environment with an Exclusive Lock check.
+# - Until the next pyfabricops release, install it from the repository, as
+#   below; then pin the release instead: pip install "pyfabricops==<version>".
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - examples/sample-workspace
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  - group: fabric-prd
+  - name: STATE_DIR
+    value: $(Pipeline.Workspace)/deploy-state
+
+steps:
+  - checkout: self
+    # The whole history: the run compares commits.
+    fetchDepth: 0
+
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: "3.13"
+
+  # The state of the last successful run. A job that fails saves no cache,
+  # so the next run compares from the same commits.
+  - task: Cache@2
+    displayName: Restore the deployment state
+    inputs:
+      key: 'deploy-state | "$(Build.BuildId)"'
+      restoreKeys: deploy-state
+      path: $(STATE_DIR)
+
+  - script: pip install "pyfabricops @ git+https://github.com/alisonpezzott/pyfabricops"
+    displayName: Install pyfabricops
+
+  - script: >
+      python examples/04-deploy-selective/deploy.py
+      --workspace "$(FABRIC_WORKSPACE)"
+      --environment PRD
+      --state-dir "$(STATE_DIR)"
+    displayName: Deploy
+    env:
+      # Secret variables reach a script only when mapped.
+      FAB_CLIENT_ID: $(FAB_CLIENT_ID)
+      FAB_TENANT_ID: $(FAB_TENANT_ID)
+      FAB_CLIENT_SECRET: $(FAB_CLIENT_SECRET)

@@ -1,0 +1,36 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
+  "name": "environment",
+  "position": {
+    "x": 440,
+    "y": 40,
+    "z": 1000,
+    "height": 160,
+    "width": 360,
+    "tabOrder": 1000
+  },
+  "visual": {
+    "visualType": "card",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Orders"
+                    }
+                  },
+                  "Property": "Current Environment"
+                }
+              },
+              "queryRef": "Orders.Current Environment"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

@@ -100,6 +100,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the Fabric API accepts, using the model created earlier in the run or the
   one already there. The file is unchanged. Without such a model the report
   fails with the reason, and nothing is sent.
+- An `examples/` folder, in the repository but not in the package:
+  - a sample workspace in Fabric's Git format, with a lakehouse, notebooks,
+    a pipeline, a semantic model and a report that refer to one another;
+  - scripts that authenticate, export a workspace, and deploy the sample
+    fully or only what changed since the last deployment;
+  - Azure DevOps and GitHub Actions definitions that run the selective
+    deployment.
+
+  `tests/test_examples.py` checks the plan the sample gives, and that no
+  ID other than its own made-up ones gets into the folder.
 
 ### Changed
 - `deploy_all_items()` and the `deploy_all_*` helpers for notebooks, semantic
