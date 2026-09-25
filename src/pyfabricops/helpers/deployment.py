@@ -27,6 +27,8 @@ from ..api.api import ApiResult, api_request
 from ..core.folders import create_folder, list_folders
 from ..core.workspaces import resolve_workspace
 from ..helpers.content_hash import definition_hash
+from ..helpers.dependencies import LocalCatalog, scan_references
+from ..helpers.dependency_graph import DependencyGraph, ItemKey
 from ..helpers.deployment_plan import (
     DeployedItem,
     DeploymentAction,
@@ -1093,12 +1095,14 @@ def _deploy_all(
     repository_path: str | None = None,
     state_backend: DeploymentStateBackend | None = None,
     environment: str | None = None,
+    resolve_dependencies: bool = True,
 ) -> DeploymentReport:
     """
     Select, plan and apply; with a state backend, record the run.
 
-    The run is recorded only when every item succeeded. See
-    ``deploy_all_items`` for the public contract.
+    The run is recorded only when every item succeeded, with the items it
+    created to meet dependencies. See ``deploy_all_items`` for the public
+    contract.
     """
     types = _ordered_types(item_types)
     items, tracker = _select_run(
@@ -1111,15 +1115,26 @@ def _deploy_all(
         state_backend=state_backend,
         environment=environment,
     )
+    dependencies = (
+        _read_dependencies(
+            path, items, start_path=start_path, hashes=tracker is not None
+        )
+        if resolve_dependencies and items
+        else None
+    )
     report = _deploy_items(
         workspace,
         items,
         fail_fast=fail_fast,
         deployed_items=tracker.deployed_items if tracker else None,
         root=path,
+        dependencies=dependencies,
+        item_types=types,
     )
     if tracker is not None:
-        tracker.record(report, types, items)
+        tracker.record(
+            report, types, [*items, *_created(report, dependencies)]
+        )
     return report
 
 
@@ -1133,6 +1148,7 @@ def _plan_all(
     repository_path: str | None = None,
     state_backend: DeploymentStateBackend | None = None,
     environment: str | None = None,
+    resolve_dependencies: bool = True,
 ) -> DeploymentPlan:
     """
     Build the plan ``_deploy_all`` would apply, and stop there.
@@ -1145,10 +1161,11 @@ def _plan_all(
         ConfigurationError: If the workspace is not found.
         RequestError: If its items and folders cannot be listed.
     """
+    types = _ordered_types(item_types)
     items, tracker = _select_run(
         workspace,
         path,
-        _ordered_types(item_types),
+        types,
         start_path=start_path,
         baseline_commit=baseline_commit,
         repository_path=repository_path,
@@ -1167,12 +1184,23 @@ def _plan_all(
             f"Could not list the items and folders of workspace '{workspace}'."
         )
 
-    planner = DeploymentPlanner(
-        existing_items=index.items.keys(),
-        deployed_items=tracker.deployed_items if tracker else None,
-        root=path,
+    dependencies = (
+        _read_dependencies(
+            path, items, start_path=start_path, hashes=tracker is not None
+        )
+        if resolve_dependencies
+        else None
     )
-    return planner.plan(items)
+    planner = _planner(
+        index,
+        tracker.deployed_items if tracker else None,
+        root=path,
+        dependencies=dependencies,
+        item_types=types,
+    )
+    return planner.plan(
+        items, available=dependencies.available if dependencies else ()
+    )
 
 
 def _select_run(
@@ -1239,6 +1267,90 @@ def _with_content_hashes(items: list[SourceItem]) -> list[SourceItem]:
     return hashed
 
 
+@dataclass(frozen=True)
+class _Dependencies:
+    """The references of a run's items, and the local items they need."""
+
+    graph: DependencyGraph
+    broken: Mapping[ItemKey, tuple[str, ...]]
+    available: list[SourceItem]
+
+
+def _read_dependencies(
+    path: str,
+    items: Sequence[SourceItem],
+    *,
+    start_path: str | None,
+    hashes: bool,
+) -> _Dependencies:
+    """
+    Read what the selected items refer to, and the local items they need.
+
+    A local item of any known type can be needed, whatever the item types
+    of the run: the planner decides what to do with it. Needed items get
+    the hash of their definition when the run keeps a state.
+    """
+    catalog = LocalCatalog.read(path, DEPLOY_ORDER)
+    keys: list[ItemKey] = [
+        (item.item_type, item.display_name)
+        for item in items
+        if item.display_name is not None
+        and item.change is not SourceChange.DELETED
+    ]
+    scan = scan_references(catalog, keys)
+    graph = DependencyGraph(scan.dependencies)
+
+    selected = set(keys)
+    available: list[SourceItem] = []
+    for key in graph.required_by(keys):
+        entry = catalog.get(key)
+        if key not in selected and entry is not None:
+            available.append(
+                _read_source_item(key[0], entry.path, start_path=start_path)
+            )
+    available = _in_deployment_order(available, DEPLOY_ORDER)
+    if hashes:
+        available = _with_content_hashes(available)
+    return _Dependencies(graph, scan.broken, available)
+
+
+def _created(
+    report: DeploymentReport, dependencies: _Dependencies | None
+) -> list[SourceItem]:
+    """Return the items a run created to meet dependencies."""
+    if dependencies is None:
+        return []
+    created = {
+        (result.item_type, result.display_name)
+        for result in report.results
+        if result.action == "created"
+    }
+    return [
+        item
+        for item in dependencies.available
+        if (item.item_type, item.display_name) in created
+    ]
+
+
+def _planner(
+    index: _WorkspaceIndex,
+    deployed_items: Mapping[tuple[str, str], DeployedItem] | None,
+    *,
+    root: str | None,
+    dependencies: _Dependencies | None,
+    item_types: Sequence[str] | None,
+) -> DeploymentPlanner:
+    """Return the planner of a run, resolving dependencies when given."""
+    return DeploymentPlanner(
+        existing_items=index.items.keys(),
+        deployed_items=deployed_items,
+        root=root,
+        dependencies=dependencies.graph if dependencies else None,
+        broken=dependencies.broken if dependencies else None,
+        item_types=item_types if dependencies else None,
+    )
+
+
 def _deploy_items(
     workspace: str,
     items: list[SourceItem],
@@ -1246,13 +1358,16 @@ def _deploy_items(
     fail_fast: bool,
     deployed_items: Mapping[tuple[str, str], DeployedItem] | None = None,
     root: str | None = None,
+    dependencies: _Dependencies | None = None,
+    item_types: Sequence[str] | None = None,
 ) -> DeploymentReport:
     """
     Plan, then apply, the deployment of the selected items.
 
     Until the plan is built the run only reads: one listing of the
     workspace. Every change is made by the executor. ``root`` is the folder
-    the items were read from, for the plan details.
+    the items were read from, for the plan details; with ``dependencies``,
+    the plan meets what the items need, within ``item_types``.
     """
     report = DeploymentReport(workspace=workspace)
     if not items:
@@ -1272,12 +1387,16 @@ def _deploy_items(
             f"'{workspace}'.",
         )
 
-    planner = DeploymentPlanner(
-        existing_items=index.items.keys(),
-        deployed_items=deployed_items,
+    planner = _planner(
+        index,
+        deployed_items,
         root=root,
+        dependencies=dependencies,
+        item_types=item_types,
     )
-    plan = planner.plan(items)
+    plan = planner.plan(
+        items, available=dependencies.available if dependencies else ()
+    )
 
     executor = DeploymentExecutor(index, fail_fast=fail_fast)
     report.results.extend(executor.apply(plan))

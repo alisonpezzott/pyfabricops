@@ -559,6 +559,7 @@ def test_deploy_all_items_delegates_to_the_engine() -> None:
             repository_path="src",
             state_backend=backend,
             environment="dev",
+            resolve_dependencies=False,
         )
 
     engine.assert_called_once_with(
@@ -571,6 +572,7 @@ def test_deploy_all_items_delegates_to_the_engine() -> None:
         repository_path="src",
         state_backend=backend,
         environment="dev",
+        resolve_dependencies=False,
     )
 
 
@@ -1564,6 +1566,7 @@ def test_plan_all_items_delegates_to_the_engine() -> None:
             repository_path="src",
             state_backend=backend,
             environment="dev",
+            resolve_dependencies=False,
         )
 
     engine.assert_called_once_with(
@@ -1575,4 +1578,146 @@ def test_plan_all_items_delegates_to_the_engine() -> None:
         repository_path="src",
         state_backend=backend,
         environment="dev",
+        resolve_dependencies=False,
     )
+
+
+# ---------------------------------------------------------------------------
+# Dependencies
+# ---------------------------------------------------------------------------
+
+
+def _write_report(root: Path, relative: str, model_path: str) -> Path:
+    """A report whose definition.pbir points to a semantic model by path."""
+    report = _write_item(root, relative)
+    pbir = {
+        "version": "4.0",
+        "datasetReference": {"byPath": {"path": model_path}},
+    }
+    (report / "definition.pbir").write_text(json.dumps(pbir), encoding="utf-8")
+    return report
+
+
+def _sales(root: Path) -> Path:
+    """The Sales model and the Sales report that reads it."""
+    _write_item(root, "Sales.SemanticModel")
+    return _write_report(root, "Sales.Report", "../Sales.SemanticModel")
+
+
+def test_a_model_missing_from_the_workspace_is_created_before_its_report(
+    git_repo: GitRepo, root: Path, fabric: SimpleNamespace
+) -> None:
+    """Only the report changed, but the workspace lacks its model."""
+    fabric.list_items.return_value = [
+        {"id": "rp-sales", "type": "Report", "displayName": "Sales"},
+    ]
+    report_dir = _sales(root)
+    baseline = git_repo.commit("baseline")
+    _change(report_dir)
+    git_repo.commit("change the report")
+
+    report = _deploy(root, baseline_commit=baseline)
+
+    assert [
+        (r.item_type, r.display_name, r.action) for r in report.results
+    ] == [
+        ("SemanticModel", "Sales", "created"),
+        ("Report", "Sales", "updated"),
+    ]
+    assert fabric.create.call_args.kwargs["item_type"] == "SemanticModel"
+    assert fabric.update.call_args.args[:2] == (_WORKSPACE_ID, "rp-sales")
+
+
+def test_without_dependency_resolution_only_the_selection_goes(
+    git_repo: GitRepo, root: Path, fabric: SimpleNamespace
+) -> None:
+    """resolve_dependencies=False deploys as before: the report alone."""
+    fabric.list_items.return_value = [
+        {"id": "rp-sales", "type": "Report", "displayName": "Sales"},
+    ]
+    report_dir = _sales(root)
+    baseline = git_repo.commit("baseline")
+    _change(report_dir)
+    git_repo.commit("change the report")
+
+    report = _deploy(
+        root, baseline_commit=baseline, resolve_dependencies=False
+    )
+
+    assert [(r.display_name, r.action) for r in report.results] == [
+        ("Sales", "updated")
+    ]
+    fabric.create.assert_not_called()
+
+
+def test_the_state_records_a_model_created_for_its_report(
+    git_repo: GitRepo,
+    root: Path,
+    fabric: SimpleNamespace,
+    state: LocalJsonStateBackend,
+) -> None:
+    """What was sent to meet a dependency is what was sent, too."""
+    report_dir = _sales(root)
+    git_repo.commit("first")
+    _deploy(root, state_backend=state, environment="dev")
+
+    # The model is deleted from the workspace by hand; the report changes.
+    fabric.list_items.return_value = [
+        {"id": "rp-sales", "type": "Report", "displayName": "Sales"},
+    ]
+    _change(report_dir)
+    git_repo.commit("change the report")
+    with patch(f"{_ENGINE}._StateTracker.record", autospec=True) as record:
+        report = _deploy(root, state_backend=state, environment="dev")
+
+    assert [(r.item_type, r.action) for r in report.results] == [
+        ("SemanticModel", "created"),
+        ("Report", "updated"),
+    ]
+    recorded = record.call_args.args[3]
+    assert {(i.item_type, i.display_name) for i in recorded} == {
+        ("Report", "Sales"),
+        ("SemanticModel", "Sales"),
+    }
+    assert all(i.content_hash for i in recorded)
+
+
+def test_plan_all_items_validates_a_needed_item_in_the_workspace(
+    git_repo: GitRepo, root: Path, fabric: SimpleNamespace
+) -> None:
+    """The model is in the workspace: validated, not deployed."""
+    fabric.list_items.return_value = [
+        {"id": "rp-sales", "type": "Report", "displayName": "Sales"},
+        {"id": "sm-sales", "type": "SemanticModel", "displayName": "Sales"},
+    ]
+    report_dir = _sales(root)
+    baseline = git_repo.commit("baseline")
+    _change(report_dir)
+    git_repo.commit("change the report")
+
+    plan = _plan(root, baseline_commit=baseline)
+
+    assert [a.describe() for a in plan.actions] == [
+        "NOOP     Sales.SemanticModel  DEPENDENCY_REQUIRED: Required by "
+        "Sales.Report (definition.pbir byPath); already in the workspace.",
+        "UPDATE   Sales.Report  SOURCE_CHANGED",
+    ]
+    _assert_no_change(fabric)
+
+
+def test_a_report_pointing_to_no_model_is_blocked(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """A report without its data is not deployed."""
+    _write_report(root, "Sales.Report", "../Gone.SemanticModel")
+
+    report = _deploy(root)
+
+    assert [(r.display_name, r.action) for r in report.results] == [
+        ("Sales", "failed")
+    ]
+    assert report.results[0].error == (
+        "definition.pbir points to ../Gone.SemanticModel, which is not a "
+        "semantic model of the source."
+    )
+    _assert_no_change(fabric)

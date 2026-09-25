@@ -63,6 +63,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Without it the copy still goes to `_stg` inside the installed package,
   which every run using the installation shares and which cannot be
   written on a read-only install.
+- Dependency resolution: `deploy_all_items()` and `plan_all_items()` read
+  the references between local items (a report's semantic model, for now).
+  With `resolve_dependencies=True`, the default, each item is deployed
+  after what it needs.
+  - A needed item that is not selected is validated when the workspace has
+    it (`DeploymentReason.DEPENDENCY_REQUIRED`).
+  - Otherwise it is created, when it is in the source and among
+    `item_types`.
+  - An item is blocked when a reference of its definition is broken, when it
+    is part of a dependency cycle, or when something it needs is blocked or
+    cannot be created.
+
+  `resolve_dependencies=False` keeps the earlier behavior.
 
 ### Changed
 - `deploy_all_items()` and the `deploy_all_*` helpers for notebooks, semantic

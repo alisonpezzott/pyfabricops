@@ -10,14 +10,21 @@ plan.
 ``plan_all_items`` returns a plan, so ``DeploymentPlan``, ``DeploymentAction``,
 ``DeploymentActionType`` and ``DeploymentReason`` are exported from
 ``pyfabricops``; the planner itself stays internal.
+
+Given the references between local items (a ``DependencyGraph``, as pure as
+the planner), the planner also orders each item after what it needs, and
+meets or blocks what the selected items need.
 """
 
 from __future__ import annotations
 
+from collections import deque
 from collections.abc import Collection, Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 from pathlib import PurePath
+
+from .dependency_graph import DependencyGraph, ItemKey
 
 __all__ = [
     "DeploymentAction",
@@ -74,12 +81,15 @@ class DeploymentReason(str, Enum):
             commit.
         ITEM_DELETED: The item was deleted from the source since the baseline
             commit.
+        DEPENDENCY_REQUIRED: An item of the plan needs it: it is validated
+            when the workspace has it, and created otherwise.
     """
 
     FULL_DEPLOYMENT = "FULL_DEPLOYMENT"
     SOURCE_CHANGED = "SOURCE_CHANGED"
     ITEM_ADDED = "ITEM_ADDED"
     ITEM_DELETED = "ITEM_DELETED"
+    DEPENDENCY_REQUIRED = "DEPENDENCY_REQUIRED"
 
 
 class SourceChange(str, Enum):
@@ -265,6 +275,15 @@ class DeploymentPlanner:
         root (str, optional): The folder the items were read from. A detail
             that points to another item folder shows it relative to this
             one. Defaults to showing it as given.
+        dependencies (DependencyGraph, optional): The references between
+            local items. Without it, dependencies are not resolved and the
+            order given is kept.
+        broken (Mapping[ItemKey, Sequence[str]], optional): For each item
+            whose definition points to a local item that is not there, why;
+            such an item is blocked.
+        item_types (Collection[str], optional): The item types the run
+            deploys; a missing dependency of another type is not created,
+            and what needs it is blocked. Defaults to any type.
 
     Examples:
         ```python
@@ -283,12 +302,24 @@ class DeploymentPlanner:
         deployed_items: Mapping[tuple[str, str], DeployedItem] | None = None,
         *,
         root: str | None = None,
+        dependencies: DependencyGraph | None = None,
+        broken: Mapping[ItemKey, Sequence[str]] | None = None,
+        item_types: Collection[str] | None = None,
     ) -> None:
         self._existing_items = frozenset(existing_items)
         self._deployed_items = dict(deployed_items or {})
         self._root = root
+        self._graph = dependencies
+        self._broken = {
+            key: tuple(problems) for key, problems in (broken or {}).items()
+        }
+        self._item_types = None if item_types is None else set(item_types)
 
-    def plan(self, items: Iterable[SourceItem]) -> DeploymentPlan:
+    def plan(
+        self,
+        items: Iterable[SourceItem],
+        available: Iterable[SourceItem] = (),
+    ) -> DeploymentPlan:
         """
         Plan one action per item.
 
@@ -302,13 +333,24 @@ class DeploymentPlanner:
         with the same type and display name as an earlier one: deploying
         both would overwrite the same workspace item.
 
+        With ``dependencies``, each item comes after the items it needs.
+        What an item to create, update or move needs, when not selected, is
+        validated (NOOP) if the workspace has it, and created otherwise from
+        ``available``. An item is blocked when a reference of its definition
+        is broken, when it is part of a dependency cycle, or when something
+        it needs is blocked or cannot be created.
+
         Args:
             items (Iterable[SourceItem]): The selected items, in deployment
                 order.
+            available (Iterable[SourceItem], optional): Local items outside
+                the selection that the plan may validate or create to meet
+                dependencies, in deployment order. Defaults to none.
 
         Returns:
-            DeploymentPlan: One action per item. Deletions come after every
-                other action; otherwise the order given is kept.
+            DeploymentPlan: One action per item, plus one per dependency met.
+                Deletions come after every other action; otherwise the order
+                given is kept, except that each item follows what it needs.
         """
         selected = list(items)
         defined: dict[tuple[str, str], str] = {}
@@ -317,6 +359,8 @@ class DeploymentPlanner:
             for item in selected
             if item.change is not SourceChange.DELETED
         ]
+        if self._graph is not None:
+            actions = self._resolve(self._graph, actions, list(available))
         deleted: dict[tuple[str, str], str] = {}
         actions += [
             self._plan_deletion(item, defined, deleted)
@@ -417,6 +461,160 @@ class DeploymentPlanner:
             "Deleted from the source and not in the workspace.",
         )
 
+    def _resolve(
+        self,
+        graph: DependencyGraph,
+        actions: list[DeploymentAction],
+        available: list[SourceItem],
+    ) -> list[DeploymentAction]:
+        """Meet or block what the actions need, and order them by it."""
+        # Each action keeps the nameless ones after it, which have no key.
+        head: list[DeploymentAction] = []
+        groups: dict[ItemKey, list[DeploymentAction]] = {}
+        group = head
+        for action in actions:
+            if action.display_name is not None:
+                group = groups.setdefault(_key(action), [])
+            group.append(action)
+        selected = {key: group[0] for key, group in groups.items()}
+
+        needed, unmet = self._required(graph, selected, available)
+        blocked = self._blocked(graph, selected, needed, unmet)
+
+        needed_in_order = [
+            key
+            for key in dict.fromkeys(
+                (item.item_type, item.display_name)
+                for item in available
+                if item.display_name is not None
+            )
+            if key in needed
+        ]
+        resolved = list(head)
+        for key in graph.order([*selected, *needed_in_order]):
+            planned = groups.get(key, [needed[key]] if key in needed else [])
+            if key in blocked:
+                planned = [_block(planned[0], blocked[key]), *planned[1:]]
+            resolved.extend(planned)
+        return resolved
+
+    def _required(
+        self,
+        graph: DependencyGraph,
+        selected: Mapping[ItemKey, DeploymentAction],
+        available: list[SourceItem],
+    ) -> tuple[dict[ItemKey, DeploymentAction], dict[ItemKey, str]]:
+        """
+        Plan what the items to deploy need and the selection lacks.
+
+        A needed item the workspace has is validated, and what it needs in
+        turn is left alone. One it lacks is created, when it can be, and
+        what it needs is followed. Returns those actions, and why each of
+        the other needed items cannot be met.
+        """
+        candidates: dict[ItemKey, SourceItem] = {}
+        for item in available:
+            if item.display_name is not None:
+                candidates.setdefault(
+                    (item.item_type, item.display_name), item
+                )
+
+        needed: dict[ItemKey, DeploymentAction] = {}
+        unmet: dict[ItemKey, str] = {}
+        seen = set(selected)
+        pending = deque(
+            key
+            for key, action in selected.items()
+            if action.action in _DEPLOYING
+        )
+        while pending:
+            key = pending.popleft()
+            for dependency in graph.dependencies_of(key):
+                target = dependency.target
+                if target in seen:
+                    continue
+                seen.add(target)
+                required_by = f"Required by {_name(key)} ({dependency.via})"
+                candidate = candidates.get(target)
+                if target in self._existing_items:
+                    if candidate is not None:
+                        needed[target] = _action(
+                            candidate,
+                            DeploymentActionType.NOOP,
+                            f"{required_by}; already in the workspace.",
+                            reason=DeploymentReason.DEPENDENCY_REQUIRED,
+                        )
+                elif candidate is None or candidate.error is not None:
+                    unmet[target] = (
+                        "is missing from the workspace and cannot be "
+                        "deployed from the source"
+                    )
+                elif (
+                    self._item_types is not None
+                    and target[0] not in self._item_types
+                ):
+                    unmet[target] = (
+                        "is missing from the workspace and not among the "
+                        "item types of this run"
+                    )
+                else:
+                    needed[target] = _action(
+                        candidate,
+                        DeploymentActionType.CREATE,
+                        f"{required_by} and missing from the workspace.",
+                        reason=DeploymentReason.DEPENDENCY_REQUIRED,
+                    )
+                    pending.append(target)
+        return needed, unmet
+
+    def _blocked(
+        self,
+        graph: DependencyGraph,
+        selected: Mapping[ItemKey, DeploymentAction],
+        needed: Mapping[ItemKey, DeploymentAction],
+        unmet: Mapping[ItemKey, str],
+    ) -> dict[ItemKey, str]:
+        """Say why each item to deploy cannot be deployed with its needs."""
+        deploying = [
+            key
+            for key, action in {**selected, **needed}.items()
+            if action.action in _DEPLOYING
+        ]
+        blocked: dict[ItemKey, str] = {}
+        for key in deploying:
+            if key in self._broken:
+                blocked[key] = " ".join(self._broken[key])
+        for members in graph.cycles(deploying):
+            names = ", ".join(_name(key) for key in members)
+            for key in members:
+                blocked.setdefault(
+                    key, f"Part of a dependency cycle: {names}."
+                )
+
+        unusable = {
+            key
+            for key, action in selected.items()
+            if action.action is DeploymentActionType.BLOCKED
+        }
+        changed = True
+        while changed:
+            changed = False
+            for key in deploying:
+                if key in blocked:
+                    continue
+                for dependency in graph.dependencies_of(key):
+                    target = dependency.target
+                    if target in unmet:
+                        why = unmet[target]
+                    elif target in blocked or target in unusable:
+                        why = "is blocked"
+                    else:
+                        continue
+                    blocked[key] = f"Needs {_name(target)}, which {why}."
+                    changed = True
+                    break
+        return blocked
+
     def _where(self, source_path: str) -> str:
         """Show an item folder relative to the root, when it is inside it."""
         if self._root is None:
@@ -436,10 +634,22 @@ _REASONS: dict[SourceChange | None, DeploymentReason] = {
 }
 
 
+# The actions that change the workspace and so need what the item needs.
+_DEPLOYING = frozenset(
+    {
+        DeploymentActionType.CREATE,
+        DeploymentActionType.UPDATE,
+        DeploymentActionType.MOVE,
+    }
+)
+
+
 def _action(
     item: SourceItem,
     action: DeploymentActionType,
     detail: str | None = None,
+    *,
+    reason: DeploymentReason | None = None,
 ) -> DeploymentAction:
     """Plan an action for an item, with the reason its change gives."""
     return DeploymentAction(
@@ -447,10 +657,26 @@ def _action(
         item_type=item.item_type,
         display_name=item.display_name,
         source_path=item.source_path,
-        reason=_REASONS[item.change],
+        reason=reason or _REASONS[item.change],
         folder_path=item.folder_path,
         detail=detail,
     )
+
+
+def _key(action: DeploymentAction) -> ItemKey:
+    """Return the ``(item_type, display_name)`` of a named action."""
+    return action.item_type, action.display_name or ""
+
+
+def _name(key: ItemKey) -> str:
+    """Name an item as ``DisplayName.Type`` for a detail."""
+    item_type, display_name = key
+    return f"{display_name}.{item_type}"
+
+
+def _block(action: DeploymentAction, detail: str) -> DeploymentAction:
+    """Turn a planned action into a blocked one, keeping its reason."""
+    return replace(action, action=DeploymentActionType.BLOCKED, detail=detail)
 
 
 def _folder(folder_path: str | None) -> str:
