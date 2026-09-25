@@ -35,6 +35,14 @@ jobs:
         uv run ruff check .
     
     - name: Run tests with coverage
+      run: uv run pytest -m "not live" --cov=pyfabricops --cov-report=xml --cov-report=term
+
+    # Tests marked live call Fabric with the repository secrets. A revoked or
+    # expired credential shows up as a failed step here without failing the
+    # build; pull requests from forks get no secrets, so these tests skip.
+    - name: Run live API tests (non-blocking)
+      if: ${{ !cancelled() }}
+      continue-on-error: true
       env:
         FAB_CLIENT_ID: ${{ secrets.FAB_CLIENT_ID }}
         FAB_CLIENT_SECRET: ${{ secrets.FAB_CLIENT_SECRET }}
@@ -45,9 +53,10 @@ jobs:
         AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
         AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
         AZURE_KEY_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
-      run: uv run pytest --cov=pyfabricops --cov-report=xml --cov-report=term || echo "Tests completed with warnings"
-    
+      run: uv run pytest -m live -rs
+
     - name: Upload coverage reports to Codecov
+      if: ${{ !cancelled() }}
       uses: codecov/codecov-action@v5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}

@@ -28,6 +28,7 @@ def test_set_auth_provider():
     pf.set_auth_provider("env")
 
 
+@pytest.mark.live
 @pytest.mark.skipif(
     not all(
         [
