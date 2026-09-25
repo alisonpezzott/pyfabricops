@@ -292,13 +292,14 @@ pf.set_auth_provider("oauth")  # Re-authenticate
 2. **Use `oauth` for local development** - Easy and no credential management
 3. **Use `env` for automation** - Required for CI/CD and production deployments
 4. **Never commit credentials** - Always use environment variables or secrets management
-5. **Clear cache when switching identities** - Use `pf.clear_token_cache()` when needed
+5. **Clear the cache to sign in with another account** - Use `pf.clear_token_cache()` before signing in again with `oauth`; with `env`, each identity already has its own cache entry
 
 ---
 
 ## Security Notes
 
-- Tokens are cached in a temporary file: `pf_token_cache.json`
+- Tokens are cached in `pyfabricops/token_cache.json` in your user cache folder (`%LOCALAPPDATA%` on Windows, `~/Library/Caches` on macOS, `$XDG_CACHE_HOME` or `~/.cache` on Linux), in a folder and a file only you can read
+- With `env`, each identity (tenant, client ID and, for `credential_type="user"`, the username) has its own cache entry, so switching credentials never reuses another identity's token
 - Tokens automatically expire and are refreshed
 - Service principal credentials should be stored securely (Key Vault, GitHub Secrets, etc.)
 - The `fabric` method is the most secure for notebooks as it uses the platform's authentication

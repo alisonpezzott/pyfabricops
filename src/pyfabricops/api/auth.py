@@ -1,9 +1,13 @@
+import contextlib
+import hashlib
 import json
 import os
+import sys
 import tempfile
 import time
 from abc import ABC, abstractmethod
-from typing import Literal
+from collections.abc import Callable, Mapping
+from typing import Any, Literal
 
 import requests
 from azure.identity import InteractiveBrowserCredential
@@ -23,49 +27,110 @@ logger = get_logger(__name__)
 __all__ = ["set_auth_provider", "clear_token_cache"]
 
 
-class TokenCache:
-    """Manage the token cache in a temporary file"""
+def _default_cache_file() -> str:
+    """Return the token cache file in the cache folder of the current user."""
+    home = os.path.expanduser("~")
+    if os.name == "nt":
+        base = os.getenv("LOCALAPPDATA") or os.path.join(
+            home, "AppData", "Local"
+        )
+    elif sys.platform == "darwin":
+        base = os.path.join(home, "Library", "Caches")
+    else:
+        base = os.getenv("XDG_CACHE_HOME") or os.path.join(home, ".cache")
+    return os.path.join(base, "pyfabricops", "token_cache.json")
 
-    CACHE_TEMPLATE = {
-        "FABRIC_SPN": {"access_token": "", "expires_at": 0},
-        "FABRIC_USER": {"access_token": "", "expires_at": 0},
-        "FABRIC_INTERACTIVE": {"access_token": "", "expires_at": 0},
-        "FABRIC_NOTEBOOK": {"access_token": "", "expires_at": 0},
-        "POWERBI_SPN": {"access_token": "", "expires_at": 0},
-        "POWERBI_USER": {"access_token": "", "expires_at": 0},
-        "POWERBI_INTERACTIVE": {"access_token": "", "expires_at": 0},
-        "POWERBI_NOTEBOOK": {"access_token": "", "expires_at": 0},
-        "GRAPH_SPN": {"access_token": "", "expires_at": 0},
-        "GRAPH_USER": {"access_token": "", "expires_at": 0},
-        "GRAPH_INTERACTIVE": {"access_token": "", "expires_at": 0},
-        "GRAPH_NOTEBOOK": {"access_token": "", "expires_at": 0},
-    }
+
+def _belongs_to_another_user(path: str) -> bool:
+    """Tell whether a path exists and another user owns it (POSIX only)."""
+    getuid: Callable[[], int] | None = getattr(os, "getuid", None)
+    if getuid is None:
+        return False
+    try:
+        return os.stat(path).st_uid != getuid()
+    except OSError:
+        # Missing or unreachable: nobody's file to refuse.
+        return False
+
+
+class TokenCache:
+    """
+    Keep access tokens in a file only the current user can read.
+
+    By default the file is ``pyfabricops/token_cache.json`` in the cache
+    folder of the user (``%LOCALAPPDATA%`` on Windows, ``~/Library/Caches``
+    on macOS, ``$XDG_CACHE_HOME`` or ``~/.cache`` elsewhere), and the
+    ``pyfabricops`` folder is made private to the user. The file is replaced
+    atomically by one only its owner can read, and a file owned by another
+    user is never used. When the file cannot be used, the tokens are kept
+    in memory for the rest of the process.
+
+    Args:
+        cache_file (str, optional): The cache file. Defaults to the one in
+            the cache folder of the user.
+    """
 
     def __init__(self, cache_file: str | None = None):
-        self.cache_file = cache_file or os.path.join(
-            tempfile.gettempdir(), "pf_token_cache.json"
-        )
-        self._init_cache()
+        self._private_folder = cache_file is None
+        self.cache_file = cache_file or _default_cache_file()
+        # The tokens of this process, once the file cannot be used.
+        self._memory: dict[str, Any] | None = None
 
-    def _init_cache(self):
-        """Initialize the cache file if it does not exist"""
-        if not os.path.exists(self.cache_file):
-            with open(self.cache_file, "w") as f:
-                json.dump(self.CACHE_TEMPLATE, f)
+    def _use_memory(self, reason: str) -> None:
+        """Keep the tokens in memory for the rest of the process."""
+        if self._memory is None:
+            logger.warning(
+                f"Token cache {self.cache_file} not used ({reason}); tokens "
+                "are kept in memory for this process."
+            )
+            self._memory = {}
 
-    def load_tokens(self) -> dict:
+    def load_tokens(self) -> dict[str, Any]:
         """Load tokens from cache"""
+        if self._memory is not None:
+            return dict(self._memory)
+        if _belongs_to_another_user(self.cache_file):
+            self._use_memory("the file belongs to another user")
+            return {}
         try:
-            with open(self.cache_file) as f:
-                return json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            self._init_cache()
-            return self.CACHE_TEMPLATE.copy()
+            with open(self.cache_file, encoding="utf-8") as f:
+                tokens = json.load(f)
+        except (OSError, ValueError):
+            return {}
+        return tokens if isinstance(tokens, dict) else {}
 
-    def save_tokens(self, tokens: dict):
+    def save_tokens(self, tokens: dict[str, Any]) -> None:
         """Save tokens to cache"""
-        with open(self.cache_file, "w") as f:
-            json.dump(tokens, f, indent=4)
+        if self._memory is None:
+            try:
+                self._write(tokens)
+                return
+            except OSError as e:
+                self._use_memory(str(e))
+        self._memory = dict(tokens)
+
+    def _write(self, tokens: dict[str, Any]) -> None:
+        """Replace the file atomically by one only its owner can read."""
+        folder = os.path.dirname(os.path.abspath(self.cache_file))
+        if self._private_folder:
+            os.makedirs(folder, mode=0o700, exist_ok=True)
+            if _belongs_to_another_user(folder):
+                raise PermissionError(f"{folder} belongs to another user")
+            if hasattr(os, "getuid"):
+                os.chmod(folder, 0o700)
+        elif _belongs_to_another_user(self.cache_file):
+            raise PermissionError("the file belongs to another user")
+
+        # mkstemp creates the file readable and writable by its owner only.
+        handle, temporary = tempfile.mkstemp(dir=folder, prefix=".tokens-")
+        try:
+            with os.fdopen(handle, "w", encoding="utf-8") as f:
+                json.dump(tokens, f)
+            os.replace(temporary, self.cache_file)
+        except BaseException:
+            with contextlib.suppress(OSError):
+                os.remove(temporary)
+            raise
 
     def get_token(self, token_key: str) -> dict | None:
         """Get a specific token from cache"""
@@ -93,13 +158,44 @@ class TokenCache:
         }
         self.save_tokens(tokens)
 
-    def clear_cache(self):
+    def clear_cache(self) -> None:
         """Clear the token cache by deleting the cache file"""
-        if os.path.exists(self.cache_file):
+        if self._memory is not None:
+            self._memory = {}
+        if _belongs_to_another_user(self.cache_file):
+            logger.warning(
+                f"Cache file {self.cache_file} belongs to another user; "
+                "not removed."
+            )
+            return
+        try:
             os.remove(self.cache_file)
-            logger.info(f"Token cache cleared: {self.cache_file}")
-        else:
+        except FileNotFoundError:
             logger.warning(f"Cache file not found: {self.cache_file}")
+        else:
+            logger.info(f"Token cache cleared: {self.cache_file}")
+
+
+def _identity_key(
+    audience: str,
+    credential_type: str,
+    credentials: Mapping[str, str | None],
+) -> str:
+    """
+    Name the cache entry of a token after the identity that obtains it.
+
+    The tenant, the client ID and, for the password flow, the username are
+    hashed, so the cache does not list them; secrets are never part of it.
+    """
+    parts = [
+        credentials.get("fab_tenant_id"),
+        credentials.get("fab_client_id"),
+    ]
+    if credential_type == "user":
+        parts.append(credentials.get("fab_username"))
+    identity = "\n".join(part or "" for part in parts)
+    digest = hashlib.sha256(identity.encode("utf-8")).hexdigest()[:32]
+    return f"{audience.upper()}_{credential_type.upper()}_{digest}"
 
 
 class CredentialProvider(ABC):
@@ -336,8 +432,10 @@ class TokenManager:
         if self.auth_provider == "fabric":
             return self.fabric_provider.get_token(audience)
 
-        # For env, use cache + API
-        token_key = f"{audience.upper()}_{credential_type.upper()}"
+        # For env, use cache + API, with one cache entry per identity
+        provider = self._credential_providers.get(self.auth_provider)
+        credentials = provider.get_credentials() if provider else {}
+        token_key = _identity_key(audience, credential_type, credentials)
 
         # Check if cached token is still valid
         if self.cache.is_token_valid(token_key):
@@ -427,7 +525,10 @@ def clear_token_cache() -> None:
     Clear the token cache by deleting the cache file.
 
     This will force all subsequent token requests to retrieve new tokens
-    from the authentication provider.
+    from the authentication provider. With ``set_auth_provider("env")``
+    each identity (tenant, client ID and, for the password flow, user) has
+    its own cache entry, so switching credentials needs no clearing; clear
+    the cache to sign in with another account through ``"oauth"``.
 
     Returns:
         None
