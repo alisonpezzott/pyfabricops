@@ -41,6 +41,7 @@ nav:
       - Items: functions/helpers/items.md
       - Lakehouses: functions/helpers/lakehouses.md
       - Notebooks: functions/helpers/notebooks.md
+      - Reconciliation: functions/helpers/reconciliation.md
       - Reports: functions/helpers/reports.md
       - Semantic Models: functions/helpers/semantic_models.md
       - Warehouses: functions/helpers/warehouses.md

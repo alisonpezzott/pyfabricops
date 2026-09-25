@@ -50,6 +50,12 @@ from ..helpers.deployment_state import (
     DeploymentState,
     DeploymentStateBackend,
 )
+from ..helpers.drift import comparable_parts, differing_parts
+from ..helpers.reconciliation import (
+    Reconciliation,
+    WorkspaceItem,
+    reconcile,
+)
 from ..helpers.source_changes import (
     GitChangeDetector,
     ItemChange,
@@ -643,6 +649,19 @@ def _request_move_item(
             endpoint=f"/workspaces/{workspace_id}/items/{item_id}/move",
             method="post",
             payload={"targetFolderId": folder_id} if folder_id else {},
+            return_result=True,
+        ),
+    )
+
+
+def _request_item_definition(workspace_id: str, item_id: str) -> ApiResult:
+    """Read an item's definition, polling the operation to the end."""
+    return cast(
+        ApiResult,
+        api_request(
+            endpoint=f"/workspaces/{workspace_id}/items/{item_id}/getDefinition",
+            method="post",
+            support_lro=True,
             return_result=True,
         ),
     )
@@ -1340,6 +1359,244 @@ def _plan_all(
     )
     return planner.plan(
         items, available=dependencies.available if dependencies else ()
+    )
+
+
+def _reconcile_all(
+    workspace: str,
+    path: str,
+    *,
+    start_path: str | None = None,
+    item_types: Sequence[str] | None = None,
+    state_backend: DeploymentStateBackend | None = None,
+    environment: str | None = None,
+) -> Reconciliation:
+    """
+    Compare every local item in scope with the workspace, and report.
+
+    Only reads happen: the local items, one listing of the workspace, the
+    definition of each item found on both sides, and the deployment state
+    when there is one. See ``reconcile_items`` for the public contract.
+
+    Raises:
+        ConfigurationError: If the workspace is not found, or the state is
+            invalid.
+        RequestError: If its items and folders cannot be listed.
+    """
+    types = _ordered_types(item_types)
+    # Every local item, whatever the scope: what the source holds is never
+    # unmanaged.
+    local = _read_source_items(
+        _find_local_items(path, DEPLOY_ORDER), start_path=start_path
+    )
+    items = _in_deployment_order(
+        [item for item in local if item.item_type in types], types
+    )
+    deployed = _deployed_items(
+        state_backend,
+        environment=environment or workspace,
+        workspace=workspace,
+    )
+    if deployed:
+        items = _with_content_hashes(items)
+
+    workspace_id = resolve_workspace(workspace)
+    if workspace_id is None:
+        raise ConfigurationError(f"Workspace '{workspace}' not found.")
+    index = _WorkspaceIndex.load(workspace_id)
+    if index is None:
+        raise RequestError(
+            f"Could not list the items and folders of workspace '{workspace}'."
+        )
+
+    folder_paths = {
+        folder_id: folder for folder, folder_id in index.folders.items()
+    }
+    listed = [
+        WorkspaceItem(
+            item_type,
+            display_name,
+            # An item at the root has no folder ID.
+            folder_paths.get(entry.get("folderId") or ""),
+        )
+        for (item_type, display_name), entry in index.items.items()
+    ]
+    differences, unchecked = _compare_definitions(index, items)
+    reconciliation = reconcile(
+        items,
+        listed,
+        differences=differences,
+        unchecked=unchecked,
+        deployed=deployed,
+        source_keys={
+            (item.item_type, item.display_name)
+            for item in local
+            if item.display_name is not None
+        },
+        deployable_types=DEPLOY_ORDER,
+        root=path,
+    )
+    _log_reconciliation(workspace, reconciliation)
+    return reconciliation
+
+
+def _deployed_items(
+    backend: DeploymentStateBackend | None, *, environment: str, workspace: str
+) -> dict[ItemKey, DeployedItem]:
+    """What the last successful deployment sent, from the state if any."""
+    if backend is None:
+        return {}
+    state = backend.load(environment)
+    if state is None:
+        logger.info(
+            f"No deployment state '{environment}': every difference counts "
+            "as drift."
+        )
+        return {}
+    if not state.targets(workspace):
+        logger.warning(
+            f"Deployment state '{environment}' was recorded for workspace "
+            f"'{state.workspace}', not '{workspace}'; ignoring it."
+        )
+        return {}
+    return dict(state.items)
+
+
+def _compare_definitions(
+    index: _WorkspaceIndex, items: Sequence[SourceItem]
+) -> tuple[dict[ItemKey, tuple[str, ...]], dict[ItemKey, str]]:
+    """
+    Compare the definition of each local item the workspace has.
+
+    Returns the parts that differ for each item compared, empty when it
+    matches, and why each of the others could not be compared.
+    """
+    models = {
+        str(entry["id"]).lower(): display_name
+        for (item_type, display_name), entry in index.items.items()
+        if item_type == "SemanticModel"
+    }
+    differences: dict[ItemKey, tuple[str, ...]] = {}
+    unchecked: dict[ItemKey, str] = {}
+    for item in items:
+        if item.error is not None or item.display_name is None:
+            continue
+        key = (item.item_type, item.display_name)
+        target = index.items.get(key)
+        if target is None or key in differences or key in unchecked:
+            continue
+
+        result = _request_item_definition(
+            index.workspace_id, cast(str, target["id"])
+        )
+        found = (
+            (result.data or {}).get("definition") if result.success else None
+        )
+        if not isinstance(found, dict):
+            unchecked[key] = (
+                "Fabric returned no definition."
+                if result.success
+                else f"Fabric returned no definition: {_describe_error(result)}."
+            )
+            continue
+        try:
+            desired = pack_item_definition(item.source_path)
+        except (PyFabricOpsError, OSError) as e:
+            unchecked[key] = f"Its definition could not be read: {e}"
+            continue
+
+        report = item.item_type == "Report"
+        differences[key] = differing_parts(
+            comparable_parts(
+                desired,
+                semantic_model=(
+                    _report_model(desired, item.source_path, models)
+                    if report
+                    else None
+                ),
+            ),
+            comparable_parts(
+                found,
+                semantic_model=(
+                    _report_model(found, None, models) if report else None
+                ),
+            ),
+        )
+    return differences, unchecked
+
+
+def _report_model(
+    definition: Mapping[str, Any],
+    report_folder: str | None,
+    models: Mapping[str, str],
+) -> str | None:
+    """
+    Name the semantic model a report's ``definition.pbir`` points to.
+
+    By path, the display name of the model folder; by connection, the
+    workspace model with that ID, else the ``initial catalog``. None when
+    the reference cannot be read, so that it is compared as it is.
+    """
+    pbirs = [
+        part["payload"]
+        for part in definition.get("parts", [])
+        if part.get("path") == "definition.pbir"
+    ]
+    try:
+        pbir = json.loads(base64.b64decode(pbirs[0])) if pbirs else None
+    except (TypeError, ValueError):
+        return None
+    reference = (
+        pbir.get("datasetReference") if isinstance(pbir, dict) else None
+    )
+    if not isinstance(reference, dict):
+        return None
+
+    by_path = reference.get("byPath")
+    path = by_path.get("path") if isinstance(by_path, dict) else None
+    if isinstance(path, str) and report_folder is not None:
+        try:
+            return _read_display_name(
+                os.path.normpath(os.path.join(report_folder, path))
+            )
+        except ConfigurationError:
+            return None
+
+    by_connection = reference.get("byConnection")
+    connection = (
+        by_connection.get("connectionString")
+        if isinstance(by_connection, dict)
+        else None
+    )
+    if not isinstance(connection, str):
+        return None
+    settings = {
+        name.strip().lower(): value.strip()
+        for name, _, value in (
+            setting.partition("=") for setting in connection.split(";")
+        )
+    }
+    model_id = settings.get("semanticmodelid", "").lower()
+    if model_id in models:
+        return models[model_id]
+    return settings.get("initial catalog") or None
+
+
+def _log_reconciliation(
+    workspace: str, reconciliation: Reconciliation
+) -> None:
+    """Log what a reconciliation found, in one line."""
+    if reconciliation.ok:
+        logger.log(
+            SUCCESS_LEVEL,
+            f"Workspace '{workspace}' matches the source: "
+            f"{len(reconciliation.in_sync)} item(s) in sync.",
+        )
+        return
+    logger.warning(
+        f"Workspace '{workspace}' differs from the source: "
+        f"{len(reconciliation.plan.actions)} item(s) to bring back, "
+        f"{len(reconciliation.unmanaged)} unmanaged."
     )
 
 
