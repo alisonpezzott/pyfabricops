@@ -83,6 +83,11 @@ class DeploymentReason(str, Enum):
             commit.
         DEPENDENCY_REQUIRED: An item of the plan needs it: it is validated
             when the workspace has it, and created otherwise.
+        TARGET_MISSING: A reconciliation found the item in the source and
+            not in the workspace.
+        WORKSPACE_DRIFT: A reconciliation found the item in the workspace
+            different from the source: changed there since the last
+            deployment, or different, when no deployment state tells.
     """
 
     FULL_DEPLOYMENT = "FULL_DEPLOYMENT"
@@ -90,6 +95,8 @@ class DeploymentReason(str, Enum):
     ITEM_ADDED = "ITEM_ADDED"
     ITEM_DELETED = "ITEM_DELETED"
     DEPENDENCY_REQUIRED = "DEPENDENCY_REQUIRED"
+    TARGET_MISSING = "TARGET_MISSING"
+    WORKSPACE_DRIFT = "WORKSPACE_DRIFT"
 
 
 class SourceChange(str, Enum):
