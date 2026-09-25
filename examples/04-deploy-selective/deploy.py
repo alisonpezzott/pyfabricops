@@ -10,7 +10,10 @@ run deployed. The next run starts from there:
 - an item whose definition hash is unchanged needs nothing, even when its
   files changed, as when a file is only reformatted;
 - what a changed item needs is checked in the workspace, and created when
-  missing: change only the report, and its model is checked first.
+  missing: change only the report, and its model is checked first;
+- an item deleted in Git is deleted from the workspace only with
+  ``--allow-deletions``, and never while an item that stays refers to it;
+  without the option, the run fails on it, so the deletion is not missed.
 
 A run with a failed item records nothing, so the next one compares from
 the same commits. Keep ``--state-dir`` between runs, as the CI examples
@@ -21,7 +24,7 @@ Usage::
 
     python examples/04-deploy-selective/deploy.py \\
         --workspace <workspace-name> --environment PRD \\
-        --state-dir .deploy-state
+        --state-dir .deploy-state [--allow-deletions]
 """
 
 from __future__ import annotations
@@ -109,6 +112,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=Path(".deploy-state"),
         help="Where the deployment state is kept. Default: .deploy-state",
     )
+    parser.add_argument(
+        "--allow-deletions",
+        action="store_true",
+        help="Delete from the workspace the items deleted in Git.",
+    )
     args = parser.parse_args(argv)
 
     load_dotenv()
@@ -122,6 +130,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             "repository_path": str(args.source),
             "state_backend": pf.LocalJsonStateBackend(args.state_dir),
             "environment": args.environment,
+            "allow_deletions": args.allow_deletions,
         }
 
         print("== Everything but the pipelines")

@@ -8,7 +8,8 @@ import json
 import shutil
 import sys
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
+from contextlib import ExitStack
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -117,6 +118,12 @@ class FakeWorkspace:
     def delete_item(self, workspace: str, item: str) -> None:
         self.items.pop(item, None)
 
+    def request_delete(self, workspace_id: str, item_id: str) -> ApiResult:
+        if self.items.pop(item_id, None) is None:
+            body = {"errorCode": "ItemNotFound", "message": "Not found."}
+            return ApiResult(False, 404, error=json.dumps(body))
+        return ApiResult(True, 200)
+
     def delete_folder(self, workspace: str, folder: str) -> None:
         self.folders.pop(folder, None)
 
@@ -209,53 +216,38 @@ def fake(
         monkeypatch.setenv(name, "offline-test")
 
     workspace = FakeWorkspace()
-    with (
-        patch("pyfabricops.clear_token_cache"),
-        patch("pyfabricops.set_auth_provider"),
-        patch("pyfabricops.setup_logging"),
-        patch(
-            "pyfabricops.resolve_workspace",
-            side_effect=workspace.resolve_workspace,
+    # Where the script and the engine reach Fabric, and what answers there.
+    answers: dict[str, Callable[..., Any]] = {
+        "pyfabricops.resolve_workspace": workspace.resolve_workspace,
+        "pyfabricops.list_items": workspace.list_items,
+        "pyfabricops.list_folders": workspace.list_folders,
+        "pyfabricops.delete_item": workspace.delete_item,
+        "pyfabricops.delete_folder": workspace.delete_folder,
+        "pyfabricops.get_item_definition": workspace.get_item_definition,
+        "pyfabricops.update_item_definition": workspace.edit_item,
+        "pyfabricops.move_item": workspace.move_by_hand,
+        "pyfabricops.create_item": workspace.create_by_hand,
+        f"{_ENGINE}._request_item_definition": workspace.read_definition,
+        f"{_ENGINE}.resolve_workspace": workspace.resolve_workspace,
+        f"{_ENGINE}.list_items": workspace.list_items,
+        f"{_ENGINE}.list_folders": workspace.list_folders,
+        f"{_ENGINE}.create_folder": workspace.create_folder,
+        f"{_ENGINE}._request_create_item": workspace.create_item,
+        f"{_ENGINE}._request_update_item_definition": (
+            workspace.update_definition
         ),
-        patch("pyfabricops.list_items", side_effect=workspace.list_items),
-        patch("pyfabricops.list_folders", side_effect=workspace.list_folders),
-        patch("pyfabricops.delete_item", side_effect=workspace.delete_item),
-        patch(
-            "pyfabricops.delete_folder", side_effect=workspace.delete_folder
-        ),
-        patch(
-            "pyfabricops.get_item_definition",
-            side_effect=workspace.get_item_definition,
-        ),
-        patch(
-            "pyfabricops.update_item_definition",
-            side_effect=workspace.edit_item,
-        ),
-        patch("pyfabricops.move_item", side_effect=workspace.move_by_hand),
-        patch("pyfabricops.create_item", side_effect=workspace.create_by_hand),
-        patch(
-            f"{_ENGINE}._request_item_definition",
-            side_effect=workspace.read_definition,
-        ),
-        patch(
-            f"{_ENGINE}.resolve_workspace",
-            side_effect=workspace.resolve_workspace,
-        ),
-        patch(f"{_ENGINE}.list_items", side_effect=workspace.list_items),
-        patch(f"{_ENGINE}.list_folders", side_effect=workspace.list_folders),
-        patch(f"{_ENGINE}.create_folder", side_effect=workspace.create_folder),
-        patch(
-            f"{_ENGINE}._request_create_item",
-            side_effect=workspace.create_item,
-        ),
-        patch(
-            f"{_ENGINE}._request_update_item_definition",
-            side_effect=workspace.update_definition,
-        ),
-        patch(
-            f"{_ENGINE}._request_move_item", side_effect=workspace.move_item
-        ),
-    ):
+        f"{_ENGINE}._request_move_item": workspace.move_item,
+        f"{_ENGINE}._request_delete_item": workspace.request_delete,
+    }
+    with ExitStack() as stack:
+        for target in (
+            "pyfabricops.clear_token_cache",
+            "pyfabricops.set_auth_provider",
+            "pyfabricops.setup_logging",
+        ):
+            stack.enter_context(patch(target))
+        for target, answer in answers.items():
+            stack.enter_context(patch(target, side_effect=answer))
         yield workspace
 
 

@@ -11,8 +11,9 @@ Steps: bootstrap without a state; nothing changed; one notebook changed;
 only the layout of a file changed (content hash); a notebook moved to a
 folder, then back to the root, without sending its definition; a run
 limited to notebooks, then a full one; a broken pipeline that fails and
-leaves the state alone; a notebook deleted from Git (refused, then deleted
-by hand); a notebook and its default lakehouse: the lakehouse created
+leaves the state alone; a notebook deleted from Git, blocked until a run
+allows deletions, which deletes it; a notebook and its default lakehouse:
+the lakehouse created
 first, then only checked when the notebook changes, and once deleted by
 hand, the notebook blocked in a run limited to notebooks and the lakehouse
 created again, before it, by the full run; a report and its semantic
@@ -21,7 +22,9 @@ workspace bound to the model's ID, when both are created and when only the
 report changes; a reconciliation: in sync after the deployments, then,
 after a notebook edited, another moved, the report deleted and a notebook
 created by hand, each change found with its reason, while a selective
-deployment has nothing to do, as Git did not change.
+deployment has nothing to do, as Git did not change; last, the semantic
+model deleted from Git while the report that reads it stays, blocked even
+with deletions allowed, then deleted once the report is deleted too.
 
 Prerequisites:
 
@@ -352,24 +355,30 @@ def _step_deletion(run: Run) -> None:
 
     _deploy_step(
         run,
-        "A notebook deleted from Git: the deletion is refused",
+        "A notebook deleted from Git, deletions not allowed: blocked",
         plan=[("BLOCKED", "C")],
         results=[("C", "failed")],
     )
     _check(_state(run).source_commit == before, "the state did not move")
+    _check(
+        _listed(run, "Notebook", name), "notebook C is still in the workspace"
+    )
 
-    _delete_by_hand(run, "Notebook", name)
     _deploy_step(
         run,
-        "Deleted by hand: nothing left to do",
-        plan=[("NOOP", "C")],
-        results=[],
+        "Deletions allowed: the notebook is deleted",
+        plan=[("DELETE", "C")],
+        results=[("C", "deleted")],
+        allow_deletions=True,
     )
     state = _state(run)
     _check(state.source_commit == head, "the state moves to HEAD")
     _check(
         ("Notebook", name) not in state.items,
         "the state forgets notebook C",
+    )
+    _check(
+        _gone(run, "Notebook", name), "notebook C is gone from the workspace"
     )
 
 
@@ -506,6 +515,53 @@ def _step_reconcile_drift(run: Run) -> None:
     )
 
 
+def _step_deletion_referenced(run: Run) -> None:
+    before = _state(run).source_commit
+    model, report = run.name("M"), run.name("R")
+    shutil.rmtree(run.items / f"{model}.SemanticModel")
+    _commit(run, "Delete semantic model M, which report R still reads")
+
+    result = _deploy_step(
+        run,
+        "A model deleted from Git while its report stays: blocked",
+        plan=[("BLOCKED", "M")],
+        results=[("M", "failed")],
+        allow_deletions=True,
+    )
+    _check(
+        f"{report}.Report (definition.pbir byPath)"
+        in (result.results[0].error or ""),
+        "the report that still reads the model is named",
+    )
+    _check(_state(run).source_commit == before, "the state did not move")
+    _check(
+        _listed(run, "SemanticModel", model),
+        "semantic model M is still in the workspace",
+    )
+
+    # Report R was deleted from the workspace by hand in the step before.
+    shutil.rmtree(run.items / f"{report}.Report")
+    head = _commit(run, "Delete report R too")
+    _deploy_step(
+        run,
+        "The report deleted too: the model goes, the report is gone already",
+        plan=[("NOOP", "R"), ("DELETE", "M")],
+        results=[("M", "deleted")],
+        allow_deletions=True,
+    )
+    state = _state(run)
+    _check(state.source_commit == head, "the state moves to HEAD")
+    _check(
+        ("SemanticModel", model) not in state.items
+        and ("Report", report) not in state.items,
+        "the state forgets the model and the report",
+    )
+    _check(
+        _gone(run, "SemanticModel", model),
+        "semantic model M is gone from the workspace",
+    )
+
+
 _STEPS: tuple[Callable[[Run], None], ...] = (
     _step_bootstrap,
     _step_nothing_changed,
@@ -523,6 +579,7 @@ _STEPS: tuple[Callable[[Run], None], ...] = (
     _step_report_in_place,
     _step_reconcile,
     _step_reconcile_drift,
+    _step_deletion_referenced,
 )
 
 
@@ -539,6 +596,7 @@ def _deploy_step(
     results: list[tuple[str, str]],
     item_types: list[str] | None = None,
     required: Sequence[str] = (),
+    allow_deletions: bool = False,
 ) -> pf.DeploymentReport:
     """
     Plan, check the plan, deploy, check the report.
@@ -554,6 +612,7 @@ def _deploy_step(
         "repository_path": str(run.items),
         "state_backend": run.state,
         "environment": _ENVIRONMENT,
+        "allow_deletions": allow_deletions,
     }
 
     planned = pf.plan_all_items(run.workspace, staging, **arguments)
@@ -984,15 +1043,26 @@ def _delete_by_hand(run: Run, item_type: str, name: str) -> None:
     for item in _list_items(run.workspace_id):
         if (item["type"], item["displayName"]) == (item_type, name):
             pf.delete_item(run.workspace_id, item["id"])
+    if not _gone(run, item_type, name):
+        raise E2EFailure(f"{name}.{item_type} is still in the workspace")
+    print(f"    {name}.{item_type} deleted by hand")
+
+
+def _listed(run: Run, item_type: str, name: str) -> bool:
+    """Whether the workspace lists an item now."""
+    return any(
+        (item["type"], item["displayName"]) == (item_type, name)
+        for item in _list_items(run.workspace_id)
+    )
+
+
+def _gone(run: Run, item_type: str, name: str) -> bool:
+    """Wait up to a minute for an item to leave the workspace listing."""
     for _ in range(30):
-        if not any(
-            (item["type"], item["displayName"]) == (item_type, name)
-            for item in _list_items(run.workspace_id)
-        ):
-            print(f"    {name}.{item_type} deleted by hand")
-            return
+        if not _listed(run, item_type, name):
+            return True
         time.sleep(2)
-    raise E2EFailure(f"{name}.{item_type} is still in the workspace")
+    return False
 
 
 def _list_items(workspace_id: str) -> list[dict[str, Any]]:
