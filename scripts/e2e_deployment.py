@@ -15,7 +15,10 @@ leaves the state alone; a notebook deleted from Git (refused, then deleted
 by hand); a notebook and its default lakehouse: the lakehouse created
 first, then only checked when the notebook changes, and once deleted by
 hand, the notebook blocked in a run limited to notebooks and the lakehouse
-created again, before it, by the full run.
+created again, before it, by the full run; a report and its semantic
+model: the report, which points to the model by path in Git, reaches the
+workspace bound to the model's ID, when both are created and when only the
+report changes.
 
 Prerequisites:
 
@@ -42,6 +45,7 @@ so a token cached for another service principal is never reused.
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import os
 import re
@@ -75,6 +79,47 @@ _CHILD_TYPES = frozenset({"SQLEndpoint"})
 # Fabric frees the name of a deleted item only minutes later.
 _NAME_ATTEMPTS = 10
 _NAME_WAIT_SECONDS = 30
+_SCHEMAS = "https://developer.microsoft.com/json-schemas/fabric/item"
+# A semantic model with its data inline, so it needs no data source.
+_MODEL: dict[str, str] = {
+    "definition.pbism": json.dumps(
+        {
+            "$schema": f"{_SCHEMAS}/semanticModel/definitionProperties/"
+            "1.0.0/schema.json",
+            "version": "4.2",
+            "settings": {},
+        },
+        indent=2,
+    ),
+    "definition/database.tmdl": "database\n\tcompatibilityLevel: 1604\n",
+    "definition/model.tmdl": (
+        "model Model\n"
+        "\tculture: en-US\n"
+        "\tdefaultPowerBIDataSourceVersion: powerBI_V3\n"
+        "\tsourceQueryCulture: en-US\n"
+        "\tdataAccessOptions\n"
+        "\t\tlegacyRedirects\n"
+        "\t\treturnErrorValuesAsNull\n"
+    ),
+    "definition/tables/Numbers.tmdl": (
+        "table Numbers\n"
+        "\n"
+        "\tcolumn Value\n"
+        "\t\tdataType: int64\n"
+        "\t\tsummarizeBy: sum\n"
+        "\t\tsourceColumn: Value\n"
+        "\n"
+        "\tpartition Numbers = m\n"
+        "\t\tmode: import\n"
+        "\t\tsource =\n"
+        "\t\t\t\tlet\n"
+        "\t\t\t\t    Source = #table(\n"
+        "\t\t\t\t        type table [Value = Int64.Type], {{1}, {2}}\n"
+        "\t\t\t\t    )\n"
+        "\t\t\t\tin\n"
+        "\t\t\t\t    Source\n"
+    ),
+}
 _NOTEBOOK = """# Fabric notebook source
 
 # METADATA ********************
@@ -383,6 +428,34 @@ def _step_dependency_missing(run: Run) -> None:
     _check(_state(run).source_commit == head, "the state moves to HEAD")
 
 
+def _step_report(run: Run) -> None:
+    _write_model(run, "M")
+    _write_report(run, "R", model="M", version=1)
+    _commit(run, "Add semantic model M and report R, which reads it")
+
+    _deploy_step(
+        run,
+        "A report and its semantic model: the report reads the model by ID",
+        plan=[("CREATE", "M"), ("CREATE", "R")],
+        results=[("M", "created"), ("R", "created")],
+    )
+    _check_bound(run, "R", model="M")
+
+
+def _step_report_in_place(run: Run) -> None:
+    _write_report(run, "R", model="M", version=2)
+    _commit(run, "Change report R")
+
+    _deploy_step(
+        run,
+        "The report changed: bound again to the model already there",
+        plan=[("NOOP", "M"), ("UPDATE", "R")],
+        results=[("R", "updated")],
+        required=["M"],
+    )
+    _check_bound(run, "R", model="M")
+
+
 _STEPS: tuple[Callable[[Run], None], ...] = (
     _step_bootstrap,
     _step_nothing_changed,
@@ -396,6 +469,8 @@ _STEPS: tuple[Callable[[Run], None], ...] = (
     _step_dependency,
     _step_dependency_in_place,
     _step_dependency_missing,
+    _step_report,
+    _step_report_in_place,
 )
 
 
@@ -587,6 +662,89 @@ def _write_lakehouse(run: Run, letter: str) -> None:
     (item / "lakehouse.metadata.json").write_text("{}\n", encoding="utf-8")
 
 
+def _write_model(run: Run, letter: str) -> None:
+    """Write a semantic model of one table, with its data inline."""
+    item = _item_folder(run, letter, "SemanticModel")
+    for relative, content in _MODEL.items():
+        path = item / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+
+
+def _write_report(run: Run, letter: str, *, model: str, version: int) -> None:
+    """Write a report of one empty page, on a model of the run, by path."""
+    item = _item_folder(run, letter, "Report")
+    files: dict[str, dict[str, Any]] = {
+        "definition.pbir": {
+            "$schema": f"{_SCHEMAS}/report/definitionProperties/2.0.0/"
+            "schema.json",
+            "version": "4.0",
+            "datasetReference": {
+                "byPath": {"path": f"../{run.name(model)}.SemanticModel"}
+            },
+        },
+        "definition/version.json": {
+            "$schema": f"{_SCHEMAS}/report/definition/versionMetadata/1.0.0/"
+            "schema.json",
+            "version": "2.0.0",
+        },
+        "definition/report.json": {
+            "$schema": f"{_SCHEMAS}/report/definition/report/3.1.0/"
+            "schema.json",
+            "themeCollection": {},
+        },
+        "definition/pages/pages.json": {
+            "$schema": f"{_SCHEMAS}/report/definition/pagesMetadata/1.0.0/"
+            "schema.json",
+            "pageOrder": ["main"],
+            "activePageName": "main",
+        },
+        "definition/pages/main/page.json": {
+            "$schema": f"{_SCHEMAS}/report/definition/page/2.0.0/schema.json",
+            "name": "main",
+            "displayName": f"Version {version}",
+            "displayOption": "FitToPage",
+            "height": 720,
+            "width": 1280,
+        },
+    }
+    for relative, content in files.items():
+        path = item / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(content, indent=2), encoding="utf-8")
+
+
+def _check_bound(run: Run, letter: str, *, model: str) -> None:
+    """Check the report reads its model by ID, while Git keeps the path."""
+    report_id = _item_id(run, "Report", run.name(letter))
+    # The response of getDefinition, as the API returns it.
+    response = pf.get_item_definition(run.workspace_id, report_id) or {}
+    pbirs = [
+        json.loads(base64.b64decode(part["payload"]))
+        for part in response.get("definition", {}).get("parts", [])
+        if part["path"] == "definition.pbir"
+    ]
+    if not pbirs:
+        raise E2EFailure(f"no definition.pbir read back for report {letter}")
+    connection = str(
+        pbirs[0]
+        .get("datasetReference", {})
+        .get("byConnection", {})
+        .get("connectionString", "")
+    )
+    model_id = _item_id(run, "SemanticModel", run.name(model))
+    _check(
+        model_id.lower() in connection.lower(),
+        "the report in the workspace reads the model by its ID",
+    )
+    local = _item_folder(run, letter, "Report") / "definition.pbir"
+    _check(
+        "byPath"
+        in json.loads(local.read_text(encoding="utf-8"))["datasetReference"],
+        "Git keeps the path to the model",
+    )
+
+
 def _write_pipeline(
     run: Run, letter: str, *, wait_seconds: int | None
 ) -> None:
@@ -701,13 +859,17 @@ def _open_sandbox(args: argparse.Namespace) -> tuple[str, bool]:
 
 def _remove_what_the_run_created(run: Run) -> None:
     """Delete the run's items and folder from the workspace."""
-    for item in _list_items(run.workspace_id):
-        if (
-            item["displayName"].startswith(f"{run.prefix}_")
-            and item["type"] not in _CHILD_TYPES
-        ):
-            pf.delete_item(run.workspace_id, item["id"])
-            print(f"Deleted {item['displayName']}.{item['type']}.")
+    # What needs an item goes before it: a report before its model.
+    rank = {item_type: n for n, item_type in enumerate(pf.DEPLOY_ORDER)}
+    created = [
+        item
+        for item in _list_items(run.workspace_id)
+        if item["displayName"].startswith(f"{run.prefix}_")
+        and item["type"] not in _CHILD_TYPES
+    ]
+    for item in sorted(created, key=lambda i: -rank.get(i["type"], -1)):
+        pf.delete_item(run.workspace_id, item["id"])
+        print(f"Deleted {item['displayName']}.{item['type']}.")
     for folder in pf.list_folders(run.workspace_id, df=False) or []:
         if folder["displayName"] == run.folder:
             pf.delete_folder(run.workspace_id, folder["id"])
@@ -735,6 +897,15 @@ def _list_items(workspace_id: str) -> list[dict[str, Any]]:
     if items is None:
         raise E2EFailure("Could not list the workspace items.")
     return list(items)
+
+
+def _item_id(run: Run, item_type: str, name: str) -> str:
+    """The ID of an item of the workspace."""
+    for item in _list_items(run.workspace_id):
+        if (item["type"], item["displayName"]) == (item_type, name):
+            item_id: str = item["id"]
+            return item_id
+    raise E2EFailure(f"{name}.{item_type} is not in the workspace")
 
 
 def _folder_of(run: Run, item_type: str, name: str) -> str | None:

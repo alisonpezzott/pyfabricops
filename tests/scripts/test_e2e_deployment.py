@@ -120,23 +120,42 @@ class FakeWorkspace:
     def delete_folder(self, workspace: str, folder: str) -> None:
         self.folders.pop(folder, None)
 
+    def get_item_definition(
+        self, workspace: str, item: str, *, format: str | None = None
+    ) -> dict[str, Any] | None:
+        """Answer as the getDefinition API does."""
+        stored = self.items.get(item)
+        return None if stored is None else {"definition": stored["definition"]}
+
     @staticmethod
     def _reject(
         item_type: str, definition: dict[str, Any]
     ) -> ApiResult | None:
-        """Refuse a pipeline whose content is not JSON, as Fabric does."""
-        if item_type != "DataPipeline":
-            return None
+        """
+        Refuse what Fabric refuses: a pipeline whose content is not JSON,
+        and a report that points to its semantic model by path.
+        """
         for part in definition["parts"]:
-            if part["path"] == "pipeline-content.json":
+            where = (item_type, part["path"])
+            content = base64.b64decode(part["payload"]).decode(
+                errors="replace"
+            )
+            if where == ("DataPipeline", "pipeline-content.json"):
                 try:
-                    json.loads(base64.b64decode(part["payload"]))
+                    json.loads(content)
+                    continue
                 except ValueError:
-                    error = {
-                        "errorCode": "InvalidDefinition",
-                        "message": "pipeline-content.json is not valid JSON.",
-                    }
-                    return ApiResult(False, 400, error=json.dumps(error))
+                    message = "pipeline-content.json is not valid JSON."
+            elif (
+                where == ("Report", "definition.pbir") and "byPath" in content
+            ):
+                message = (
+                    "Fabric REST API only supports byConnection references."
+                )
+            else:
+                continue
+            error = {"errorCode": "InvalidDefinition", "message": message}
+            return ApiResult(False, 400, error=json.dumps(error))
         return None
 
 
@@ -164,6 +183,10 @@ def fake(
         patch("pyfabricops.delete_item", side_effect=workspace.delete_item),
         patch(
             "pyfabricops.delete_folder", side_effect=workspace.delete_folder
+        ),
+        patch(
+            "pyfabricops.get_item_definition",
+            side_effect=workspace.get_item_definition,
         ),
         patch(
             f"{_ENGINE}.resolve_workspace",
