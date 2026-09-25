@@ -11,8 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `deploy_all_items()` accepts `item_types`, to deploy only some item types
   (e.g. `["Notebook", "DataPipeline"]` on every merge), and `fail_fast`. It
   returns a `DeploymentReport` with the outcome and duration of each item:
-  `report.failed`, `report.summary()`, `report.durations_by_type()` and
-  `report.to_df()`.
+  `report.failed`, `report.summary()`, `report.durations_by_type()`,
+  `report.to_df()` and `report.describe()`, which gives it as text.
 - `DEPLOY_ORDER` — the item types `deploy_all_items()` deploys by default, in
   dependency order.
 - Selective deployment: `deploy_all_items(baseline_commit=...)` deploys only

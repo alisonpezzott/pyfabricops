@@ -223,6 +223,35 @@ class DeploymentReport:
             counts[result.action] += 1
         return counts
 
+    def describe(self) -> str:
+        """
+        Describe the run: one line per item, then the counts and the time.
+
+        Returns:
+            str: Such as ``updated  Orders.Notebook  (2.1s)``, a failed or
+                skipped item followed by why, and a last line of counts.
+
+        Examples:
+            ```python
+            report = deploy_all_items('Sales-PRD', staging)
+            print(report.describe())
+            ```
+        """
+        lines = []
+        for result in self.results:
+            line = f"{result.action:<8} {_label(result)}"
+            if result.error:
+                line += f": {result.error}"
+            elif result.duration_seconds:
+                line += f"  ({result.duration_seconds:.1f}s)"
+            lines.append(line)
+        counts = self.summary()
+        lines.append(
+            ", ".join(f"{counts[action]} {action}" for action in _ACTIONS)
+            + f" in {self.duration_seconds:.1f}s"
+        )
+        return "\n".join(lines)
+
     def durations_by_type(self) -> dict[str, float]:
         """
         Sum the wall-clock time spent per item type.

@@ -571,6 +571,44 @@ def test_report_helpers() -> None:
     ]
 
 
+def test_a_report_describes_each_item_then_the_counts() -> None:
+    """Failures and skips say why; the others how long they took."""
+    report = DeploymentReport(
+        workspace="Sales-DEV",
+        results=[
+            DeploymentResult("Notebook", "A", "a", "created", "1", False, 1.5),
+            DeploymentResult(
+                "SemanticModel", "S", "s", "failed", error="Create failed."
+            ),
+            DeploymentResult(
+                "Report",
+                "S",
+                "r",
+                "skipped",
+                error="Needs S.SemanticModel, which failed.",
+            ),
+        ],
+    )
+
+    assert report.describe() == "\n".join(
+        [
+            "created  A.Notebook  (1.5s)",
+            "failed   S.SemanticModel: Create failed.",
+            "skipped  S.Report: Needs S.SemanticModel, which failed.",
+            "1 created, 0 updated, 0 moved, 1 failed, 1 skipped in 1.5s",
+        ]
+    )
+
+
+def test_an_empty_report_describes_its_counts() -> None:
+    """A run with nothing to do says so in its counts."""
+    report = DeploymentReport(workspace="Sales-DEV")
+
+    assert report.describe() == (
+        "0 created, 0 updated, 0 moved, 0 failed, 0 skipped in 0.0s"
+    )
+
+
 def test_empty_report_to_df_keeps_the_columns() -> None:
     """An empty report still has the result columns."""
     df = DeploymentReport(workspace="Sales-DEV").to_df()

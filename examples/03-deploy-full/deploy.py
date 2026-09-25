@@ -80,11 +80,7 @@ def deploy(workspace: str, staging: str, item_types: list[str]) -> bool:
     }
     print(pf.plan_all_items(workspace, staging, **arguments).describe())
     report = pf.deploy_all_items(workspace, staging, **arguments)
-    for result in report.results:
-        error = f": {result.error}" if result.error else ""
-        print(
-            f"  {result.display_name}.{result.item_type} {result.action}{error}"
-        )
+    print(report.describe())
     ok: bool = report.ok
     return ok
 
