@@ -119,7 +119,15 @@ This file maps your local branches to Fabric branches, allowing the library to a
 
 ## 🪄 Examples
 
-Visit: [https://github.com/alisonpezzott/pyfabricops-examples](https://github.com/alisonpezzott/pyfabricops-examples)
+The [`examples/`](examples/) folder has runnable examples:
+
+- a sample workspace with a lakehouse, notebooks, a pipeline, a semantic
+  model and a report;
+- scripts that authenticate, export a workspace and deploy the sample,
+  fully or only what changed;
+- CI definitions for Azure DevOps and GitHub Actions.
+
+More examples: [https://github.com/alisonpezzott/pyfabricops-examples](https://github.com/alisonpezzott/pyfabricops-examples)
 
 
 ## 🧬 Project Structure

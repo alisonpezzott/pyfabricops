@@ -1,0 +1,70 @@
+# Deploys examples/sample-workspace to a Fabric workspace on every push to
+# main that changes it, deploying only what changed since the last
+# successful run.
+#
+# Before using it:
+# - Copy this file to .github/workflows/ (it does not run from here).
+# - Create an environment named "prd" with the secrets FAB_CLIENT_ID,
+#   FAB_CLIENT_SECRET and FAB_TENANT_ID, and the variable FABRIC_WORKSPACE.
+# - Until the next pyfabricops release, install it from the repository, as
+#   below; then pin the release instead: pip install "pyfabricops==<version>".
+
+name: Deploy to Fabric
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - examples/sample-workspace/**
+  workflow_dispatch:
+
+# One deployment at a time: two runs would race on the workspace and on
+# the deployment state.
+concurrency:
+  group: deploy-prd
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: prd
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The whole history: the run compares commits.
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      # The state of the last successful run.
+      - name: Restore the deployment state
+        uses: actions/cache/restore@v4
+        with:
+          path: .deploy-state
+          key: deploy-state-${{ github.run_id }}
+          restore-keys: deploy-state-
+
+      - name: Install pyfabricops
+        run: pip install "pyfabricops @ git+https://github.com/alisonpezzott/pyfabricops"
+
+      - name: Deploy
+        run: >
+          python examples/04-deploy-selective/deploy.py
+          --workspace "${{ vars.FABRIC_WORKSPACE }}"
+          --environment PRD
+          --state-dir .deploy-state
+        env:
+          FAB_CLIENT_ID: ${{ secrets.FAB_CLIENT_ID }}
+          FAB_CLIENT_SECRET: ${{ secrets.FAB_CLIENT_SECRET }}
+          FAB_TENANT_ID: ${{ secrets.FAB_TENANT_ID }}
+
+      # Saved only after a successful deployment, so a failed run leaves
+      # the next one to compare from the same commits.
+      - name: Save the deployment state
+        uses: actions/cache/save@v4
+        with:
+          path: .deploy-state
+          key: deploy-state-${{ github.run_id }}
