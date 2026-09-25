@@ -13,9 +13,12 @@ from pyfabricops.helpers.dependencies import (
 )
 from pyfabricops.helpers.dependency_graph import Dependency
 
-_TYPES = ("SemanticModel", "Notebook", "Report")
+_TYPES = ("Lakehouse", "Environment", "SemanticModel", "Notebook", "Report")
 SALES_REPORT = ("Report", "Sales")
 SALES_MODEL = ("SemanticModel", "Sales")
+LOAD = ("Notebook", "Load")
+CLEAN = ("Notebook", "Clean")
+GOLD = ("Lakehouse", "Gold")
 
 
 def _item(root: Path, relative: str, logical_id: str | None = None) -> Path:
@@ -194,9 +197,201 @@ def test_the_scan_starts_from_the_selection_only(tmp_path: Path) -> None:
 
 
 def test_types_without_references_to_read_give_none(tmp_path: Path) -> None:
-    """Notebook references come in a later step."""
-    _item(tmp_path, "Load.Notebook")
+    """Semantic model sources are not read yet."""
+    _item(tmp_path, "Sales.SemanticModel")
 
-    scan = _scan(tmp_path, ("Notebook", "Load"))
+    scan = _scan(tmp_path, SALES_MODEL)
 
     assert (scan.dependencies, dict(scan.broken)) == ((), {})
+
+
+# ---------------------------------------------------------------------------
+# Notebook -> Lakehouse, Environment, Notebook
+# ---------------------------------------------------------------------------
+
+
+def _notebook(
+    root: Path,
+    relative: str,
+    metadata: dict[str, Any] | None = None,
+    cells: tuple[str, ...] = (),
+    *,
+    language: str = "py",
+    comment: str = "#",
+) -> Path:
+    """Write a notebook in the Fabric source format of its language."""
+    folder = _item(root, relative)
+    lines = [f"{comment} Fabric notebook source", ""]
+    lines += [f"{comment} METADATA ********************", ""]
+    meta = json.dumps(metadata or {"dependencies": {}}, indent=2)
+    lines += [f"{comment} META {line}" for line in meta.splitlines()]
+    for cell in cells:
+        lines += ["", f"{comment} CELL ********************", "", cell]
+        lines += ["", f"{comment} METADATA ********************", ""]
+        lines += [f'{comment} META {{"language": "{language}"}}']
+    (folder / f"notebook-content.{language}").write_text(
+        "\n".join(lines) + "\n", encoding="utf-8"
+    )
+    return folder
+
+
+def _lakehouse(default: str, name: str) -> dict[str, Any]:
+    """Notebook metadata with a default lakehouse."""
+    return {
+        "dependencies": {
+            "lakehouse": {
+                "default_lakehouse": default,
+                "default_lakehouse_name": name,
+                "default_lakehouse_workspace_id": "<workspace-id>",
+            }
+        }
+    }
+
+
+def _vias(scan: ReferenceScan) -> list[tuple[str, str]]:
+    """Each dependency as (target name, via)."""
+    return [(d.target[1], d.via) for d in scan.dependencies]
+
+
+def test_a_notebook_needs_its_default_lakehouse_by_logical_id(
+    tmp_path: Path,
+) -> None:
+    """The logical ID wins over the name."""
+    _item(tmp_path, "Gold.Lakehouse", "lid-gold")
+    _item(tmp_path, "Other.Lakehouse")
+    _notebook(tmp_path, "Load.Notebook", _lakehouse("lid-gold", "Other"))
+
+    assert _vias(_scan(tmp_path, LOAD)) == [
+        ("Gold", "notebook default lakehouse")
+    ]
+
+
+def test_a_notebook_needs_its_default_lakehouse_by_name(
+    tmp_path: Path,
+) -> None:
+    """A physical ID matches no local item, so the name decides."""
+    _item(tmp_path, "Gold.Lakehouse", "lid-gold")
+    _notebook(tmp_path, "Load.Notebook", _lakehouse("<lakehouse-id>", "Gold"))
+
+    assert _vias(_scan(tmp_path, LOAD)) == [
+        ("Gold", "notebook default lakehouse, by name")
+    ]
+
+
+def test_a_default_lakehouse_outside_the_source_is_left_out(
+    tmp_path: Path,
+) -> None:
+    """A shared lakehouse of another workspace is neither deployed nor broken."""
+    _notebook(
+        tmp_path, "Load.Notebook", _lakehouse("<lakehouse-id>", "Shared")
+    )
+
+    scan = _scan(tmp_path, LOAD)
+
+    assert (scan.dependencies, dict(scan.broken)) == ((), {})
+
+
+def test_a_notebook_needs_its_environment_by_logical_id(
+    tmp_path: Path,
+) -> None:
+    """Only a logical ID names a local environment; there is no name."""
+    _item(tmp_path, "Spark.Environment", "lid-spark")
+    environment = {"environmentId": "lid-spark", "workspaceId": "<id>"}
+    _notebook(
+        tmp_path,
+        "Load.Notebook",
+        {"dependencies": {"environment": environment}},
+    )
+    _notebook(
+        tmp_path,
+        "Clean.Notebook",
+        {"dependencies": {"environment": {"environmentId": "<env-id>"}}},
+    )
+
+    assert _vias(_scan(tmp_path, LOAD)) == [("Spark", "notebook environment")]
+    assert _scan(tmp_path, CLEAN).dependencies == ()
+
+
+def test_run_refers_to_other_notebooks_by_name(tmp_path: Path) -> None:
+    """Quoted or not, raw or as MAGIC; resource scripts are not notebooks."""
+    _notebook(tmp_path, "Clean.Notebook")
+    _notebook(tmp_path, "Shared Utils.Notebook")
+    _notebook(
+        tmp_path,
+        "Load.Notebook",
+        cells=(
+            "%run Clean",
+            '# MAGIC %run "Shared Utils"',
+            "%run -b script_file.py",
+            "%run helpers.py",
+            "%run Missing",
+            '%run Clean { "parameterInt": 1 }',
+        ),
+    )
+
+    assert _vias(_scan(tmp_path, LOAD)) == [
+        ("Clean", "%run"),
+        ("Shared Utils", "%run"),
+    ]
+
+
+def test_sql_notebooks_are_read_too(tmp_path: Path) -> None:
+    """The metadata comments start with -- in a Spark SQL notebook."""
+    _item(tmp_path, "Gold.Lakehouse")
+    _notebook(
+        tmp_path,
+        "Load.Notebook",
+        _lakehouse("<lakehouse-id>", "Gold"),
+        cells=("SELECT 1",),
+        language="sql",
+        comment="--",
+    )
+
+    assert [d.target for d in _scan(tmp_path, LOAD).dependencies] == [GOLD]
+
+
+def test_ipynb_notebooks_are_read_too(tmp_path: Path) -> None:
+    """The metadata and the cell sources come from the JSON."""
+    _item(tmp_path, "Gold.Lakehouse")
+    _notebook(tmp_path, "Clean.Notebook")
+    folder = _item(tmp_path, "Load.Notebook")
+    ipynb = {
+        "metadata": _lakehouse("<lakehouse-id>", "Gold"),
+        "cells": [{"cell_type": "code", "source": ["%run Clean\n", "x = 1"]}],
+    }
+    (folder / "notebook-content.ipynb").write_text(
+        json.dumps(ipynb), encoding="utf-8"
+    )
+
+    assert [d.target for d in _scan(tmp_path, LOAD).dependencies] == [
+        GOLD,
+        CLEAN,
+    ]
+
+
+def test_the_scan_follows_what_run_notebooks_need(tmp_path: Path) -> None:
+    """Load runs Clean, which writes to Gold: both are needed."""
+    _item(tmp_path, "Gold.Lakehouse")
+    _notebook(tmp_path, "Clean.Notebook", _lakehouse("<id>", "Gold"))
+    _notebook(tmp_path, "Load.Notebook", cells=("%run Clean",))
+
+    scan = _scan(tmp_path, LOAD)
+
+    assert [(d.source, d.target) for d in scan.dependencies] == [
+        (LOAD, CLEAN),
+        (CLEAN, GOLD),
+    ]
+
+
+def test_a_notebook_without_dependencies_needs_nothing(
+    tmp_path: Path,
+) -> None:
+    """No lakehouse, no environment, no %run: nothing to read."""
+    _notebook(
+        tmp_path,
+        "Load.Notebook",
+        {"kernel_info": {"name": "synapse_pyspark"}, "dependencies": {}},
+        cells=("print(1)",),
+    )
+
+    assert _scan(tmp_path, LOAD).dependencies == ()

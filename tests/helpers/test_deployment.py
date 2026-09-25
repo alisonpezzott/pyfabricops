@@ -1721,3 +1721,37 @@ def test_a_report_pointing_to_no_model_is_blocked(
         "semantic model of the source."
     )
     _assert_no_change(fabric)
+
+
+def test_a_lakehouse_missing_from_the_workspace_is_created_before_its_notebook(
+    git_repo: GitRepo, root: Path, fabric: SimpleNamespace
+) -> None:
+    """The notebook's default lakehouse, found by name, is created first."""
+    fabric.list_items.return_value = [
+        {"id": "nb-load", "type": "Notebook", "displayName": "Load"},
+    ]
+    _write_item(root, "Gold.Lakehouse")
+    notebook = _write_item(root, "Load.Notebook")
+    lakehouse = {
+        "default_lakehouse": "<lakehouse-id>",
+        "default_lakehouse_name": "Gold",
+    }
+    meta = json.dumps({"dependencies": {"lakehouse": lakehouse}}, indent=2)
+    (notebook / "notebook-content.py").write_text(
+        "# Fabric notebook source\n\n# METADATA ********************\n\n"
+        + "\n".join(f"# META {line}" for line in meta.splitlines())
+        + "\n",
+        encoding="utf-8",
+    )
+    baseline = git_repo.commit("baseline")
+    _change(notebook)
+    git_repo.commit("change the notebook")
+
+    report = _deploy(root, baseline_commit=baseline)
+
+    assert [
+        (r.item_type, r.display_name, r.action) for r in report.results
+    ] == [
+        ("Lakehouse", "Gold", "created"),
+        ("Notebook", "Load", "updated"),
+    ]

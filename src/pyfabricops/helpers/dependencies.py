@@ -15,6 +15,12 @@ References read:
 - Report → SemanticModel: ``datasetReference`` in ``definition.pbir``, by
   path, or by connection through the ``initial catalog`` of the connection
   string.
+- Notebook → Lakehouse: the default lakehouse in the notebook metadata, by
+  logical ID (as Fabric writes it for a lakehouse of the same workspace) or
+  else by ``default_lakehouse_name``.
+- Notebook → Environment: the attached environment, by logical ID.
+- Notebook → Notebook: ``%run <notebook>``; ``%run -b`` runs a script of
+  the notebook's resources, not a notebook.
 """
 
 from __future__ import annotations
@@ -64,9 +70,12 @@ class LocalCatalog:
     def __init__(self, items: Iterable[CatalogItem]) -> None:
         self._by_key: dict[ItemKey, CatalogItem] = {}
         self._by_folder: dict[str, CatalogItem] = {}
+        self._by_logical_id: dict[str, CatalogItem] = {}
         for item in items:
             self._by_key.setdefault(item.key, item)
             self._by_folder.setdefault(_folder_id(item.path), item)
+            if item.logical_id is not None:
+                self._by_logical_id.setdefault(item.logical_id, item)
 
     @classmethod
     def read(cls, path: str, item_types: Sequence[str]) -> LocalCatalog:
@@ -121,6 +130,18 @@ class LocalCatalog:
             CatalogItem | None: The item, or None when there is none.
         """
         return self._by_folder.get(_folder_id(folder))
+
+    def with_logical_id(self, logical_id: str) -> CatalogItem | None:
+        """
+        Return the item with a logical ID.
+
+        Args:
+            logical_id (str): The ``config.logicalId`` of its ``.platform``.
+
+        Returns:
+            CatalogItem | None: The item, or None when there is none.
+        """
+        return self._by_logical_id.get(logical_id)
 
 
 @dataclass(frozen=True)
@@ -229,9 +250,154 @@ def _report_references(item: CatalogItem, catalog: LocalCatalog) -> _Found:
     return [], []
 
 
+def _notebook_references(item: CatalogItem, catalog: LocalCatalog) -> _Found:
+    """Notebook → Lakehouse, Environment and Notebook, from its source."""
+    notebook = _read_notebook(Path(item.path))
+    if notebook is None:
+        return [], []
+    metadata, lines = notebook
+    dependencies = metadata.get("dependencies")
+    if not isinstance(dependencies, dict):
+        dependencies = {}
+    found: list[Dependency] = []
+
+    lakehouse = dependencies.get("lakehouse")
+    if isinstance(lakehouse, dict):
+        target = _with_logical_id(
+            catalog, lakehouse.get("default_lakehouse"), "Lakehouse"
+        )
+        via = "notebook default lakehouse"
+        name = lakehouse.get("default_lakehouse_name")
+        if target is None and isinstance(name, str):
+            target = catalog.get(("Lakehouse", name))
+            via = "notebook default lakehouse, by name"
+        if target is not None:
+            found.append(Dependency(item.key, target.key, via))
+
+    environment = dependencies.get("environment")
+    if isinstance(environment, dict):
+        target = _with_logical_id(
+            catalog, environment.get("environmentId"), "Environment"
+        )
+        if target is not None:
+            found.append(
+                Dependency(item.key, target.key, "notebook environment")
+            )
+
+    for name in _run_targets(lines):
+        target = catalog.get(("Notebook", name))
+        if target is not None:
+            found.append(Dependency(item.key, target.key, "%run"))
+    # A notebook outside the source is neither deployed nor blocking.
+    return list(dict.fromkeys(found)), []
+
+
 _READERS: dict[str, Callable[[CatalogItem, LocalCatalog], _Found]] = {
     "Report": _report_references,
+    "Notebook": _notebook_references,
 }
+
+# A metadata line of a notebook source file, whose comments start with #,
+# -- or // depending on its language.
+_META = re.compile(r"^(?:#|--|//)\s?META(?: (.*))?$")
+# A %run line, raw or in a cell of another language (``# MAGIC %run``).
+_RUN = re.compile(r"^\s*(?:(?:#|--|//)\s*MAGIC\s+)?%run\s+(.+)$")
+
+
+def _read_notebook(folder: Path) -> tuple[dict[str, Any], list[str]] | None:
+    """Read a notebook's metadata and code lines from its source file."""
+    sources = sorted(folder.glob("notebook-content.*"))
+    if not sources:
+        return None
+    source = sources[0]
+    try:
+        text = source.read_text(encoding="utf-8-sig")
+    except (OSError, UnicodeDecodeError):
+        return None
+
+    if source.suffix == ".ipynb":
+        try:
+            notebook = json.loads(text)
+        except ValueError:
+            return None
+        if not isinstance(notebook, dict):
+            return None
+        metadata = notebook.get("metadata")
+        lines = [
+            line
+            for cell in notebook.get("cells", [])
+            if isinstance(cell, dict)
+            for line in _cell_lines(cell.get("source"))
+        ]
+        return (metadata if isinstance(metadata, dict) else {}), lines
+
+    return _source_metadata(text), text.splitlines()
+
+
+def _source_metadata(text: str) -> dict[str, Any]:
+    """
+    Parse the notebook-level ``META`` block of a notebook source file.
+
+    It is the first run of ``META`` lines; the later ones are the metadata
+    of each cell.
+    """
+    lines: list[str] = []
+    for line in text.splitlines():
+        match = _META.match(line)
+        if match:
+            lines.append(match.group(1) or "")
+        elif lines:
+            break
+    try:
+        metadata = json.loads("\n".join(lines)) if lines else {}
+    except ValueError:
+        return {}
+    return metadata if isinstance(metadata, dict) else {}
+
+
+def _cell_lines(source: object) -> list[str]:
+    """Return the lines of an ipynb cell source, a string or a list."""
+    if isinstance(source, str):
+        return source.splitlines()
+    if isinstance(source, list):
+        return [
+            line
+            for part in source
+            if isinstance(part, str)
+            for line in part.splitlines()
+        ]
+    return []
+
+
+def _run_targets(lines: Iterable[str]) -> list[str]:
+    """Return the notebooks ``%run`` lines refer to, by name."""
+    targets: list[str] = []
+    for line in lines:
+        match = _RUN.match(line)
+        if match is None:
+            continue
+        arguments = match.group(1).strip()
+        if not arguments or arguments.startswith("-"):
+            # -b/--builtin or -c/--current: a script of the resources.
+            continue
+        if arguments[0] in "\"'":
+            end = arguments.find(arguments[0], 1)
+            name = arguments[1:end] if end > 0 else arguments[1:]
+        else:
+            name = arguments.split()[0]
+        if name and not name.lower().endswith((".py", ".sql")):
+            targets.append(name)
+    return targets
+
+
+def _with_logical_id(
+    catalog: LocalCatalog, value: object, item_type: str
+) -> CatalogItem | None:
+    """Return the local item of a type whose logical ID is ``value``."""
+    if not isinstance(value, str):
+        return None
+    item = catalog.with_logical_id(value)
+    return item if item is not None and item.key[0] == item_type else None
 
 
 def _read_platform(item_path: str) -> tuple[str, str | None] | None:

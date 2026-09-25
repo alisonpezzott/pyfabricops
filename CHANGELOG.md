@@ -64,7 +64,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   which every run using the installation shares and which cannot be
   written on a read-only install.
 - Dependency resolution: `deploy_all_items()` and `plan_all_items()` read
-  the references between local items (a report's semantic model, for now).
+  the references between local items:
+  - a report's semantic model;
+  - a notebook's default lakehouse, by logical ID or else by name;
+  - a notebook's environment, by logical ID;
+  - the notebooks a notebook runs with `%run`.
+
   With `resolve_dependencies=True`, the default, each item is deployed
   after what it needs.
   - A needed item that is not selected is validated when the workspace has
