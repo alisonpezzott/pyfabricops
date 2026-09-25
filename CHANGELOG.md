@@ -114,10 +114,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   Each definition is compared with the one the workspace returns, leaving
   out what Fabric rewrites by itself: layout, the logical ID in
-  `.platform`, a report's reference to its model, and the `ref` lines of
-  `model.tmdl`. A difference names the parts that differ. `Reconciliation`
-  and `UnmanagedItem` are exported. The Reconciliation page of the
-  documentation explains each finding.
+  `.platform`, a report's reference to its model, the `ref` lines of
+  `model.tmdl`, and the empty parts it adds, such as a lakehouse's
+  `shortcuts.metadata.json`. A difference names the parts that differ.
+  `Reconciliation` and `UnmanagedItem` are exported. The Reconciliation
+  page of the documentation explains each finding.
 - An `examples/` folder, in the repository but not in the package:
   - a sample workspace in Fabric's Git format, with a lakehouse, notebooks,
     a pipeline, a semantic model and a report that refer to one another;

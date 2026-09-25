@@ -65,7 +65,10 @@ in these, which the comparison leaves out:
 - a report's reference to its semantic model: by path in Git, by
   connection in the workspace. Both are compared by the model they point
   to;
-- the `ref` lines Fabric adds to `model.tmdl` to order a model's tables.
+- the `ref` lines Fabric adds to `model.tmdl` to order a model's tables;
+- a part that holds nothing, such as the empty `shortcuts.metadata.json`
+  Fabric adds to a lakehouse sent without one, when the other side lacks
+  it.
 
 A difference names the parts of the definition that differ.
 

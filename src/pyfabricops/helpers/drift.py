@@ -15,7 +15,10 @@ out what Fabric changes by itself, as measured against a workspace:
   path of its folder in Git, by a connection in the workspace. Given the
   name of the model it points to, the reference is compared by that name;
 - the ``ref`` lines Fabric adds to a semantic model's ``model.tmdl`` to
-  order its tables and other objects.
+  order its tables and other objects;
+- a part that holds nothing, such as the empty ``shortcuts.metadata.json``
+  Fabric adds to a lakehouse sent without one, when the other side lacks
+  it.
 
 Internal for now: nothing here is exported from ``pyfabricops``.
 """
@@ -38,6 +41,8 @@ _MODEL_TMDL = "definition/model.tmdl"
 # A line that only orders the objects of a model, such as "ref table Sales".
 _TMDL_REF = re.compile(r"ref\s")
 _BLANK_LINES = re.compile(r"\n{3,}")
+# What a comparable part holds when it holds nothing.
+_EMPTY = frozenset({b"", b"[]", b"{}"})
 
 
 def comparable_parts(
@@ -80,8 +85,9 @@ def differing_parts(
     """
     Name the parts that differ between two definitions.
 
-    A part that only one side has differs, except ``.platform``: when one
-    side has none, it is left out, as not every item type returns one.
+    A part that only one side has differs, unless it holds nothing (empty,
+    ``[]`` or ``{}``), as the parts Fabric adds by itself do. ``.platform``
+    is left out when one side has none, as not every item type returns one.
 
     Args:
         source (Mapping[str, bytes]): The comparable parts of the item in
@@ -98,8 +104,18 @@ def differing_parts(
         paths.discard(_PLATFORM)
     return tuple(
         sorted(
-            path for path in paths if source.get(path) != workspace.get(path)
+            path
+            for path in paths
+            if source.get(path) != workspace.get(path)
+            and not _empty_on_one_side(source.get(path), workspace.get(path))
         )
+    )
+
+
+def _empty_on_one_side(source: bytes | None, workspace: bytes | None) -> bool:
+    """Whether one side lacks a part that holds nothing on the other."""
+    return (source is None and workspace in _EMPTY) or (
+        workspace is None and source in _EMPTY
     )
 
 

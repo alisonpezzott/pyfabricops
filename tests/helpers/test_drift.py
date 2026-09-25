@@ -189,9 +189,36 @@ def test_a_model_property_changed_is_a_difference() -> None:
 def test_a_part_on_one_side_only_is_a_difference() -> None:
     """Each missing or extra part is named, in path order."""
     assert _differ(
-        {"b.json": "{}", "a.json": "{}"},
-        {"b.json": "{}", "c.json": "{}"},
+        {"b.json": '{"x": 1}', "a.json": '{"x": 1}'},
+        {"b.json": '{"x": 1}', "c.json": '{"x": 1}'},
     ) == ("a.json", "c.json")
+
+
+def test_an_empty_part_fabric_adds_is_no_difference() -> None:
+    """A lakehouse sent without shortcuts comes back with an empty list."""
+    assert (
+        _differ(
+            {"lakehouse.metadata.json": "{}"},
+            {
+                "lakehouse.metadata.json": "{}",
+                "shortcuts.metadata.json": "[]\n",
+            },
+        )
+        == ()
+    )
+
+
+def test_shortcuts_removed_by_hand_are_a_difference() -> None:
+    """An empty part still differs from one that holds something."""
+    shortcut = '[{"name": "Sales", "path": "Tables"}]'
+
+    assert _differ(
+        {"shortcuts.metadata.json": shortcut},
+        {"shortcuts.metadata.json": "[]"},
+    ) == ("shortcuts.metadata.json",)
+    assert _differ({"shortcuts.metadata.json": shortcut}, {}) == (
+        "shortcuts.metadata.json",
+    )
 
 
 def test_a_platform_file_on_one_side_only_is_left_out() -> None:
