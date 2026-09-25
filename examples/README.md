@@ -83,6 +83,7 @@ data source. A real model would read the lakehouse, with its connection in
 | `04-deploy-selective/` | Deploying only what changed in Git since the last successful deployment, with a deployment state. |
 | `05-ci-azure-devops/` | An Azure Pipelines definition that runs the selective deployment. |
 | `06-ci-github-actions/` | A GitHub Actions workflow that runs it. |
+| `07-reconcile/` | Reporting drift: how the workspace stands against the source, with scheduled Azure DevOps and GitHub Actions definitions that fail when anything differs. |
 
 Run the scripts from the repository root, for example:
 
@@ -91,6 +92,9 @@ python examples/03-deploy-full/deploy.py --workspace <workspace-name> --environm
 ```
 
 `03-deploy-full` and `04-deploy-selective` print the plan before they
-deploy, and exit with 1 when an item fails. The sample workspace is what
+deploy, and exit with 1 when an item fails. `07-reconcile` prints what
+differs, changing nothing, and exits with 1 when anything does: an item
+missing from the workspace, one changed or moved there by hand, or one the
+source lacks. The sample workspace is what
 `tests/test_examples.py` checks: the plan it gives, what each item needs,
 and that no ID other than its own made-up ones gets into this folder.

@@ -103,8 +103,11 @@ def test_the_pipeline_placeholders_are_warned_about_until_replaced(
     )
 
 
-def test_the_deploy_examples_replace_every_placeholder_of_the_sample() -> None:
-    """A placeholder added to the sample must be handled by the examples."""
+def test_the_examples_replace_every_placeholder_of_the_sample() -> None:
+    """
+    A placeholder added to the sample must be handled by the examples that
+    stage it: the deployments and the reconciliation.
+    """
     placeholder = re.compile(r"#\{\w+\}#")
     in_sample = {
         match
@@ -118,8 +121,12 @@ def test_the_deploy_examples_replace_every_placeholder_of_the_sample() -> None:
         "#{workspace_id}#",
         "#{load_orders_notebook_id}#",
     }
-    for script in ("03-deploy-full", "04-deploy-selective"):
-        text = (_EXAMPLES / script / "deploy.py").read_text(encoding="utf-8")
+    for script in (
+        "03-deploy-full/deploy.py",
+        "04-deploy-selective/deploy.py",
+        "07-reconcile/reconcile.py",
+    ):
+        text = (_EXAMPLES / script).read_text(encoding="utf-8")
         assert in_sample <= set(placeholder.findall(text)), script
 
 

@@ -125,7 +125,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - scripts that authenticate, export a workspace, and deploy the sample
     fully or only what changed since the last deployment;
   - Azure DevOps and GitHub Actions definitions that run the selective
-    deployment.
+    deployment;
+  - a reconciliation that reports drift, with scheduled Azure DevOps and
+    GitHub Actions definitions that fail when anything differs.
 
   `tests/test_examples.py` checks the plan the sample gives, and that no
   ID other than its own made-up ones gets into the folder.
