@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Notebook",
+    "displayName": "LoadOrders",
+    "description": "Loads the sample orders into the Bronze lakehouse."
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "33333333-3333-4333-8333-333333333333"
+  }
+}
