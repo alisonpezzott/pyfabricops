@@ -302,7 +302,8 @@ def test_deletions_and_unreadable_items_keep_their_places() -> None:
         ("UPDATE", "ws/Sales.SemanticModel"),
         ("UPDATE", "ws/Sales.Report"),
         ("BLOCKED", "ws/Broken.Notebook"),
-        ("DELETE", "ws/Load.Notebook"),
+        # Blocked, as deletions are not allowed, but still last.
+        ("BLOCKED", "ws/Load.Notebook"),
     ]
 
 

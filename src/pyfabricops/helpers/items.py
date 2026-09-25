@@ -260,6 +260,7 @@ def deploy_all_items(
     state_backend: DeploymentStateBackend | None = None,
     environment: str | None = None,
     resolve_dependencies: bool = True,
+    allow_deletions: bool = False,
 ) -> DeploymentReport:
     """
     Deploy all items found under a local path to a workspace.
@@ -269,13 +270,27 @@ def deploy_all_items(
     moved when their local folder differs; missing items are created. The
     workspace items and folders are listed once per run, and the item types
     are deployed in dependency order (``DEPLOY_ORDER``). A failed item does
-    not stop the run unless ``fail_fast`` is set. Nothing is ever deleted.
+    not stop the run unless ``fail_fast`` is set.
 
     With ``baseline_commit``, only the items changed in Git between that
-    commit and HEAD are deployed (selective deployment). An item deleted
-    since then is reported as failed while the workspace still has it,
-    because deleting is not supported yet; once it is gone, it needs
-    nothing.
+    commit and HEAD are deployed (selective deployment).
+
+    An item deleted in Git since the baseline is deleted from the workspace
+    only with ``allow_deletions``, once every other item succeeded, and by
+    type in the reverse of ``DEPLOY_ORDER``, so that an item goes before
+    what it refers to. Without it the item is blocked, so the run fails and
+    the state stays until a run allows it or the item is deleted by hand.
+    It is blocked as well while an item that stays in the source refers to
+    it: by a reference the engine reads (a report's semantic model, a
+    notebook's default lakehouse, environment or ``%run``), whatever
+    ``resolve_dependencies`` says, or by its ID in the workspace, for a
+    lakehouse its SQL analytics endpoint's too. No item is deleted because
+    another one is. It needs nothing when the source still defines it in
+    another folder, or the workspace no longer has it. A run without a
+    baseline, or a type left out of ``item_types``, deletes nothing. Fabric
+    keeps a deleted item in the workspace recycle bin when its type supports
+    it, such as a lakehouse or a notebook; it deletes a semantic model or a
+    report for good.
 
     With ``state_backend``, the baseline comes from the last successful
     deployment to ``environment``, kept per item type: a type deploys what
@@ -329,6 +344,9 @@ def deploy_all_items(
         resolve_dependencies (bool, optional): Order, meet and check the
             dependencies of the items. Defaults to True; False keeps the
             type and path order and deploys only the selected items.
+        allow_deletions (bool, optional): Delete from the workspace the
+            items deleted in Git since the baseline. Defaults to False: each
+            is blocked and fails the run, so the deletion is not missed.
 
     Returns:
         DeploymentReport: The outcome of each item; ``report.failed`` lists
@@ -383,6 +401,7 @@ def deploy_all_items(
         state_backend=state_backend,
         environment=environment,
         resolve_dependencies=resolve_dependencies,
+        allow_deletions=allow_deletions,
     )
 
 
@@ -397,6 +416,7 @@ def plan_all_items(
     state_backend: DeploymentStateBackend | None = None,
     environment: str | None = None,
     resolve_dependencies: bool = True,
+    allow_deletions: bool = False,
 ) -> DeploymentPlan:
     """
     Show what ``deploy_all_items`` would do, without doing it.
@@ -425,6 +445,9 @@ def plan_all_items(
         resolve_dependencies (bool, optional): Order, meet and check the
             dependencies of the items, as ``deploy_all_items`` does.
             Defaults to True.
+        allow_deletions (bool, optional): Plan as DELETE the deletions
+            ``deploy_all_items`` would make with ``allow_deletions``.
+            Defaults to False: they are planned as blocked.
 
     Returns:
         DeploymentPlan: One action per selected item, and per dependency
@@ -460,6 +483,7 @@ def plan_all_items(
         state_backend=state_backend,
         environment=environment,
         resolve_dependencies=resolve_dependencies,
+        allow_deletions=allow_deletions,
     )
 
 

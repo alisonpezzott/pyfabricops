@@ -699,6 +699,7 @@ def test_deploy_all_items_delegates_to_the_engine() -> None:
             state_backend=backend,
             environment="dev",
             resolve_dependencies=False,
+            allow_deletions=True,
         )
 
     engine.assert_called_once_with(
@@ -712,6 +713,7 @@ def test_deploy_all_items_delegates_to_the_engine() -> None:
         state_backend=backend,
         environment="dev",
         resolve_dependencies=False,
+        allow_deletions=True,
     )
 
 
@@ -1312,7 +1314,7 @@ def test_selective_plan_says_why(
             DeploymentReason.ITEM_ADDED,
         ),
         (
-            DeploymentActionType.DELETE,
+            DeploymentActionType.BLOCKED,
             "Report",
             "Old",
             DeploymentReason.ITEM_DELETED,
@@ -1940,6 +1942,7 @@ def test_plan_all_items_delegates_to_the_engine() -> None:
             state_backend=backend,
             environment="dev",
             resolve_dependencies=False,
+            allow_deletions=True,
         )
 
     engine.assert_called_once_with(
@@ -1952,6 +1955,7 @@ def test_plan_all_items_delegates_to_the_engine() -> None:
         state_backend=backend,
         environment="dev",
         resolve_dependencies=False,
+        allow_deletions=True,
     )
 
 
@@ -2471,7 +2475,9 @@ def test_a_model_a_report_still_reads_is_not_deleted(
     baseline = git_repo.commit("baseline")
     _delete_folder(git_repo, root / "Sales.SemanticModel")
 
-    (action,) = _plan(root, baseline_commit=baseline).actions
+    (action,) = _plan(
+        root, baseline_commit=baseline, allow_deletions=True
+    ).actions
 
     assert (action.action, action.item_type) == (
         DeploymentActionType.BLOCKED,
@@ -2497,7 +2503,9 @@ def test_a_lakehouse_a_notebook_uses_by_logical_id_is_not_deleted(
     baseline = git_repo.commit("baseline")
     _delete_folder(git_repo, lakehouse)
 
-    (action,) = _plan(root, baseline_commit=baseline).actions
+    (action,) = _plan(
+        root, baseline_commit=baseline, allow_deletions=True
+    ).actions
 
     assert action.action == DeploymentActionType.BLOCKED
     assert action.detail == (
@@ -2525,7 +2533,9 @@ def test_a_lakehouse_whose_endpoint_a_model_reads_by_id_is_not_deleted(
     baseline = git_repo.commit("baseline")
     _delete_folder(git_repo, lakehouse)
 
-    (action,) = _plan(root, baseline_commit=baseline).actions
+    (action,) = _plan(
+        root, baseline_commit=baseline, allow_deletions=True
+    ).actions
 
     assert action.action == DeploymentActionType.BLOCKED
     assert action.detail == (
@@ -2547,7 +2557,9 @@ def test_a_notebook_a_pipeline_runs_by_id_is_not_deleted(
     baseline = git_repo.commit("baseline")
     _delete_folder(git_repo, notebook)
 
-    (action,) = _plan(root, baseline_commit=baseline).actions
+    (action,) = _plan(
+        root, baseline_commit=baseline, allow_deletions=True
+    ).actions
 
     assert action.action == DeploymentActionType.BLOCKED
     assert action.detail == (
@@ -2569,9 +2581,91 @@ def test_items_deleted_together_do_not_block_each_other(
     shutil.rmtree(root / "Sales.Report")
     _delete_folder(git_repo, root / "Sales.SemanticModel")
 
-    plan = _plan(root, baseline_commit=baseline)
+    plan = _plan(root, baseline_commit=baseline, allow_deletions=True)
 
     assert [(a.action, a.item_type) for a in plan.actions] == [
         (DeploymentActionType.DELETE, "Report"),
         (DeploymentActionType.DELETE, "SemanticModel"),
     ]
+
+
+# ---------------------------------------------------------------------------
+# Deletions: allow_deletions
+# ---------------------------------------------------------------------------
+
+
+def test_what_git_deleted_is_deleted_when_the_run_allows_it(
+    git_repo: GitRepo, root: Path, fabric: SimpleNamespace
+) -> None:
+    """The plan says DELETE, and the executor deletes."""
+    fabric.list_items.return_value = [
+        {"id": "nb-old", "type": "Notebook", "displayName": "Old"},
+    ]
+    old = _write_item(root, "Old.Notebook")
+    baseline = git_repo.commit("baseline")
+    _delete_folder(git_repo, old)
+
+    report = _deploy(root, baseline_commit=baseline, allow_deletions=True)
+
+    assert [(r.display_name, r.action) for r in report.results] == [
+        ("Old", "deleted")
+    ]
+    assert report.ok
+    fabric.delete.assert_called_once_with(_WORKSPACE_ID, "nb-old")
+
+
+def test_the_plan_shows_the_deletion_only_when_allowed(
+    git_repo: GitRepo, root: Path, fabric: SimpleNamespace
+) -> None:
+    """plan_all_items takes the flag too, so it shows what would happen."""
+    fabric.list_items.return_value = [
+        {"id": "nb-old", "type": "Notebook", "displayName": "Old"},
+    ]
+    old = _write_item(root, "Old.Notebook")
+    baseline = git_repo.commit("baseline")
+    _delete_folder(git_repo, old)
+
+    (refused,) = _plan(root, baseline_commit=baseline).actions
+    (allowed,) = _plan(
+        root, baseline_commit=baseline, allow_deletions=True
+    ).actions
+
+    assert (refused.action, allowed.action) == (
+        DeploymentActionType.BLOCKED,
+        DeploymentActionType.DELETE,
+    )
+    _assert_no_change(fabric)
+
+
+def test_the_state_forgets_an_item_once_it_is_deleted(
+    git_repo: GitRepo,
+    root: Path,
+    fabric: SimpleNamespace,
+    state: LocalJsonStateBackend,
+) -> None:
+    """Refused, the state stays; deleted, it moves on without the item."""
+    old = _write_item(root, "Old.Notebook")
+    _write_item(root, "Kept.Notebook")
+    git_repo.commit("first")
+    _deploy(root, state_backend=state, environment="dev")
+    first = _recorded(state, "dev")
+    fabric.list_items.return_value = [
+        {"id": "nb-old", "type": "Notebook", "displayName": "Old"},
+        {"id": "nb-kept", "type": "Notebook", "displayName": "Kept"},
+    ]
+    _delete_folder(git_repo, old)
+    head = git_repo.run("rev-parse", "HEAD")
+
+    refused = _deploy(root, state_backend=state, environment="dev")
+    assert not refused.ok
+    assert _recorded(state, "dev").source_commit == first.source_commit
+
+    deleted = _deploy(
+        root, state_backend=state, environment="dev", allow_deletions=True
+    )
+    assert [(r.display_name, r.action) for r in deleted.results] == [
+        ("Old", "deleted")
+    ]
+    recorded = _recorded(state, "dev")
+    assert recorded.source_commit == head
+    assert set(recorded.items) == {("Notebook", "Kept")}

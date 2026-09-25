@@ -353,7 +353,7 @@ def _step_deletion(run: Run) -> None:
     _deploy_step(
         run,
         "A notebook deleted from Git: the deletion is refused",
-        plan=[("DELETE", "C")],
+        plan=[("BLOCKED", "C")],
         results=[("C", "failed")],
     )
     _check(_state(run).source_commit == before, "the state did not move")

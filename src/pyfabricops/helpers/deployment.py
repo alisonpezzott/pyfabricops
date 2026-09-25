@@ -8,7 +8,9 @@ builds a ``DeploymentPlan`` from them without changing anything.
 ``DeploymentExecutor`` then applies the plan, and the run returns a
 ``DeploymentReport`` with the outcome of each item, so a partial failure
 reaches the caller instead of being logged and lost. The state is recorded
-only when every item succeeded. Nothing is ever deleted.
+only when every item succeeded. An item deleted from Git is deleted from the
+workspace only when the run allows deletions, after every other item
+succeeded, and only while no item that stays in the source refers to it.
 """
 
 from __future__ import annotations
@@ -1403,6 +1405,7 @@ def _deploy_all(
     state_backend: DeploymentStateBackend | None = None,
     environment: str | None = None,
     resolve_dependencies: bool = True,
+    allow_deletions: bool = False,
 ) -> DeploymentReport:
     """
     Select, plan and apply; with a state backend, record the run.
@@ -1437,6 +1440,7 @@ def _deploy_all(
         root=path,
         dependencies=dependencies,
         item_types=types,
+        allow_deletions=allow_deletions,
     )
     if tracker is not None:
         tracker.record(
@@ -1456,6 +1460,7 @@ def _plan_all(
     state_backend: DeploymentStateBackend | None = None,
     environment: str | None = None,
     resolve_dependencies: bool = True,
+    allow_deletions: bool = False,
 ) -> DeploymentPlan:
     """
     Build the plan ``_deploy_all`` would apply, and stop there.
@@ -1506,6 +1511,7 @@ def _plan_all(
         item_types=types,
         warnings=_id_warnings(dependencies, index),
         deletions=_read_deletions(path, items, index),
+        allow_deletions=allow_deletions,
     )
     return planner.plan(
         items, available=dependencies.available if dependencies else ()
@@ -2071,6 +2077,7 @@ def _planner(
     item_types: Sequence[str] | None,
     warnings: Mapping[ItemKey, tuple[str, ...]] | None = None,
     deletions: _Deletions | None = None,
+    allow_deletions: bool = False,
 ) -> DeploymentPlanner:
     """Return the planner of a run, resolving dependencies when given."""
     return DeploymentPlanner(
@@ -2083,6 +2090,7 @@ def _planner(
         warnings=warnings,
         source=deletions.source if deletions else None,
         referenced_by=deletions.referenced_by if deletions else None,
+        allow_deletions=allow_deletions,
     )
 
 
@@ -2095,14 +2103,16 @@ def _deploy_items(
     root: str | None = None,
     dependencies: _Dependencies | None = None,
     item_types: Sequence[str] | None = None,
+    allow_deletions: bool = False,
 ) -> DeploymentReport:
     """
     Plan, then apply, the deployment of the selected items.
 
     Until the plan is built the run only reads: one listing of the
-    workspace. Every change is made by the executor. ``root`` is the folder
-    the items were read from, for the plan details; with ``dependencies``,
-    the plan meets what the items need, within ``item_types``.
+    workspace, and the source when an item to delete must be checked.
+    Every change is made by the executor. ``root`` is the folder the items
+    were read from, for the plan details; with ``dependencies``, the plan
+    meets what the items need, within ``item_types``.
     """
     report = DeploymentReport(workspace=workspace)
     if not items:
@@ -2136,12 +2146,15 @@ def _deploy_items(
         deletions=(
             _read_deletions(root, items, index) if root is not None else None
         ),
+        allow_deletions=allow_deletions,
     )
     plan = planner.plan(
         items, available=dependencies.available if dependencies else ()
     )
 
-    executor = DeploymentExecutor(index, fail_fast=fail_fast)
+    executor = DeploymentExecutor(
+        index, fail_fast=fail_fast, allow_deletions=allow_deletions
+    )
     report.results.extend(executor.apply(plan))
 
     _log_report(report)

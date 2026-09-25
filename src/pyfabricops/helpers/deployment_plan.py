@@ -53,8 +53,9 @@ class DeploymentActionType(str, Enum):
             definition is the one the last successful deployment sent, so it
             is not sent again.
         DELETE: Delete the item from the workspace, because it was deleted
-            from the source. The executor refuses it until a policy allows
-            deletions.
+            from the source. Planned only when the run allows deletions and
+            no item that stays in the source refers to it; the item is
+            blocked otherwise.
         NOOP: Nothing to do, such as for an item deleted from the source
             that the workspace no longer has.
         BLOCKED: Leave the item alone and report it as failed;
@@ -316,6 +317,9 @@ class DeploymentPlanner:
             refer to it, and how, such as ``"Sales.Report (definition.pbir
             byPath)"``. Its deletion is blocked, so that nothing is deleted
             from under an item that needs it.
+        allow_deletions (bool, optional): Delete from the workspace the
+            items deleted from the source. Defaults to False: each is
+            blocked, so the run fails and the deletion is not missed.
 
     Examples:
         ```python
@@ -340,6 +344,7 @@ class DeploymentPlanner:
         warnings: Mapping[ItemKey, Sequence[str]] | None = None,
         source: Mapping[ItemKey, str] | None = None,
         referenced_by: Mapping[ItemKey, Sequence[str]] | None = None,
+        allow_deletions: bool = False,
     ) -> None:
         self._existing_items = frozenset(existing_items)
         self._deployed_items = dict(deployed_items or {})
@@ -356,6 +361,7 @@ class DeploymentPlanner:
         self._referenced_by = {
             key: tuple(texts) for key, texts in (referenced_by or {}).items()
         }
+        self._allow_deletions = allow_deletions
 
     def plan(
         self,
@@ -369,12 +375,12 @@ class DeploymentPlanner:
         created. An item whose definition is the one its last successful
         deployment sent needs nothing, or only a move when its folder
         changed. An item deleted from the source is deleted from the
-        workspace, unless an item that stays still refers to it, which
-        blocks it; it needs nothing when the workspace no longer has it or
-        the source still defines it, as when its folder moved. An item
-        whose display name is unknown is blocked, and so is an item
-        with the same type and display name as an earlier one: deploying
-        both would overwrite the same workspace item.
+        workspace when the run allows deletions and no item that stays
+        refers to it, and blocked otherwise; it needs nothing when the
+        workspace no longer has it or the source still defines it, as when
+        its folder moved. An item whose display name is unknown is blocked,
+        and so is an item with the same type and display name as an earlier
+        one: deploying both would overwrite the same workspace item.
 
         With ``dependencies``, each item comes after the items it needs.
         What an item to create, update or move needs, when not selected, is
@@ -509,19 +515,21 @@ class DeploymentPlanner:
                 DeploymentActionType.NOOP,
                 "Deleted from the source and not in the workspace.",
             )
+        problems: list[str] = []
         referrers = self._referenced_by.get(identity)
         if referrers:
-            return _action(
-                item,
-                DeploymentActionType.BLOCKED,
-                f"Still referred to by {'; '.join(referrers)}.",
+            problems.append(f"Still referred to by {'; '.join(referrers)}.")
+        if not self._allow_deletions:
+            problems.append(
+                "Deletions are not allowed in this run: pass "
+                "allow_deletions=True, or delete it from the workspace by "
+                "hand."
             )
-        return _action(
-            item,
-            DeploymentActionType.DELETE,
-            "Refused until deletions are allowed: delete it from the "
-            "workspace by hand.",
-        )
+        if problems:
+            return _action(
+                item, DeploymentActionType.BLOCKED, " ".join(problems)
+            )
+        return _action(item, DeploymentActionType.DELETE)
 
     def _resolve(
         self,
