@@ -87,7 +87,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     same run gets its ID when created. References to other workspaces are
     not checked.
 
-  `resolve_dependencies=False` keeps the earlier behavior.
+  `resolve_dependencies=False` keeps the earlier behavior. The Dependencies
+  page of the documentation shows what the plan does in each case.
 
 ### Changed
 - `deploy_all_items()` and the `deploy_all_*` helpers for notebooks, semantic
