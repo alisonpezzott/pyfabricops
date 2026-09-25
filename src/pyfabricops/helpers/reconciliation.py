@@ -35,6 +35,7 @@ from .deployment_plan import (
     DeploymentPlan,
     DeploymentReason,
     SourceItem,
+    name_problem,
 )
 
 __all__ = [
@@ -263,6 +264,16 @@ def reconcile(
         target = found.get(key)
         record = deployed.get(key)
         if target is None:
+            problem = name_problem(item.item_type, item.display_name)
+            if problem is not None:
+                actions.append(
+                    _action(
+                        item,
+                        DeploymentActionType.BLOCKED,
+                        f"Fabric refuses this name: {problem}.",
+                    )
+                )
+                continue
             actions.append(
                 _action(
                     item,

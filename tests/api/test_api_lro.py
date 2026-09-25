@@ -341,6 +341,124 @@ def test_throttled_lro_poll_is_retried(
 
 
 # ---------------------------------------------------------------------------
+# Transient failures
+# ---------------------------------------------------------------------------
+
+
+def test_a_get_is_retried_after_a_transient_failure(
+    http: MagicMock, clock: MagicMock
+) -> None:
+    """Reading is safe to repeat, so a 503 is tried again."""
+    http.side_effect = [_response(503), _response(200, {"id": "ws-1"})]
+
+    assert api_request("/workspaces/ws-1") == {"id": "ws-1"}
+    clock.sleep.assert_called_once_with(2.0)
+
+
+def test_a_get_is_retried_after_a_connection_error(
+    http: MagicMock, clock: MagicMock
+) -> None:
+    """A dropped connection is transient too."""
+    http.side_effect = [
+        requests.exceptions.ConnectionError("reset by peer"),
+        _response(200, {"id": "ws-1"}),
+    ]
+
+    assert api_request("/workspaces/ws-1") == {"id": "ws-1"}
+    assert http.call_count == 2
+
+
+def test_a_post_is_not_retried_unless_marked_safe(
+    http: MagicMock, clock: MagicMock
+) -> None:
+    """Creating twice could create twice: the failure goes back as it is."""
+    http.side_effect = [_response(503)]
+
+    result = _api_result("/items", method="post")
+
+    assert result.status_code == 503
+    assert http.call_count == 1
+    clock.sleep.assert_not_called()
+
+
+def test_a_post_marked_safe_is_retried_with_backoff(
+    http: MagicMock, clock: MagicMock
+) -> None:
+    """Waits of 2, then 4 seconds."""
+    http.side_effect = [
+        _response(500),
+        _response(502),
+        _response(200, {"id": "item-1"}),
+    ]
+
+    result = _api_result("/items/item-1/move", method="post", retry=True)
+
+    assert result.data == {"id": "item-1"}
+    assert [c.args[0] for c in clock.sleep.call_args_list] == [2.0, 4.0]
+
+
+def test_an_error_fabric_marks_retriable_is_retried(
+    http: MagicMock, clock: MagicMock
+) -> None:
+    """Fabric says so in the error body."""
+    busy = {"errorCode": "ServiceBusy", "isRetriable": True}
+    http.side_effect = [_response(409, busy), _response(200, {"id": "ws-1"})]
+
+    assert api_request("/workspaces/ws-1") == {"id": "ws-1"}
+
+
+def test_an_error_not_marked_retriable_is_not_retried(
+    http: MagicMock, clock: MagicMock
+) -> None:
+    """A bad request stays bad."""
+    invalid = {"errorCode": "InvalidInput", "isRetriable": False}
+    http.side_effect = [_response(400, invalid)]
+
+    assert _api_result("/workspaces/ws-1").status_code == 400
+    assert http.call_count == 1
+
+
+def test_a_transient_failure_waits_its_retry_after(
+    http: MagicMock, clock: MagicMock
+) -> None:
+    """The service's Retry-After wins over the backoff."""
+    http.side_effect = [
+        _response(503, headers={"Retry-After": "7"}),
+        _response(200, {"id": "ws-1"}),
+    ]
+
+    assert api_request("/workspaces/ws-1") == {"id": "ws-1"}
+    clock.sleep.assert_called_once_with(7.0)
+
+
+def test_transient_retries_give_up_after_three(
+    http: MagicMock, clock: MagicMock
+) -> None:
+    """The last failure goes back to the caller."""
+    http.side_effect = [
+        _response(503) for _ in range(api._TRANSIENT_MAX_RETRIES + 1)
+    ]
+
+    result = _api_result("/workspaces/ws-1")
+
+    assert result.status_code == 503
+    assert http.call_count == api._TRANSIENT_MAX_RETRIES + 1
+    assert [c.args[0] for c in clock.sleep.call_args_list] == [2.0, 4.0, 8.0]
+
+
+def test_a_connection_error_that_persists_is_reported(
+    http: MagicMock, clock: MagicMock
+) -> None:
+    """After the retries, as before: a failed result, not an exception."""
+    http.side_effect = requests.exceptions.ConnectionError("down")
+
+    result = _api_result("/workspaces/ws-1")
+
+    assert (result.success, result.status_code) == (False, 503)
+    assert http.call_count == api._TRANSIENT_MAX_RETRIES + 1
+
+
+# ---------------------------------------------------------------------------
 # Pagination
 # ---------------------------------------------------------------------------
 

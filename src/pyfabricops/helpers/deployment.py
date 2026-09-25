@@ -119,6 +119,13 @@ _APPLIED = frozenset(
 # How an outcome that deployed nothing is told to the items that need it.
 _NOT_DEPLOYED: dict[str, str] = {"failed": "failed", "skipped": "was skipped"}
 
+# Fabric frees the name of a deleted item only minutes later, and answers a
+# create under that name with this error code until then. The create is
+# tried again every _NAME_WAIT_SECONDS, for about five minutes.
+_NAME_NOT_AVAILABLE = "ItemDisplayNameNotAvailableYet"
+_NAME_WAIT_SECONDS = 30.0
+_NAME_WAIT_ATTEMPTS = 10
+
 
 @dataclass(frozen=True)
 class DeploymentResult:
@@ -215,6 +222,35 @@ class DeploymentReport:
         for result in self.results:
             counts[result.action] += 1
         return counts
+
+    def describe(self) -> str:
+        """
+        Describe the run: one line per item, then the counts and the time.
+
+        Returns:
+            str: Such as ``updated  Orders.Notebook  (2.1s)``, a failed or
+                skipped item followed by why, and a last line of counts.
+
+        Examples:
+            ```python
+            report = deploy_all_items('Sales-PRD', staging)
+            print(report.describe())
+            ```
+        """
+        lines = []
+        for result in self.results:
+            line = f"{result.action:<8} {_label(result)}"
+            if result.error:
+                line += f": {result.error}"
+            elif result.duration_seconds:
+                line += f"  ({result.duration_seconds:.1f}s)"
+            lines.append(line)
+        counts = self.summary()
+        lines.append(
+            ", ".join(f"{counts[action]} {action}" for action in _ACTIONS)
+            + f" in {self.duration_seconds:.1f}s"
+        )
+        return "\n".join(lines)
 
     def durations_by_type(self) -> dict[str, float]:
         """
@@ -635,6 +671,8 @@ def _request_update_item_definition(
             params={"updateMetadata": True},
             support_lro=True,
             return_result=True,
+            # Replacing a definition twice gives the same item.
+            retry=True,
         ),
     )
 
@@ -650,6 +688,7 @@ def _request_move_item(
             method="post",
             payload={"targetFolderId": folder_id} if folder_id else {},
             return_result=True,
+            retry=True,
         ),
     )
 
@@ -663,6 +702,7 @@ def _request_item_definition(workspace_id: str, item_id: str) -> ApiResult:
             method="post",
             support_lro=True,
             return_result=True,
+            retry=True,
         ),
     )
 
@@ -816,15 +856,33 @@ def _create_planned_item(
     definition: dict[str, Any],
     folder_id: str | None,
 ) -> str | None:
-    """Create the item of a CREATE action and add it to the index."""
+    """
+    Create the item of a CREATE action and add it to the index.
+
+    While Fabric has not freed the name of an item deleted moments ago, the
+    create is tried again: that answer means nothing was created.
+    """
     item_type, display_name = _identity(action)
-    created = _request_create_item(
-        index.workspace_id,
-        display_name=display_name,
-        item_type=item_type,
-        item_definition=definition,
-        folder_id=folder_id,
-    )
+    for attempt in range(1, _NAME_WAIT_ATTEMPTS + 1):
+        created = _request_create_item(
+            index.workspace_id,
+            display_name=display_name,
+            item_type=item_type,
+            item_definition=definition,
+            folder_id=folder_id,
+        )
+        if (
+            created.success
+            or _NAME_NOT_AVAILABLE not in (created.error or "")
+            or attempt == _NAME_WAIT_ATTEMPTS
+        ):
+            break
+        logger.warning(
+            f"{display_name}.{item_type}: Fabric has not freed the name of "
+            f"a deleted item yet; trying again in {_NAME_WAIT_SECONDS:g}s "
+            f"(attempt {attempt}/{_NAME_WAIT_ATTEMPTS - 1})."
+        )
+        time.sleep(_NAME_WAIT_SECONDS)
     _raise_for_failure(created, "Create")
     item_id: str | None = (created.data or {}).get("id")
     index.items[(item_type, display_name)] = {

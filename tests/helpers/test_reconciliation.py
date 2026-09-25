@@ -106,6 +106,22 @@ def test_an_item_missing_from_the_workspace_would_be_created(
     assert not result.ok
 
 
+def test_a_missing_item_under_a_name_fabric_refuses_is_blocked() -> None:
+    """Creating it would fail, so the plan says so up front."""
+    result = _reconcile([_item(("Lakehouse", "Bronze-Raw"))], [])
+
+    assert _lines(result) == [
+        (
+            "BLOCKED",
+            "Bronze-Raw",
+            "FULL_DEPLOYMENT",
+            "Fabric refuses this name: a lakehouse name starts with a letter "
+            "and holds only letters, digits and underscores, up to 123 "
+            "characters.",
+        )
+    ]
+
+
 def test_a_change_made_in_the_workspace_is_drift() -> None:
     """The source is as deployed, so the workspace changed."""
     result = _reconcile(

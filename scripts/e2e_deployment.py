@@ -79,9 +79,6 @@ _PLATFORM_SCHEMA = (
 _SAME_WORKSPACE = "00000000-0000-0000-0000-000000000000"
 # Items Fabric creates along with a lakehouse, and deletes with it.
 _CHILD_TYPES = frozenset({"SQLEndpoint"})
-# Fabric frees the name of a deleted item only minutes later.
-_NAME_ATTEMPTS = 10
-_NAME_WAIT_SECONDS = 30
 _SCHEMAS = "https://developer.microsoft.com/json-schemas/fabric/item"
 # A semantic model with its data inline, so it needs no data source.
 _MODEL: dict[str, str] = {
@@ -577,7 +574,11 @@ def _deploy_step(
             "the plan has what the items need",
         )
 
-    report = _deploy(run, staging, arguments)
+    # Fabric frees the name of an item deleted moments ago only minutes
+    # later; deploy_all_items waits for it.
+    report: pf.DeploymentReport = pf.deploy_all_items(
+        run.workspace, staging, **arguments
+    )
     for result in report.results:
         error = f": {result.error}" if result.error else ""
         print(f"    {result.display_name} {result.action}{error}")
@@ -587,37 +588,6 @@ def _deploy_step(
         "the deployment did what the plan said",
     )
     return report
-
-
-def _deploy(
-    run: Run, staging: str, arguments: dict[str, Any]
-) -> pf.DeploymentReport:
-    """
-    Deploy, and again while an item waits for Fabric to free its name.
-
-    A run with a failed item records no state, so every attempt plans the
-    same actions.
-    """
-    for _ in range(_NAME_ATTEMPTS - 1):
-        report: pf.DeploymentReport = pf.deploy_all_items(
-            run.workspace, staging, **arguments
-        )
-        waiting = [
-            f"{r.display_name}.{r.item_type}"
-            for r in report.failed
-            if "ItemDisplayNameNotAvailableYet" in (r.error or "")
-        ]
-        if not waiting:
-            return report
-        print(
-            f"    {', '.join(waiting)}: Fabric has not freed the name yet; "
-            f"trying again in {_NAME_WAIT_SECONDS}s"
-        )
-        time.sleep(_NAME_WAIT_SECONDS)
-    last: pf.DeploymentReport = pf.deploy_all_items(
-        run.workspace, staging, **arguments
-    )
-    return last
 
 
 def _reconcile(run: Run, title: str) -> pf.Reconciliation:

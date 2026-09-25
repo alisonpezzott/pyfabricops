@@ -11,8 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `deploy_all_items()` accepts `item_types`, to deploy only some item types
   (e.g. `["Notebook", "DataPipeline"]` on every merge), and `fail_fast`. It
   returns a `DeploymentReport` with the outcome and duration of each item:
-  `report.failed`, `report.summary()`, `report.durations_by_type()` and
-  `report.to_df()`.
+  `report.failed`, `report.summary()`, `report.durations_by_type()`,
+  `report.to_df()` and `report.describe()`, which gives it as text.
 - `DEPLOY_ORDER` — the item types `deploy_all_items()` deploys by default, in
   dependency order.
 - Selective deployment: `deploy_all_items(baseline_commit=...)` deploys only
@@ -100,6 +100,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the Fabric API accepts, using the model created earlier in the run or the
   one already there. The file is unchanged. Without such a model the report
   fails with the reason, and nothing is sent.
+- A lakehouse to create under a name Fabric refuses is blocked in the plan,
+  before anything is sent. Fabric's documented rule: start with a letter,
+  hold only letters, digits and underscores, up to 123 characters. A
+  lakehouse already in the workspace is updated whatever its name, and no
+  rule is guessed for other item types.
 - `reconcile_items()` tells how a workspace stands against the source,
   changing nothing. It returns a `Reconciliation`:
   - a plan of what would bring the workspace back: `CREATE` for an item it
@@ -155,6 +160,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   5 s) until a 600 s timeout, instead of every 5 s for at most 50 s.
 - Throttled requests (429) are retried after the `Retry-After` seconds the
   service returns, up to 3 times and for waits of up to 60 s.
+- A request that is safe to repeat is retried on a transient failure too,
+  up to 3 times, after its `Retry-After` or 2, 4 and 8 seconds. A transient
+  failure is a connection error or timeout, a 500, 502, 503 or 504, or an
+  error Fabric marks `isRetriable`.
+  - Safe requests are every GET and, in `deploy_all_items()` and
+    `reconcile_items()`, reading a definition, updating one and moving an
+    item.
+  - Creating an item is not retried, since a create that seemed to fail may
+    have been made.
+  - `api_request(retry=...)` sets it for a request.
+- `deploy_all_items()` waits while Fabric has not freed the name of an item
+  deleted moments ago (`ItemDisplayNameNotAvailableYet`), trying the create
+  again every 30 s for about 5 minutes, instead of failing it.
 - Pagination follows the `continuationUri` returned by the service, which
   keeps the original query parameters.
 - The error of a failed item in a `DeploymentReport`, and of a failed

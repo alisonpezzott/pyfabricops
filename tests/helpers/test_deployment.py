@@ -361,23 +361,74 @@ def test_a_failure_gives_the_details_of_the_error(
         "moreDetails": [
             {
                 "errorCode": "InvalidParameter",
-                "message": "DisplayName is Invalid for ArtifactType. "
-                "DisplayName: <pi>Bronze-Raw</pi>",
+                "message": "Definition part notebook-content.py is invalid. "
+                "Item: <pi>Orders</pi>",
             }
         ],
     }
     fabric.create.return_value = ApiResult(
         success=False, status_code=400, error=json.dumps(body)
     )
-    _write_item(root, "Bronze-Raw.Lakehouse")
+    _write_item(root, "Orders.Notebook")
 
     report = _deploy(root)
 
     assert report.results[0].error == (
         "Create failed with 400: InvalidInput - The request has an invalid "
-        "input - DisplayName is Invalid for ArtifactType. DisplayName: "
-        "Bronze-Raw"
+        "input - Definition part notebook-content.py is invalid. Item: "
+        "Orders"
     )
+
+
+def test_a_create_waits_while_fabric_frees_a_deleted_name(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """Fabric frees the name of a deleted item minutes later."""
+    fabric.create.side_effect = [
+        _failure("ItemDisplayNameNotAvailableYet"),
+        ApiResult(True, 201, data={"id": "lh-1"}),
+    ]
+    _write_item(root, "Bronze.Lakehouse")
+
+    with patch(f"{_ENGINE}.time.sleep") as sleep:
+        report = _deploy(root)
+
+    assert [(r.display_name, r.action) for r in report.results] == [
+        ("Bronze", "created")
+    ]
+    sleep.assert_called_once_with(30.0)
+    assert fabric.create.call_count == 2
+
+
+def test_a_create_gives_up_when_the_name_stays_taken(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """The wait is bounded; then the item fails with Fabric's answer."""
+    fabric.create.return_value = _failure("ItemDisplayNameNotAvailableYet")
+    _write_item(root, "Bronze.Lakehouse")
+
+    with patch(f"{_ENGINE}.time.sleep") as sleep:
+        report = _deploy(root)
+
+    assert report.results[0].action == "failed"
+    assert "ItemDisplayNameNotAvailableYet" in (report.results[0].error or "")
+    assert fabric.create.call_count == 10
+    assert sleep.call_count == 9
+
+
+def test_other_create_failures_are_not_tried_again(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """A name in use by another item will not free itself."""
+    fabric.create.return_value = _failure("ItemDisplayNameAlreadyInUse")
+    _write_item(root, "Bronze.Lakehouse")
+
+    with patch(f"{_ENGINE}.time.sleep") as sleep:
+        report = _deploy(root)
+
+    assert report.results[0].action == "failed"
+    assert fabric.create.call_count == 1
+    sleep.assert_not_called()
 
 
 def test_fail_fast_skips_the_remaining_items(
@@ -518,6 +569,44 @@ def test_report_helpers() -> None:
         "path",
         "action",
     ]
+
+
+def test_a_report_describes_each_item_then_the_counts() -> None:
+    """Failures and skips say why; the others how long they took."""
+    report = DeploymentReport(
+        workspace="Sales-DEV",
+        results=[
+            DeploymentResult("Notebook", "A", "a", "created", "1", False, 1.5),
+            DeploymentResult(
+                "SemanticModel", "S", "s", "failed", error="Create failed."
+            ),
+            DeploymentResult(
+                "Report",
+                "S",
+                "r",
+                "skipped",
+                error="Needs S.SemanticModel, which failed.",
+            ),
+        ],
+    )
+
+    assert report.describe() == "\n".join(
+        [
+            "created  A.Notebook  (1.5s)",
+            "failed   S.SemanticModel: Create failed.",
+            "skipped  S.Report: Needs S.SemanticModel, which failed.",
+            "1 created, 0 updated, 0 moved, 1 failed, 1 skipped in 1.5s",
+        ]
+    )
+
+
+def test_an_empty_report_describes_its_counts() -> None:
+    """A run with nothing to do says so in its counts."""
+    report = DeploymentReport(workspace="Sales-DEV")
+
+    assert report.describe() == (
+        "0 created, 0 updated, 0 moved, 0 failed, 0 skipped in 0.0s"
+    )
 
 
 def test_empty_report_to_df_keeps_the_columns() -> None:

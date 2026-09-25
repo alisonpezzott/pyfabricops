@@ -18,6 +18,7 @@ meets or blocks what the selected items need.
 
 from __future__ import annotations
 
+import re
 from collections import deque
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
@@ -35,6 +36,7 @@ __all__ = [
     "DeployedItem",
     "SourceChange",
     "SourceItem",
+    "name_problem",
 ]
 
 
@@ -413,6 +415,13 @@ class DeploymentPlanner:
         defined[identity] = item.source_path
 
         if identity not in self._existing_items:
+            problem = name_problem(item.item_type, display_name)
+            if problem is not None:
+                return _action(
+                    item,
+                    DeploymentActionType.BLOCKED,
+                    f"Fabric refuses this name: {problem}.",
+                )
             return _action(item, DeploymentActionType.CREATE)
         sent = self._sent_before(identity, item)
         if sent is None:
@@ -591,6 +600,11 @@ class DeploymentPlanner:
                         "is missing from the workspace and not among the "
                         "item types of this run"
                     )
+                elif (problem := name_problem(*target)) is not None:
+                    unmet[target] = (
+                        f"is missing from the workspace, with a name Fabric "
+                        f"refuses: {problem}"
+                    )
                 else:
                     needed[target] = _action(
                         candidate,
@@ -691,6 +705,39 @@ _DEPLOYING = frozenset(
         DeploymentActionType.MOVE,
     }
 )
+
+
+# Display names Fabric documents that it refuses, by item type, and what it
+# expects instead.
+_NAME_RULES: dict[str, tuple[re.Pattern[str], str]] = {
+    "Lakehouse": (
+        re.compile(r"[A-Za-z][A-Za-z0-9_]{0,122}"),
+        "a lakehouse name starts with a letter and holds only letters, "
+        "digits and underscores, up to 123 characters",
+    ),
+}
+
+
+def name_problem(item_type: str, display_name: str) -> str | None:
+    """
+    Say why Fabric would refuse a display name for an item type.
+
+    Only the rules Fabric documents are checked, so that an item is not
+    held back by a guess: a lakehouse name starts with a letter and holds
+    only letters, digits and underscores, up to 123 characters.
+
+    Args:
+        item_type (str): The Fabric item type.
+        display_name (str): The display name to create the item under.
+
+    Returns:
+        str | None: What Fabric expects, when the name breaks one of its
+            rules; None otherwise.
+    """
+    rule = _NAME_RULES.get(item_type)
+    if rule is None or rule[0].fullmatch(display_name):
+        return None
+    return rule[1]
 
 
 def _action(
