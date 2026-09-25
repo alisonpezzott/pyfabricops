@@ -160,6 +160,49 @@ def test_a_duplicate_identity_blocks_the_later_item() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    "name", ["Bronze-Raw", "Bronze Raw", "1Bronze", "_Bronze", "B" * 124]
+)
+def test_a_lakehouse_to_create_under_a_name_fabric_refuses_is_blocked(
+    name: str,
+) -> None:
+    """Fabric documents its lakehouse names; nothing is sent to fail."""
+    (action,) = _plan([_item(name, "Lakehouse")]).actions
+
+    assert (action.action, action.detail) == (
+        BLOCKED,
+        "Fabric refuses this name: a lakehouse name starts with a letter and "
+        "holds only letters, digits and underscores, up to 123 characters.",
+    )
+
+
+@pytest.mark.parametrize("name", ["Bronze", "bronze_raw_2", "B" * 123])
+def test_a_lakehouse_name_fabric_accepts_is_created(name: str) -> None:
+    """A letter, then letters, digits or underscores, up to 123."""
+    (action,) = _plan([_item(name, "Lakehouse")]).actions
+
+    assert action.action is CREATE
+
+
+def test_a_lakehouse_already_in_the_workspace_is_updated_whatever_its_name() -> (
+    None
+):
+    """Fabric accepted the name once; the rule only guards a create."""
+    plan = _plan(
+        [_item("Bronze-Raw", "Lakehouse")],
+        existing={("Lakehouse", "Bronze-Raw")},
+    )
+
+    assert [a.action for a in plan.actions] == [UPDATE]
+
+
+def test_the_names_of_other_item_types_are_not_checked() -> None:
+    """Only documented rules are applied: a notebook takes a hyphen."""
+    (action,) = _plan([_item("Load-Orders", "Notebook")]).actions
+
+    assert action.action is CREATE
+
+
 # ---------------------------------------------------------------------------
 # Changes since a baseline commit
 # ---------------------------------------------------------------------------

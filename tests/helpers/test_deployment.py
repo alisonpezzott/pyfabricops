@@ -361,22 +361,22 @@ def test_a_failure_gives_the_details_of_the_error(
         "moreDetails": [
             {
                 "errorCode": "InvalidParameter",
-                "message": "DisplayName is Invalid for ArtifactType. "
-                "DisplayName: <pi>Bronze-Raw</pi>",
+                "message": "Definition part notebook-content.py is invalid. "
+                "Item: <pi>Orders</pi>",
             }
         ],
     }
     fabric.create.return_value = ApiResult(
         success=False, status_code=400, error=json.dumps(body)
     )
-    _write_item(root, "Bronze-Raw.Lakehouse")
+    _write_item(root, "Orders.Notebook")
 
     report = _deploy(root)
 
     assert report.results[0].error == (
         "Create failed with 400: InvalidInput - The request has an invalid "
-        "input - DisplayName is Invalid for ArtifactType. DisplayName: "
-        "Bronze-Raw"
+        "input - Definition part notebook-content.py is invalid. Item: "
+        "Orders"
     )
 
 

@@ -100,6 +100,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the Fabric API accepts, using the model created earlier in the run or the
   one already there. The file is unchanged. Without such a model the report
   fails with the reason, and nothing is sent.
+- A lakehouse to create under a name Fabric refuses is blocked in the plan,
+  before anything is sent. Fabric's documented rule: start with a letter,
+  hold only letters, digits and underscores, up to 123 characters. A
+  lakehouse already in the workspace is updated whatever its name, and no
+  rule is guessed for other item types.
 - `reconcile_items()` tells how a workspace stands against the source,
   changing nothing. It returns a `Reconciliation`:
   - a plan of what would bring the workspace back: `CREATE` for an item it

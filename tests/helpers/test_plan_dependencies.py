@@ -154,6 +154,27 @@ def test_a_missing_dependency_outside_the_item_types_blocks_its_user() -> None:
     )
 
 
+def test_a_missing_dependency_under_a_name_fabric_refuses_blocks_its_user() -> (
+    None
+):
+    """The lakehouse cannot be created, so the notebook waits."""
+    raw = ("Lakehouse", "Bronze-Raw")
+    plan = _plan(
+        [_item(LOAD)],
+        edges=[(LOAD, raw)],
+        existing={LOAD},
+        available=[raw],
+    )
+
+    assert _lines(plan) == [("BLOCKED", "Load.Notebook", "SOURCE_CHANGED")]
+    assert plan.actions[0].detail == (
+        "Needs Bronze-Raw.Lakehouse, which is missing from the workspace, "
+        "with a name Fabric refuses: a lakehouse name starts with a letter "
+        "and holds only letters, digits and underscores, up to 123 "
+        "characters."
+    )
+
+
 def test_a_broken_reference_blocks_the_item() -> None:
     """The scan's reason is the detail."""
     problem = (
