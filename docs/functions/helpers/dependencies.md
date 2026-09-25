@@ -50,6 +50,25 @@ when it is part of a dependency cycle, such as two notebooks that `%run`
 each other. What needs a blocked item is blocked in turn. A blocked item is
 reported as failed, so the deployment state does not move.
 
+## Reports and their semantic model
+
+In Git, a report's `definition.pbir` points to its semantic model by the
+path of its folder (`byPath`). The Fabric API accepts no path: only a
+connection to the model's ID in the workspace, which exists once the model
+is deployed. So when it deploys such a report, the engine sends the
+reference as a connection to the ID of that model in the target
+workspace, the one created earlier in the same run or the one already
+there. The file keeps its path.
+
+```text
+In Git:     "byPath": {"path": "../Sales.SemanticModel"}
+Sent:       "byConnection": {"connectionString": "semanticmodelid=<ID of Sales in the workspace>"}
+```
+
+A report whose model the workspace lacks fails with the reason, and
+nothing is sent. A report that already points to a model by connection is
+sent as it is.
+
 ## When an item fails
 
 The plan lists in each action's `needs` the items of the plan it needs.

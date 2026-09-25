@@ -1742,7 +1742,8 @@ def test_a_model_missing_from_the_workspace_is_created_before_its_report(
 def test_without_dependency_resolution_only_the_selection_goes(
     git_repo: GitRepo, root: Path, fabric: SimpleNamespace
 ) -> None:
-    """resolve_dependencies=False deploys as before: the report alone."""
+    """resolve_dependencies=False creates no model: the report goes alone,
+    and without a model to point to, it fails."""
     fabric.list_items.return_value = [
         {"id": "rp-sales", "type": "Report", "displayName": "Sales"},
     ]
@@ -1755,10 +1756,15 @@ def test_without_dependency_resolution_only_the_selection_goes(
         root, baseline_commit=baseline, resolve_dependencies=False
     )
 
-    assert [(r.display_name, r.action) for r in report.results] == [
-        ("Sales", "updated")
+    assert [(r.display_name, r.action, r.error) for r in report.results] == [
+        (
+            "Sales",
+            "failed",
+            "definition.pbir points to ../Sales.SemanticModel, but the "
+            "workspace has no semantic model Sales.",
+        )
     ]
-    fabric.create.assert_not_called()
+    _assert_no_change(fabric)
 
 
 def test_a_report_whose_model_failed_is_skipped(
@@ -1786,14 +1792,18 @@ def test_a_report_whose_model_failed_is_skipped(
 def test_without_dependency_resolution_a_failure_skips_nothing(
     root: Path, fabric: SimpleNamespace
 ) -> None:
-    """resolve_dependencies=False tries every item, as before."""
+    """resolve_dependencies=False tries every item: the report is not
+    skipped, and fails for want of its model."""
     fabric.create.return_value = _failure("InvalidDefinition")
     _sales(root)
 
     report = _deploy(root, resolve_dependencies=False)
 
     assert [r.action for r in report.results] == ["failed", "failed"]
-    assert fabric.create.call_count == 2
+    assert report.results[1].error == (
+        "definition.pbir points to ../Sales.SemanticModel, but the workspace "
+        "has no semantic model Sales."
+    )
 
 
 def test_the_state_records_a_model_created_for_its_report(
@@ -1865,6 +1875,115 @@ def test_a_report_pointing_to_no_model_is_blocked(
     assert report.results[0].error == (
         "definition.pbir points to ../Gone.SemanticModel, which is not a "
         "semantic model of the source."
+    )
+    _assert_no_change(fabric)
+
+
+def _pbir_sent(definition: dict[str, Any]) -> dict[str, Any]:
+    """The definition.pbir of a definition sent to Fabric."""
+    (part,) = [
+        p for p in definition["parts"] if p["path"] == "definition.pbir"
+    ]
+    pbir: dict[str, Any] = json.loads(base64.b64decode(part["payload"]))
+    return pbir
+
+
+def test_a_report_by_path_is_sent_bound_to_its_model(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """The API takes no path: the model goes by its ID in the workspace."""
+    fabric.list_items.return_value = [
+        {"id": "sm-sales", "type": "SemanticModel", "displayName": "Sales"},
+        {"id": "rp-sales", "type": "Report", "displayName": "Sales"},
+    ]
+    report_dir = _sales(root)
+
+    report = _deploy(root)
+
+    assert [r.action for r in report.results] == ["updated", "updated"]
+    sent = fabric.update.call_args_list[1].args[2]
+    assert _pbir_sent(sent)["datasetReference"] == {
+        "byConnection": {"connectionString": "semanticmodelid=sm-sales"}
+    }
+    local = json.loads(
+        (report_dir / "definition.pbir").read_text(encoding="utf-8")
+    )
+    assert local["datasetReference"] == {
+        "byPath": {"path": "../Sales.SemanticModel"}
+    }
+
+
+def test_a_report_is_bound_to_the_model_created_before_it(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """A model created in the same run gives the report its new ID."""
+    fabric.create.side_effect = [
+        ApiResult(True, 201, data={"id": "sm-new"}),
+        ApiResult(True, 201, data={"id": "rp-new"}),
+    ]
+    _sales(root)
+
+    report = _deploy(root)
+
+    assert [r.action for r in report.results] == ["created", "created"]
+    sent = fabric.create.call_args_list[1].kwargs["item_definition"]
+    assert _pbir_sent(sent)["datasetReference"] == {
+        "byConnection": {"connectionString": "semanticmodelid=sm-new"}
+    }
+
+
+def test_a_report_by_connection_is_sent_as_it_is(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """Only a path is bound; a connection is left as its author wrote it."""
+    report_dir = _write_item(root, "Sales.Report")
+    pbir = {
+        "version": "4.0",
+        "datasetReference": {
+            "byConnection": {"connectionString": "semanticmodelid=sm-other"}
+        },
+    }
+    (report_dir / "definition.pbir").write_text(
+        json.dumps(pbir), encoding="utf-8"
+    )
+
+    _deploy(root)
+
+    sent = fabric.create.call_args.kwargs["item_definition"]
+    assert _pbir_sent(sent) == pbir
+
+
+def test_a_report_whose_model_is_not_in_the_workspace_fails(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """Nothing to bind the report to: it is not sent at all."""
+    _sales(root)
+
+    report = _deploy(root, item_types=["Report"], resolve_dependencies=False)
+
+    assert [(r.display_name, r.action, r.error) for r in report.results] == [
+        (
+            "Sales",
+            "failed",
+            "definition.pbir points to ../Sales.SemanticModel, but the "
+            "workspace has no semantic model Sales.",
+        )
+    ]
+    _assert_no_change(fabric)
+
+
+def test_a_report_by_path_to_another_item_type_fails(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """Without dependency resolution the executor still checks the path."""
+    _write_item(root, "Bronze.Lakehouse")
+    _write_report(root, "Sales.Report", "../Bronze.Lakehouse")
+
+    report = _deploy(root, item_types=["Report"], resolve_dependencies=False)
+
+    assert report.results[0].error == (
+        "definition.pbir points to ../Bronze.Lakehouse, which is not a "
+        "semantic model folder."
     )
     _assert_no_change(fabric)
 

@@ -93,6 +93,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   `resolve_dependencies=False` keeps the earlier behavior. The Dependencies
   page of the documentation shows what the plan does in each case.
+- Reports whose `definition.pbir` points to their semantic model by path
+  (`byPath`), as Fabric Git integration and Power BI projects write it, can
+  be deployed. `deploy_all_items()` sends the reference as a connection to
+  the model's ID in the target workspace (`byConnection`), the only form
+  the Fabric API accepts, using the model created earlier in the run or the
+  one already there. The file is unchanged. Without such a model the report
+  fails with the reason, and nothing is sent.
 
 ### Changed
 - `deploy_all_items()` and the `deploy_all_*` helpers for notebooks, semantic

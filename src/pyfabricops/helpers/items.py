@@ -292,6 +292,10 @@ def deploy_all_items(
     part of a dependency cycle, or when something it needs is blocked or
     cannot be created.
 
+    A report whose ``definition.pbir`` points to its semantic model by path
+    is sent with a connection to that model's ID in the workspace instead,
+    as the Fabric API accepts no path; the file is left as it is.
+
     Args:
         workspace (str): The name or ID of the workspace.
         path (str): The path to the items.
