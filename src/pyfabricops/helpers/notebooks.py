@@ -7,10 +7,12 @@ import pandas as pd
 from pandas import DataFrame
 
 from ..core.workspaces import resolve_workspace
+from ..helpers.deployment import DeploymentReport
 from ..helpers.folders import (
     create_folders_from_path_string,
     resolve_folder_from_id_to_path,
 )
+from ..helpers.items import deploy_all_items
 from ..items.items import move_item
 from ..items.notebooks import (
     create_notebook,
@@ -25,7 +27,6 @@ from ..utils.logging import get_logger
 from ..utils.utils import (
     extract_display_name_from_platform,
     extract_middle_path,
-    list_paths_of_type,
     pack_item_definition,
     unpack_item_definition,
 )
@@ -166,6 +167,8 @@ def export_all_notebooks(
     if items is None:
         return None
 
+    failed = []
+
     for item in items:
         try:
             folder_path = resolve_folder_from_id_to_path(
@@ -183,15 +186,26 @@ def export_all_notebooks(
             item_path = (
                 Path(path) / folder_path / (item["displayName"] + ".Notebook")
             )
-        os.makedirs(item_path, exist_ok=True)
 
         definition = get_notebook_definition(workspace_id, item["id"])
         if definition is None:
-            return None
+            logger.error(
+                f"Could not get the definition of "
+                f"{item['displayName']}.Notebook; skipping it."
+            )
+            failed.append(item["displayName"])
+            continue
 
+        os.makedirs(item_path, exist_ok=True)
         unpack_item_definition(definition, item_path)
 
-    logger.success(f"All notebooks were exported to {path} successfully.")
+    if failed:
+        logger.warning(
+            f"{len(failed)} notebook(s) could not be exported: "
+            f"{', '.join(failed)}."
+        )
+    else:
+        logger.success(f"All notebooks were exported to {path} successfully.")
     return None
 
 
@@ -258,58 +272,23 @@ def deploy_all_notebooks(
     workspace: str,
     path: str,
     start_path: str | None = None,
-) -> None:
+) -> DeploymentReport:
     """
     Deploy all notebooks to workspace.
+
+    Shortcut for ``deploy_all_items(..., item_types=["Notebook"])``.
 
     Args:
         workspace (str): The name or ID of the workspace.
         path (str): The path to the notebooks.
         start_path (Optional[str]): The starting path for folder creation.
+
+    Returns:
+        DeploymentReport: The outcome of each notebook.
     """
-    workspace_id = resolve_workspace(workspace)
-    if workspace_id is None:
-        return None
-
-    notebooks_paths = list_paths_of_type(path, "Notebook")
-
-    for path_ in notebooks_paths:
-        display_name = extract_display_name_from_platform(path_)
-        if display_name is None:
-            return None
-
-        item_id = resolve_notebook(workspace_id, display_name)
-
-        folder_path_string = extract_middle_path(path_, start_path=start_path)
-        folder_id = create_folders_from_path_string(
-            workspace_id, folder_path_string
-        )
-
-        item_definition = pack_item_definition(path_)
-
-        if item_id is None:
-            create_notebook(
-                workspace_id,
-                display_name=display_name,
-                item_definition=item_definition,
-                folder=folder_id,
-                df=False,
-            )
-
-        else:
-            if folder_id:
-                move_item(workspace_id, item_id, target_folder=folder_id)
-            update_notebook_definition(
-                workspace_id,
-                item_id,
-                item_definition=item_definition,
-                df=False,
-            )
-
-    logger.success(
-        f'All notebooks were deployed to workspace "{workspace}" successfully.'
+    return deploy_all_items(
+        workspace, path, start_path, item_types=["Notebook"]
     )
-    return None
 
 
 def extract_notebook_parameters(path: str) -> list[dict[str, Any]]:

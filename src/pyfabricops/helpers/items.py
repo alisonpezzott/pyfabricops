@@ -1,10 +1,14 @@
 import os
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
 from pandas import DataFrame
 
 from ..core.workspaces import resolve_workspace
+from ..helpers.deployment import DeploymentReport, _deploy_all, _plan_all
+from ..helpers.deployment_plan import DeploymentPlan
+from ..helpers.deployment_state import DeploymentStateBackend
 from ..helpers.folders import (
     create_folders_from_path_string,
     resolve_folder_from_id_to_path,
@@ -23,7 +27,6 @@ from ..utils.logging import get_logger
 from ..utils.utils import (
     extract_display_name_from_platform,
     extract_middle_path,
-    list_paths_of_type,
     pack_item_definition,
     unpack_item_definition,
 )
@@ -101,6 +104,9 @@ def export_all_items(
     """
     Exports all items to the specified folder structure.
 
+    An item that cannot be read is logged and skipped; the export goes on
+    with the next one.
+
     Args:
         workspace (str): The workspace name or ID.
         path (str): The root path of the project.
@@ -116,11 +122,18 @@ def export_all_items(
 
     items = [item for item in items if item["type"] != "SQLEndpoint"]
 
+    failed = []
+
     for item in items:
         item_id = item["id"]
         item_ = get_item(workspace_id, item_id, df=False)
         if not item_:
-            return None
+            logger.error(
+                f"Could not get {item['displayName']}.{item['type']}; "
+                "skipping it."
+            )
+            failed.append(f"{item['displayName']}.{item['type']}")
+            continue
 
         item_id = item_["id"]
         item_name = item_["displayName"]
@@ -128,7 +141,12 @@ def export_all_items(
 
         definition = get_item_definition(workspace_id, item_id)
         if not definition:
-            return None
+            logger.error(
+                f"Could not get the definition of {item_name}.{item_type}; "
+                "skipping it."
+            )
+            failed.append(f"{item_name}.{item_type}")
+            continue
 
         folder_id = None
         folder_path = None
@@ -156,6 +174,11 @@ def export_all_items(
 
         logger.success(
             f"{item_name}.{item_type} was exported to {item_path} successfully."
+        )
+
+    if failed:
+        logger.warning(
+            f"{len(failed)} item(s) could not be exported: {', '.join(failed)}."
         )
     return None
 
@@ -202,6 +225,7 @@ def deploy_item(
             workspace_id,
             display_name=display_name,
             item_definition=item_definition,
+            item_type=item_type,
             description=description,
             folder=folder_id,
             df=False,
@@ -222,76 +246,188 @@ def deploy_all_items(
     workspace: str,
     path: str,
     start_path: str | None = None,
-) -> None:
+    *,
+    item_types: Sequence[str] | None = None,
+    fail_fast: bool = False,
+    baseline_commit: str | None = None,
+    repository_path: str | None = None,
+    state_backend: DeploymentStateBackend | None = None,
+    environment: str | None = None,
+) -> DeploymentReport:
     """
-    Deploy all items to workspace.
+    Deploy all items found under a local path to a workspace.
+
+    Local items are matched to workspace items by type and display name (from
+    ``.platform``): existing items get their definition updated, and are
+    moved when their local folder differs; missing items are created. The
+    workspace items and folders are listed once per run, and the item types
+    are deployed in dependency order (``DEPLOY_ORDER``). A failed item does
+    not stop the run unless ``fail_fast`` is set. Nothing is ever deleted.
+
+    With ``baseline_commit``, only the items changed in Git between that
+    commit and HEAD are deployed (selective deployment). An item deleted
+    since then is reported as failed while the workspace still has it,
+    because deleting is not supported yet; once it is gone, it needs
+    nothing.
+
+    With ``state_backend``, the baseline comes from the last successful
+    deployment to ``environment``, kept per item type: a type deploys what
+    changed since it was last deployed, or every item when it never was.
+    An item whose definition and folder are those its last successful
+    deployment sent is skipped, even when Git lists it, since changes of
+    layout or line endings do not count; one whose folder only changed is
+    moved without sending its definition, to the workspace root too. When
+    every item succeeds, HEAD and
+    what was sent for each item are recorded; otherwise the state stays,
+    and the next run compares from the same commits. A run without
+    ``state_backend`` compares nothing and deploys every candidate.
 
     Args:
         workspace (str): The name or ID of the workspace.
         path (str): The path to the items.
-        start_path (Optional[str]): The starting path for folder creation.
+        start_path (Optional[str]): The local path that maps to the
+            workspace root, used to derive each item's folder.
+        item_types (Sequence[str], optional): The item types to deploy.
+            Defaults to every type in ``DEPLOY_ORDER``. Whatever the order
+            given, the types are deployed in dependency order.
+        fail_fast (bool, optional): Stop at the first failed item and mark
+            the remaining ones as skipped. Defaults to False.
+        baseline_commit (str, optional): Deploy only the items changed since
+            this commit (an ID, tag or branch). Needs git, and the commit in
+            the local history. Defaults to None: every item.
+        repository_path (str, optional): The folder of the Git repository
+            that ``path`` was copied from, such as the one given to
+            ``copy_to_staging``: changes are found there and the items read
+            from ``path``. Only used with ``baseline_commit`` or
+            ``state_backend``. Defaults to ``path``.
+        state_backend (DeploymentStateBackend, optional): Where the
+            deployment state is kept, such as a ``LocalJsonStateBackend``.
+            An explicit ``baseline_commit`` still wins over the state.
+            Defaults to None: no state.
+        environment (str, optional): The name the state is kept under, such
+            as ``'prod'``. Defaults to ``workspace``.
+
+    Returns:
+        DeploymentReport: The outcome of each item; ``report.failed`` lists
+            the items that failed.
+
+    Raises:
+        ConfigurationError: With ``baseline_commit`` or ``state_backend``, if
+            git cannot run, the folder is not in a Git repository or a commit
+            is not in its history (a shallow clone may lack it); with
+            ``state_backend``, also if the stored state is invalid.
+
+    Examples:
+        ```python
+        report = deploy_all_items(
+            'Sales-DEV',
+            'stg/workspace',
+            start_path='stg/workspace',
+            item_types=['Notebook', 'DataPipeline'],
+        )
+        if report.failed:
+            raise SystemExit(1)
+
+        # Only what changed since the last deployment
+        staging = copy_to_staging('workspace')
+        report = deploy_all_items(
+            'Sales-PRD',
+            staging,
+            start_path=staging,
+            baseline_commit=last_deployed_commit,
+            repository_path='workspace',
+        )
+
+        # The same, with the baseline kept by the deployment state
+        report = deploy_all_items(
+            'Sales-PRD',
+            staging,
+            start_path=staging,
+            repository_path='workspace',
+            state_backend=LocalJsonStateBackend('.pyfabricops/state'),
+            environment='prod',
+        )
+        ```
     """
-    workspace_id = resolve_workspace(workspace)
-    if workspace_id is None:
-        return None
-
-    types = [
-        "Notebook",
-        "DataPipeline",
-        "Dataflow",
-        "SemanticModel",
-        "Report",
-        "VariableLibrary",
-        "Lakehouse",
-        "Warehouse",
-        "Environment",
-        "CopyJob",
-    ]
-    for type in types:
-        item_paths = list_paths_of_type(path, type)
-
-        for path_ in item_paths:
-            display_name = extract_display_name_from_platform(path_)
-            if display_name is None:
-                return None
-            item_type = path_.split(".")[-1]
-            item_with_type = f"{display_name}.{item_type}"
-            item_id = resolve_item(workspace_id, item_with_type)
-
-            item_definition = pack_item_definition(path_)
-
-            if item_id is None:
-                folder_path_string = extract_middle_path(
-                    path_, start_path=start_path
-                )
-                folder_id = create_folders_from_path_string(
-                    workspace_id, folder_path_string
-                )
-                create_item(
-                    workspace_id,
-                    display_name=display_name,
-                    item_definition=item_definition,
-                    folder=folder_id,
-                    df=False,
-                )
-
-            else:
-                folder_path_string = extract_middle_path(
-                    path_, start_path=start_path
-                )
-                folder_id = create_folders_from_path_string(
-                    workspace_id, folder_path_string
-                )
-                if folder_id:
-                    move_item(workspace_id, item_id, target_folder=folder_id)
-                update_item_definition(
-                    workspace_id,
-                    item_id,
-                    item_definition=item_definition,
-                    df=False,
-                )
-
-    logger.success(
-        f"All items were deployed to workspace {workspace} successfully."
+    return _deploy_all(
+        workspace,
+        path,
+        start_path=start_path,
+        item_types=item_types,
+        fail_fast=fail_fast,
+        baseline_commit=baseline_commit,
+        repository_path=repository_path,
+        state_backend=state_backend,
+        environment=environment,
     )
-    return None
+
+
+def plan_all_items(
+    workspace: str,
+    path: str,
+    start_path: str | None = None,
+    *,
+    item_types: Sequence[str] | None = None,
+    baseline_commit: str | None = None,
+    repository_path: str | None = None,
+    state_backend: DeploymentStateBackend | None = None,
+    environment: str | None = None,
+) -> DeploymentPlan:
+    """
+    Show what ``deploy_all_items`` would do, without doing it.
+
+    The plan is built as ``deploy_all_items`` builds it with the same
+    arguments: same items, baselines, hashes and decisions. It is not
+    applied, and the deployment state is read but never updated. Only reads
+    happen: the local items, Git, and one listing of the workspace items and
+    folders.
+
+    Args:
+        workspace (str): The name or ID of the workspace.
+        path (str): The path to the items.
+        start_path (Optional[str]): The local path that maps to the
+            workspace root, used to derive each item's folder.
+        item_types (Sequence[str], optional): The item types to plan.
+            Defaults to every type in ``DEPLOY_ORDER``.
+        baseline_commit (str, optional): Plan only the items changed since
+            this commit. Defaults to None: every item.
+        repository_path (str, optional): The folder of the Git repository
+            that ``path`` was copied from. Defaults to ``path``.
+        state_backend (DeploymentStateBackend, optional): Where the
+            deployment state is kept. Defaults to None: no state.
+        environment (str, optional): The name the state is kept under.
+            Defaults to ``workspace``.
+
+    Returns:
+        DeploymentPlan: One action per selected item, saying what would
+            happen and why; ``plan.describe()`` gives it as text.
+
+    Raises:
+        ConfigurationError: If the workspace is not found, or, with
+            ``baseline_commit`` or ``state_backend``, for the Git and state
+            errors ``deploy_all_items`` raises.
+        RequestError: If the workspace items and folders cannot be listed.
+
+    Examples:
+        ```python
+        plan = plan_all_items(
+            'Sales-PRD',
+            staging,
+            start_path=staging,
+            repository_path='workspace',
+            state_backend=LocalJsonStateBackend('.pyfabricops/state'),
+            environment='prod',
+        )
+        print(plan.describe())
+        ```
+    """
+    return _plan_all(
+        workspace,
+        path,
+        start_path=start_path,
+        item_types=item_types,
+        baseline_commit=baseline_commit,
+        repository_path=repository_path,
+        state_backend=state_backend,
+        environment=environment,
+    )

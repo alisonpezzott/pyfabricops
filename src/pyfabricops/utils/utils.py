@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import uuid
 from pathlib import Path
+from typing import Any
 
 try:
     import json5
@@ -212,7 +213,7 @@ def pack_item_definition(
     path: str,
     exclude_paths: list = None,
     exclude_patterns: list = None,
-) -> dict[dict, str]:
+) -> dict[str, Any]:
     """
     Pack the definition files into a JSON structure.
 

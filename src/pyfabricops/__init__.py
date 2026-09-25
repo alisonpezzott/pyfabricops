@@ -1,5 +1,5 @@
 from ._version import __version__
-from .api.api import ApiResult, api_request
+from .api.api import ApiResult, api_request, set_lro_options
 from .api.auth import clear_token_cache, set_auth_provider
 from .cd.support_files import create_support_files
 from .core.capacities import get_capacity_id, list_capacities, resolve_capacity
@@ -162,6 +162,22 @@ from .helpers.dataflows_gen2 import (
     replace_dataflow_gen2_placeholders_with_parameters,
     replace_dataflow_gen2_variables_with_placeholders,
 )
+from .helpers.deployment import (
+    DEPLOY_ORDER,
+    DeploymentReport,
+    DeploymentResult,
+)
+from .helpers.deployment_plan import (
+    DeploymentAction,
+    DeploymentActionType,
+    DeploymentPlan,
+    DeploymentReason,
+)
+from .helpers.deployment_state import (
+    DeploymentState,
+    DeploymentStateBackend,
+    LocalJsonStateBackend,
+)
 from .helpers.environments import (
     add_environment_external_library_from_pypi,
     deploy_all_environments,
@@ -185,6 +201,7 @@ from .helpers.items import (
     deploy_item,
     export_all_items,
     export_item,
+    plan_all_items,
 )
 from .helpers.lakehouses import (
     export_all_lakehouses,
@@ -435,6 +452,16 @@ __all__ = [
     "ApiResult",
     "AuthenticationError",
     "ConfigurationError",
+    "DEPLOY_ORDER",
+    "DeploymentAction",
+    "DeploymentActionType",
+    "DeploymentPlan",
+    "DeploymentReason",
+    "DeploymentReport",
+    "DeploymentResult",
+    "DeploymentState",
+    "DeploymentStateBackend",
+    "LocalJsonStateBackend",
     "PyFabricOpsFileNotFoundError",
     "InvalidParameterError",
     "OptionNotAvailableError",
@@ -711,6 +738,7 @@ __all__ = [
     "pack_item_definition",
     "parse_definition_report",
     "parse_tmdl_parameters",
+    "plan_all_items",
     "publish_environment",
     "read_json",
     "refresh_dataflow_gen1",
@@ -750,6 +778,7 @@ __all__ = [
     "set_auth_provider",
     "set_dmv_connection_string_spn",
     "set_dmv_connection_string_user",
+    "set_lro_options",
     "setup_logging",
     "takeover_dataflow_gen1",
     "unassign_all_domain_workspaces",

@@ -247,13 +247,22 @@ def delete_item(workspace: str, item: str) -> None:
     )
 
 
-def get_item_definition(workspace: str, item: str) -> dict[str, Any] | None:
+def get_item_definition(
+    workspace: str,
+    item: str,
+    *,
+    format: str | None = None,
+) -> dict[str, Any] | None:
     """
     Retrieves the definition of an item by its name or ID from the specified workspace.
 
     Args:
         workspace (str): The workspace name or ID.
         item (str): The name or ID of the item.
+        format (str, optional): The definition format to request, for item
+            types that have more than one (e.g. ``"TMDL"`` or ``"TMSL"`` for
+            a semantic model, ``"ipynb"`` for a notebook). Defaults to the
+            service default.
 
     Returns:
         (Union[Dict[str, Any], None]): The item definition if found, otherwise None.
@@ -262,6 +271,7 @@ def get_item_definition(workspace: str, item: str) -> dict[str, Any] | None:
         ```python
         get_item_definition('MyProjectWorkspace', 'Salesitem')
         get_item_definition('MyProjectWorkspace', '123e4567-e89b-12d3-a456-426614174000')
+        get_item_definition('MyProjectWorkspace', 'Sales.SemanticModel', format='TMDL')
         ```
     """
     workspace_id = resolve_workspace(workspace)
@@ -275,6 +285,7 @@ def get_item_definition(workspace: str, item: str) -> dict[str, Any] | None:
         + item_id
         + "/getDefinition",
         method="post",
+        params={"format": format} if format else None,
         support_lro=True,
     )
 
@@ -334,6 +345,7 @@ def create_item(
     display_name: str,
     item_definition: dict[str, Any],
     *,
+    item_type: str | None = None,
     description: str | None = None,
     folder: str | None = None,
     df: bool | None = True,
@@ -345,6 +357,8 @@ def create_item(
         workspace (str): The workspace name or ID.
         display_name (str): The display name of the item.
         item_definition (Dict[str, Any]): The item definition.
+        item_type (str, optional): The item type, e.g. ``"Notebook"``. The
+            Create Item API documents it as required.
         description (str, optional): A description for the item.
         folder (str, optional): The folder to create the item in.
         df (Optional[bool]): If True or not provided, returns a DataFrame with flattened keys.
@@ -356,13 +370,19 @@ def create_item(
     Examples:
         ```python
         create_item(
-            'MyProjectWorkspace', 'SalesDataModel', item_definition={...}
+            'MyProjectWorkspace',
+            'SalesDataModel',
+            item_definition={...},
+            item_type='SemanticModel',
         )
         ```
     """
     workspace_id = resolve_workspace(workspace)
 
     payload = {"displayName": display_name, "definition": item_definition}
+
+    if item_type:
+        payload["type"] = item_type
 
     if description:
         payload["description"] = description

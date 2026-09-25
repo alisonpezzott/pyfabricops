@@ -7,7 +7,102 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `deploy_all_items()` accepts `item_types`, to deploy only some item types
+  (e.g. `["Notebook", "DataPipeline"]` on every merge), and `fail_fast`. It
+  returns a `DeploymentReport` with the outcome and duration of each item:
+  `report.failed`, `report.summary()`, `report.durations_by_type()` and
+  `report.to_df()`.
+- `DEPLOY_ORDER` — the item types `deploy_all_items()` deploys by default, in
+  dependency order.
+- Selective deployment: `deploy_all_items(baseline_commit=...)` deploys only
+  the items changed in Git between that commit and HEAD, and
+  `repository_path` names the repository folder to compare when `path` is a
+  staging copy (as made by `copy_to_staging()`). An item deleted since the
+  baseline is reported as failed while the workspace still has it, because
+  deleting is not supported yet, and needs nothing once it is gone. Git must
+  be on PATH and the baseline commit in the local history; a shallow clone
+  may lack it.
+- Deployment state: `deploy_all_items(state_backend=..., environment=...)`
+  takes the baseline from the last successful deployment to the environment,
+  instead of a manual `baseline_commit`. The state keeps one commit per item
+  type, so a run limited by `item_types` advances only its types and a later
+  full run still deploys what changed in the others. HEAD is recorded only
+  when every item succeeded; a type never deployed gets every item. A state
+  recorded for another workspace is ignored. `LocalJsonStateBackend` keeps
+  states as JSON files in a folder; any object with `load(environment)` and
+  `save(environment, state)` is a `DeploymentStateBackend`. States hold no
+  secrets.
+- Content hash: with a deployment state, an item whose definition and
+  folder are those its last successful deployment sent is skipped, even
+  when Git lists it as changed, and one whose folder only changed is moved
+  (`MOVE` in the plan, `"moved"` in the report) without sending its
+  definition again, to the workspace root too. The hash is taken on what
+  would be sent (after placeholders are replaced, so it is per environment)
+  and ignores part order, UTF-8 byte order marks, Windows line endings and
+  the layout and key order of JSON files. The state records it per item;
+  states written without it still load. Without a state, nothing is
+  skipped or moved without its definition.
+- `plan_all_items()` shows what `deploy_all_items()` would do with the
+  same arguments, without doing it: it returns the `DeploymentPlan`, one
+  action per item saying what would happen and why (`plan.describe()` gives
+  it as text), and only reads the local items, Git and one listing of the
+  workspace. The deployment state is read, never updated.
+  `DeploymentPlan`, `DeploymentAction`, `DeploymentActionType` and
+  `DeploymentReason` are exported.
+- `set_lro_options()` — configures the long-running operation timeout
+  (default 600 s) and the maximum polling interval (default 5 s).
+- `get_item_definition()` accepts an optional `format` (e.g. `"TMDL"`).
+- `create_item()` accepts `item_type`, sent as the `type` property the Create
+  Item API documents as required. `deploy_item()` now passes it.
+- `api_request()` accepts `return_result=True` to get the final `ApiResult`
+  after pagination or LRO polling, so callers can tell a failure from a
+  success without data.
+
+### Changed
+- `deploy_all_items()` and the `deploy_all_*` helpers for notebooks, semantic
+  models, reports, environments, data pipelines and dataflows gen2 share one
+  engine and now return a `DeploymentReport` instead of `None`:
+  - the workspace items and folders are listed once per run, not once per
+    item;
+  - item types are deployed in dependency order (VariableLibrary → Lakehouse
+    → Warehouse → Environment → Notebook → Dataflow → CopyJob → DataPipeline
+    → SemanticModel → Report);
+  - items are created through the generic Create Item API, with `type`;
+  - existing items are moved only when their folder differs;
+  - a failed item no longer aborts the run, and the final message is a
+    success only when every item succeeded.
+- The engine behind `deploy_all_items()` now plans before it deploys: a
+  planner decides, from the local items and the workspace listing, whether
+  each item is created, updated or blocked (and why), without changing the
+  workspace; an executor then applies that plan. Functions, arguments and
+  `DeploymentReport` are unchanged. The plan model
+  (`pyfabricops.helpers.deployment_plan`) is internal for now.
+- Long-running operations are polled with a backoff (1 s, 2 s, 4 s, up to
+  5 s) until a 600 s timeout, instead of every 5 s for at most 50 s.
+- Throttled requests (429) are retried after the `Retry-After` seconds the
+  service returns, up to 3 times and for waits of up to 60 s.
+- Pagination follows the `continuationUri` returned by the service, which
+  keeps the original query parameters.
+
 ### Fixed
+- A long-running operation that had already succeeded at the first status
+  check returned no data, so `get_item_definition()` and the export helpers
+  could intermittently get `None`. The result is now fetched from the URL
+  the service advertises.
+- A failed long-running operation was reported as a success: the operation
+  state came back as if it were the result.
+- The `export_all_*` helpers for items, notebooks, semantic models, reports,
+  environments, data pipelines and dataflows gen2 stopped at the first item
+  whose definition could not be read. They now log it, skip it and go on,
+  without leaving an empty folder behind.
+- `deploy_environment()` and `deploy_all_environments()` passed
+  `item_definition=` to functions that take `environment_definition`, and
+  failed with `TypeError`.
+- Two local folders with the same type and display name were deployed onto
+  the same item, the last one silently winning. `deploy_all_items()` now
+  reports the second one as failed.
+- `pack_item_definition()` return annotation is now `dict[str, Any]`.
 - Cached access tokens are kept per identity (tenant, client ID and, for
   `credential_type="user"`, the username), so switching credentials no
   longer reuses the previous identity's token. The cache moved from the

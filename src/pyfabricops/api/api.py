@@ -1,4 +1,6 @@
 import time
+from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any, Literal, NamedTuple
 from urllib.parse import urlencode
 
@@ -13,6 +15,71 @@ from .auth import _get_token
 from .scopes import FABRIC_API, GRAPH_API, POWERBI_API
 
 logger = get_logger(__name__)
+
+# A 429 response is retried after the Retry-After seconds the service
+# returns, up to _THROTTLE_MAX_RETRIES times. Longer waits are not
+# attempted: the 429 goes back to the caller instead.
+_THROTTLE_MAX_RETRIES = 3
+_THROTTLE_MAX_WAIT_SECONDS = 60.0
+_THROTTLE_DEFAULT_WAIT_SECONDS = 10.0
+
+# Consecutive failed LRO status checks (network errors, 5xx) tolerated
+# before the operation is reported as failed.
+_LRO_MAX_CHECK_FAILURES = 3
+
+
+@dataclass
+class _LroOptions:
+    """Polling settings for long-running operations (LRO)."""
+
+    timeout: float = 600.0
+    max_poll_interval: float = 5.0
+
+
+_lro_options = _LroOptions()
+
+
+def set_lro_options(
+    *,
+    timeout: float | None = None,
+    max_poll_interval: float | None = None,
+) -> None:
+    """
+    Configure how long-running operations (LRO) are polled.
+
+    The first status check runs as soon as the service accepts the request.
+    Later checks wait 1 s, 2 s, 4 s and so on, up to ``max_poll_interval``,
+    until ``timeout`` seconds have passed. The ``Retry-After`` header of an
+    accepted operation is not used as the interval: the Fabric samples show
+    30 s, which would add half a minute to every item of a deployment.
+
+    Args:
+        timeout (float, optional): Seconds to wait for an operation before
+            reporting it as failed. The operation may still complete on the
+            service side. Defaults to 600.
+        max_poll_interval (float, optional): Maximum seconds between two
+            status checks. Defaults to 5.
+
+    Raises:
+        InvalidParameterError: If a value is not greater than zero.
+
+    Examples:
+        ```python
+        set_lro_options(timeout=1800)
+        set_lro_options(max_poll_interval=10)
+        ```
+    """
+    for name, value in (
+        ("timeout", timeout),
+        ("max_poll_interval", max_poll_interval),
+    ):
+        if value is not None and value <= 0:
+            raise InvalidParameterError(f"{name} must be greater than zero.")
+
+    if timeout is not None:
+        _lro_options.timeout = float(timeout)
+    if max_poll_interval is not None:
+        _lro_options.max_poll_interval = float(max_poll_interval)
 
 
 def _sanitize_headers_for_log(headers: dict[str, str] | None) -> dict:
@@ -43,6 +110,63 @@ class ApiResult(NamedTuple):
     headers: dict | None = None
     error: str | None = None
     request_kwargs: dict | None = None
+
+
+def _header(headers: Mapping[str, str] | None, name: str) -> str | None:
+    """Return a header value, matching the name case-insensitively."""
+    if not headers:
+        return None
+
+    wanted = name.lower()
+    for key, value in headers.items():
+        if key.lower() == wanted:
+            return value
+    return None
+
+
+def _retry_after_seconds(headers: Mapping[str, str] | None) -> float | None:
+    """Return the ``Retry-After`` header in seconds, or None if absent."""
+    value = _header(headers, "Retry-After")
+    if value is None:
+        return None
+    try:
+        return max(float(value), 0.0)
+    except ValueError:
+        return None
+
+
+def _send(**request_kwargs: Any) -> requests.Response:
+    """
+    Send an HTTP request, waiting out throttling as the service instructs.
+
+    A ``429 Too Many Requests`` is retried after the ``Retry-After`` seconds
+    the service returns, up to ``_THROTTLE_MAX_RETRIES`` times. A wait above
+    ``_THROTTLE_MAX_WAIT_SECONDS`` is not attempted: the 429 response is
+    returned to the caller.
+    """
+    response = requests.request(**request_kwargs)
+    for attempt in range(1, _THROTTLE_MAX_RETRIES + 1):
+        if response.status_code != 429:
+            break
+
+        wait = _retry_after_seconds(response.headers)
+        if wait is None:
+            wait = _THROTTLE_DEFAULT_WAIT_SECONDS
+        if wait > _THROTTLE_MAX_WAIT_SECONDS:
+            logger.warning(
+                f"Throttled (429): Retry-After {wait:g}s exceeds the "
+                f"{_THROTTLE_MAX_WAIT_SECONDS:g}s limit, not retrying."
+            )
+            break
+
+        logger.warning(
+            f"Throttled (429): retrying in {wait:g}s "
+            f"(attempt {attempt}/{_THROTTLE_MAX_RETRIES})."
+        )
+        time.sleep(wait)
+        response = requests.request(**request_kwargs)
+
+    return response
 
 
 def _base_api(
@@ -135,7 +259,7 @@ def _base_api(
 
     # Request execution with proper error handling
     try:
-        response = requests.request(**request_kwargs)
+        response = _send(**request_kwargs)
     except requests.exceptions.ConnectionError as e:
         return ApiResult(
             success=False,
@@ -179,44 +303,44 @@ def _base_api(
         )
 
 
-def _pagination_handler(api_result: NamedTuple) -> ApiResult:
+def _pagination_handler(api_result: ApiResult) -> ApiResult:
     """Handle paginated responses with continuation tokens."""
     # Check for continuation token
     if not api_result.data or "continuationToken" not in api_result.data:
         return api_result
 
     continuation_token = api_result.data.get("continuationToken")
-    data = api_result.data.get("value", [])
+    continuation_uri = api_result.data.get("continuationUri")
+    data = list(api_result.data.get("value", []))
 
     # Get original request kwargs for subsequent requests
-    original_kwargs = api_result.request_kwargs.copy()
+    original_kwargs = api_result.request_kwargs or {}
     headers = original_kwargs.get("headers", {})
+    base_url = original_kwargs.get("url", "").split("?")[0]
 
     # Continue fetching data until no continuation token is left
     while continuation_token:
+        # Prefer the URI the service returns: it keeps the original query.
+        next_url = (
+            continuation_uri
+            or f"{base_url}?{urlencode({'continuationToken': continuation_token})}"
+        )
         try:
-            # Update URL with continuation token
-            base_url = original_kwargs["url"].split("?")[
-                0
-            ]  # Remove existing params
-            new_url = f"{base_url}?continuationToken={continuation_token}"
-
-            response = requests.request(
+            response = _send(
                 method="GET",  # Pagination is always GET
-                url=new_url,
+                url=next_url,
                 headers=headers,
             )
             response.raise_for_status()
-
             response_data = response.json()
-            new_data = response_data.get("value", [])
-            data.extend(new_data)
-            continuation_token = response_data.get("continuationToken")
-
-        except Exception as e:
+        except (requests.exceptions.RequestException, ValueError) as e:
             logger.error(f"Pagination failed: {str(e)}")
             # Return what we have so far
             break
+
+        data.extend(response_data.get("value", []))
+        continuation_token = response_data.get("continuationToken")
+        continuation_uri = response_data.get("continuationUri")
 
     return ApiResult(
         success=True,
@@ -228,172 +352,139 @@ def _pagination_handler(api_result: NamedTuple) -> ApiResult:
     )
 
 
-def _lro_handler(api_result: NamedTuple) -> ApiResult:
-    """Handle long-running operations (LRO)."""
-    # Check if headers exist first
-    if not api_result.headers:
+def _lro_error(status: str, state: dict[str, Any]) -> str:
+    """Describe a failed LRO from its state payload."""
+    error = state.get("error") or {}
+    detail = " - ".join(
+        str(part)
+        for part in (error.get("errorCode"), error.get("message"))
+        if part
+    )
+    message = f"LRO failed with status: {status}"
+    return f"{message} ({detail})" if detail else message
+
+
+def _lro_result(
+    state_response: requests.Response,
+    operation_url: str,
+    headers: dict[str, str] | None,
+) -> ApiResult:
+    """
+    Fetch the result of a succeeded LRO.
+
+    Fabric advertises the result URL in the ``Location`` header of the
+    succeeded state, with ``{operation}/result`` as the fallback. Not every
+    operation has a result, so a missing one still counts as success.
+    """
+    result_url = _header(state_response.headers, "Location")
+    if not result_url or result_url == operation_url:
+        result_url = f"{operation_url}/result"
+
+    try:
+        response = _send(method="GET", url=result_url, headers=headers)
+    except requests.exceptions.RequestException as e:
+        logger.debug(f"LRO succeeded, but its result could not be read: {e}")
+        return ApiResult(success=True, status_code=200)
+
+    if response.ok and response.content:
+        try:
+            return ApiResult(
+                success=True,
+                status_code=response.status_code,
+                data=response.json(),
+                headers=dict(response.headers),
+            )
+        except ValueError as e:
+            logger.debug(f"LRO result is not JSON: {e}")
+
+    logger.debug(f"LRO succeeded without a result ({response.status_code}).")
+    return ApiResult(success=True, status_code=200)
+
+
+def _lro_handler(api_result: ApiResult) -> ApiResult:
+    """
+    Poll a long-running operation (LRO) until it finishes.
+
+    The first status check runs right away; later checks back off from 1 s
+    up to the configured maximum interval, until the configured timeout
+    (see ``set_lro_options``). On success, the operation result is fetched
+    when the operation has one.
+    """
+    operation_url = _header(api_result.headers, "Location")
+    if not operation_url:
         return api_result
 
-    # Check if is a long-running operation (LRO) - check both cases
-    location_header = None
-    if "Location" in api_result.headers:
-        location_header = api_result.headers["Location"]
-    elif "location" in api_result.headers:
-        location_header = api_result.headers["location"]
+    logger.debug(f"Long-running operation detected at {operation_url}")
 
-    if not location_header:
-        return api_result
-
-    logger.debug(f"Long-running operation detected at {location_header}")
-
-    headers = api_result.request_kwargs.get("headers")
+    headers = (api_result.request_kwargs or {}).get("headers")
     logger.debug(
         f"Headers for LRO request: {_sanitize_headers_for_log(headers)}"
     )
 
-    def _get_lro_result(result_url: str) -> ApiResult:
-        """Get the final result from LRO."""
+    deadline = time.monotonic() + _lro_options.timeout
+    interval = 1.0
+    failures = 0
+
+    while True:
         try:
-            response = requests.request(
-                method="GET", url=result_url, headers=headers
+            state_response = _send(
+                method="GET", url=operation_url, headers=headers
             )
+            state_response.raise_for_status()
+            state = state_response.json()
+        except (requests.exceptions.RequestException, ValueError) as e:
+            failures += 1
+            if (
+                failures >= _LRO_MAX_CHECK_FAILURES
+                or time.monotonic() >= deadline
+            ):
+                return ApiResult(
+                    success=False,
+                    status_code=500,
+                    error=f"Failed to check LRO status: {str(e)}",
+                )
+            logger.warning(
+                f"LRO status check failed "
+                f"({failures}/{_LRO_MAX_CHECK_FAILURES}), retrying: {e}"
+            )
+            time.sleep(interval)
+            interval = min(interval * 2, _lro_options.max_poll_interval)
+            continue
+
+        failures = 0
+        if not isinstance(state, dict):
+            state = {}
+        status = state.get("status", "Unknown")
+        logger.debug(f"LRO status: {status}")
+
+        if status == "Succeeded":
+            return _lro_result(state_response, operation_url, headers)
+
+        if status in ("Failed", "Undefined"):
             return ApiResult(
-                success=response.ok,
-                status_code=response.status_code,
-                data=response.json()
-                if response.ok and response.content
-                else None,
-                headers=dict(response.headers) if response.ok else None,
-                error=response.text if not response.ok else None,
-                request_kwargs=None,
+                success=False,
+                status_code=state_response.status_code,
+                data=state,
+                headers=dict(state_response.headers),
+                error=_lro_error(status, state),
             )
-        except Exception as e:
+
+        if status not in ("NotStarted", "Running"):
+            logger.warning(f"Unknown LRO status: {status}")
+
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
             return ApiResult(
                 success=False,
                 status_code=500,
-                data=None,
-                headers=None,
-                error=f"Failed to get LRO result: {str(e)}",
-                request_kwargs=None,
+                error=(
+                    f"LRO timed out after {_lro_options.timeout:g}s "
+                    f"(last status: {status}); it may still be running."
+                ),
             )
 
-    def _check_lro_status(status_url: str) -> tuple[str, requests.Response]:
-        """Check LRO status and return status and response."""
-        response = requests.request(
-            method="GET", url=status_url, headers=headers
-        )
-        response.raise_for_status()
-        status = response.json().get("status", "Unknown")
-        logger.debug(f"LRO status: {status}")
-        return status, response
-
-    # Initial status check
-    try:
-        status, state_response = _check_lro_status(location_header)
-    except Exception as e:
-        return ApiResult(
-            success=False,
-            status_code=500,
-            data=None,
-            headers=None,
-            error=f"Failed to check LRO status: {str(e)}",
-            request_kwargs=None,
-        )
-
-    # Handle immediate completion states
-    if status in ["Succeeded"]:
-        # return _get_lro_result(f'{location_header}/result')
-        return ApiResult(
-            success=True,
-            status_code=200,
-            data=None,
-            headers=None,
-            error=None,
-            request_kwargs=None,
-        )
-    elif status in ["Failed", "Undefined"]:
-        return ApiResult(
-            success=False,
-            status_code=state_response.status_code,
-            data=state_response.json() if state_response.content else None,
-            headers=dict(state_response.headers),
-            error=f"LRO failed with status: {status}",
-            request_kwargs=None,
-        )
-
-    # Handle polling for running operations
-    elif status in ["Running", "NotStarted"]:
-        MAX_RETRIES = 10
-        RETRY_INTERVAL = 5
-
-        for attempt in range(1, MAX_RETRIES + 1):
-            try:
-                logger.debug(f"LRO polling attempt {attempt}/{MAX_RETRIES}")
-                time.sleep(RETRY_INTERVAL)
-
-                status, state_response = _check_lro_status(location_header)
-
-                if status == "Succeeded":
-                    return _get_lro_result(f"{location_header}/result")
-
-                elif status in ["Failed", "Undefined"]:
-                    return ApiResult(
-                        success=False,
-                        status_code=state_response.status_code,
-                        data=state_response.json()
-                        if state_response.content
-                        else None,
-                        headers=dict(state_response.headers),
-                        error=f"LRO failed with status: {status}",
-                        request_kwargs=None,
-                    )
-
-                # Continue polling if still running
-                elif status in ["Running", "NotStarted"]:
-                    continue
-
-                # Unknown status
-                else:
-                    logger.warning(f"Unknown LRO status: {status}")
-                    continue
-
-            except Exception as e:
-                logger.error(
-                    f"LRO polling failed at attempt {attempt}: {str(e)}"
-                )
-                # If it's the last attempt, return error
-                if attempt == MAX_RETRIES:
-                    return ApiResult(
-                        success=False,
-                        status_code=500,
-                        data=None,
-                        headers=None,
-                        error=f"LRO polling failed after {MAX_RETRIES} attempts. Last error: {str(e)}",
-                        request_kwargs=None,
-                    )
-                # Otherwise, continue to next attempt
-                continue
-
-        # Max retries exceeded
-        return ApiResult(
-            success=False,
-            status_code=500,  # Internal Server Error
-            data=None,
-            headers=None,
-            error=f"LRO max retries ({MAX_RETRIES}) exceeded. Last status: {status}",
-            request_kwargs=None,
-        )
-
-    # Unknown initial status
-    else:
-        return ApiResult(
-            success=False,
-            status_code=state_response.status_code,
-            data=state_response.json() if state_response.content else None,
-            headers=dict(state_response.headers),
-            error=f"Unknown LRO status: {status}",
-            request_kwargs=None,
-        )
+        time.sleep(min(interval, remaining))
+        interval = min(interval * 2, _lro_options.max_poll_interval)
 
 
 def api_request(
@@ -409,8 +500,9 @@ def api_request(
     support_pagination: bool | None = False,
     support_lro: bool | None = False,
     return_raw: bool = False,
+    return_result: bool = False,
     **kwargs,
-) -> list[dict[str, Any]] | dict[str, Any] | None:
+) -> list[dict[str, Any]] | dict[str, Any] | ApiResult | None:
     """
     Makes a request to the Microsoft Fabric or Power BI API.
     This function supports various HTTP methods and can handle both JSON payloads and form data.
@@ -418,6 +510,7 @@ def api_request(
     It supports pagination by allowing query parameters to be passed in as a dictionary.
     It also supports long-running operations (LRO) by checking the response headers for a 'Location' header.
     It can return the raw response object or parsed JSON data based on the `return_raw` parameter.
+    Throttled requests (429) are retried after the `Retry-After` seconds the service returns.
 
     Args:
         endpoint (str): The API endpoint to call.
@@ -428,10 +521,16 @@ def api_request(
         audience (Literal["fabric", "powerbi", "graph"]): The API audience to target. Defaults to "fabric".
         credential_type (Literal["spn", "user"]): The type of credentials to use for authentication. Defaults to "spn".
         method (Literal["get", "post", "patch", "delete"]): The HTTP method to use for the request. Defaults to "get".
+        support_pagination (bool, optional): Follow continuation tokens and return every page. Defaults to False.
+        support_lro (bool, optional): Poll a `202 Accepted` long-running operation until it finishes. Defaults to False.
         return_raw (bool, optional): If True, returns the raw response object. Defaults to False.
+        return_result (bool, optional): If True, returns the final `ApiResult`
+            (after pagination or LRO polling) instead of its data, so the caller
+            can tell a failure from a success without data. Defaults to False.
 
     Returns:
-        ApiResult (NamedTuple): The response object from the request with the following fields:
+        The parsed response data, or None on failure. With `return_result=True`,
+        the `ApiResult` (NamedTuple) with the following fields:
             success: bool
             status_code: int
             data: Optional[Any] = None
@@ -474,40 +573,30 @@ def api_request(
     if return_raw:
         return response
 
-    if not response.success:
-        logger.warning(f"{response.status_code}: {response.error}.")
+    result = response
+    if result.success and support_pagination:
+        result = _pagination_handler(result)
+    elif result.success and support_lro and result.status_code == 202:
+        logger.debug("Long-running operation detected, handling LRO...")
+        result = _lro_handler(result)
+
+    if return_result:
+        return result
+
+    if not result.success:
+        logger.warning(f"{result.status_code}: {result.error}.")
         return None
 
     if method == "delete" and response.status_code == 200:
         logger.success(f"Deleted {endpoint} successfully.")
         return None
 
-    # Handle pagination if supported
     if support_pagination:
-        return _pagination_handler(response).data.get("value", [])
+        return (result.data or {}).get("value", [])
 
-    # Handle long-running operations (LRO) if supported
-    if support_lro and response.status_code == 202:
-        logger.debug("Long-running operation detected, handling LRO...")
-
-        # Call the LRO handler
-        lro_response = _lro_handler(response)
-
-        # Checking the LRO response
-        if lro_response.success or lro_response.status_code == 200:
-            if lro_response.data:
-                return lro_response.data
-            else:
-                logger.success(
-                    "Long-running operation completed successfully."
-                )
-                return None
-
-        else:
-            logger.warning(
-                f"{lro_response.status_code}: {lro_response.error}."
-            )
-            return None
+    if support_lro and response.status_code == 202 and not result.data:
+        logger.success("Long-running operation completed successfully.")
+        return None
 
     # Otherwise, return the parsed data
-    return response.data
+    return result.data
