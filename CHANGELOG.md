@@ -58,6 +58,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `api_request()` accepts `return_result=True` to get the final `ApiResult`
   after pagination or LRO polling, so callers can tell a failure from a
   success without data.
+- `copy_to_staging()` accepts `staging_dir`, the folder to copy into (as
+  `<staging_dir>/<folder name>`), such as a temporary folder of the CI run.
+  Without it the copy still goes to `_stg` inside the installed package,
+  which every run using the installation shares and which cannot be
+  written on a read-only install.
 
 ### Changed
 - `deploy_all_items()` and the `deploy_all_*` helpers for notebooks, semantic
@@ -86,6 +91,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   keeps the original query parameters.
 
 ### Fixed
+- `copy_to_staging()` refuses a staging folder that is the source folder,
+  holds it or lies inside it, since replacing it would delete the source or
+  copy it into itself. A source path ending with a separator no longer
+  stages into the parent folder itself.
 - A long-running operation that had already succeeded at the first status
   check returned no data, so `get_item_definition()` and the export helpers
   could intermittently get `None`. The result is now fetched from the URL
