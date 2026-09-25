@@ -119,6 +119,13 @@ _APPLIED = frozenset(
 # How an outcome that deployed nothing is told to the items that need it.
 _NOT_DEPLOYED: dict[str, str] = {"failed": "failed", "skipped": "was skipped"}
 
+# Fabric frees the name of a deleted item only minutes later, and answers a
+# create under that name with this error code until then. The create is
+# tried again every _NAME_WAIT_SECONDS, for about five minutes.
+_NAME_NOT_AVAILABLE = "ItemDisplayNameNotAvailableYet"
+_NAME_WAIT_SECONDS = 30.0
+_NAME_WAIT_ATTEMPTS = 10
+
 
 @dataclass(frozen=True)
 class DeploymentResult:
@@ -820,15 +827,33 @@ def _create_planned_item(
     definition: dict[str, Any],
     folder_id: str | None,
 ) -> str | None:
-    """Create the item of a CREATE action and add it to the index."""
+    """
+    Create the item of a CREATE action and add it to the index.
+
+    While Fabric has not freed the name of an item deleted moments ago, the
+    create is tried again: that answer means nothing was created.
+    """
     item_type, display_name = _identity(action)
-    created = _request_create_item(
-        index.workspace_id,
-        display_name=display_name,
-        item_type=item_type,
-        item_definition=definition,
-        folder_id=folder_id,
-    )
+    for attempt in range(1, _NAME_WAIT_ATTEMPTS + 1):
+        created = _request_create_item(
+            index.workspace_id,
+            display_name=display_name,
+            item_type=item_type,
+            item_definition=definition,
+            folder_id=folder_id,
+        )
+        if (
+            created.success
+            or _NAME_NOT_AVAILABLE not in (created.error or "")
+            or attempt == _NAME_WAIT_ATTEMPTS
+        ):
+            break
+        logger.warning(
+            f"{display_name}.{item_type}: Fabric has not freed the name of "
+            f"a deleted item yet; trying again in {_NAME_WAIT_SECONDS:g}s "
+            f"(attempt {attempt}/{_NAME_WAIT_ATTEMPTS - 1})."
+        )
+        time.sleep(_NAME_WAIT_SECONDS)
     _raise_for_failure(created, "Create")
     item_id: str | None = (created.data or {}).get("id")
     index.items[(item_type, display_name)] = {

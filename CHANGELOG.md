@@ -165,6 +165,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Creating an item is not retried, since a create that seemed to fail may
     have been made.
   - `api_request(retry=...)` sets it for a request.
+- `deploy_all_items()` waits while Fabric has not freed the name of an item
+  deleted moments ago (`ItemDisplayNameNotAvailableYet`), trying the create
+  again every 30 s for about 5 minutes, instead of failing it.
 - Pagination follows the `continuationUri` returned by the service, which
   keeps the original query parameters.
 - The error of a failed item in a `DeploymentReport`, and of a failed
