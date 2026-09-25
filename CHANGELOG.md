@@ -155,6 +155,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   5 s) until a 600 s timeout, instead of every 5 s for at most 50 s.
 - Throttled requests (429) are retried after the `Retry-After` seconds the
   service returns, up to 3 times and for waits of up to 60 s.
+- A request that is safe to repeat is retried on a transient failure too,
+  up to 3 times, after its `Retry-After` or 2, 4 and 8 seconds. A transient
+  failure is a connection error or timeout, a 500, 502, 503 or 504, or an
+  error Fabric marks `isRetriable`.
+  - Safe requests are every GET and, in `deploy_all_items()` and
+    `reconcile_items()`, reading a definition, updating one and moving an
+    item.
+  - Creating an item is not retried, since a create that seemed to fail may
+    have been made.
+  - `api_request(retry=...)` sets it for a request.
 - Pagination follows the `continuationUri` returned by the service, which
   keeps the original query parameters.
 - The error of a failed item in a `DeploymentReport`, and of a failed

@@ -635,6 +635,8 @@ def _request_update_item_definition(
             params={"updateMetadata": True},
             support_lro=True,
             return_result=True,
+            # Replacing a definition twice gives the same item.
+            retry=True,
         ),
     )
 
@@ -650,6 +652,7 @@ def _request_move_item(
             method="post",
             payload={"targetFolderId": folder_id} if folder_id else {},
             return_result=True,
+            retry=True,
         ),
     )
 
@@ -663,6 +666,7 @@ def _request_item_definition(workspace_id: str, item_id: str) -> ApiResult:
             method="post",
             support_lro=True,
             return_result=True,
+            retry=True,
         ),
     )
 

@@ -24,6 +24,13 @@ _THROTTLE_MAX_RETRIES = 3
 _THROTTLE_MAX_WAIT_SECONDS = 60.0
 _THROTTLE_DEFAULT_WAIT_SECONDS = 10.0
 
+# A request that is safe to repeat is retried on a transient failure: a
+# connection error, a 5xx below, or a response Fabric marks isRetriable. It
+# waits the Retry-After seconds, or 2, 4, then 8 seconds.
+_TRANSIENT_STATUS = frozenset({500, 502, 503, 504})
+_TRANSIENT_MAX_RETRIES = 3
+_TRANSIENT_BASE_WAIT_SECONDS = 2.0
+
 # Consecutive failed LRO status checks (network errors, 5xx) tolerated
 # before the operation is reported as failed.
 _LRO_MAX_CHECK_FAILURES = 3
@@ -140,7 +147,9 @@ def _retry_after_seconds(headers: Mapping[str, str] | None) -> float | None:
         return None
 
 
-def _send(**request_kwargs: Any) -> requests.Response:
+def _send(
+    *, retry_transient: bool = False, **request_kwargs: Any
+) -> requests.Response:
     """
     Send an HTTP request, waiting out throttling as the service instructs.
 
@@ -148,30 +157,92 @@ def _send(**request_kwargs: Any) -> requests.Response:
     the service returns, up to ``_THROTTLE_MAX_RETRIES`` times. A wait above
     ``_THROTTLE_MAX_WAIT_SECONDS`` is not attempted: the 429 response is
     returned to the caller.
+
+    With ``retry_transient``, for a request that is safe to repeat, a
+    transient failure is retried too, up to ``_TRANSIENT_MAX_RETRIES``
+    times: a connection error or timeout, a 500, 502, 503 or 504, or an
+    error Fabric marks ``isRetriable``.
+
+    Raises:
+        requests.exceptions.RequestException: If the request fails without
+            a response, and is not retried or keeps failing.
     """
-    response = requests.request(**request_kwargs)
-    for attempt in range(1, _THROTTLE_MAX_RETRIES + 1):
-        if response.status_code != 429:
-            break
-
-        wait = _retry_after_seconds(response.headers)
-        if wait is None:
-            wait = _THROTTLE_DEFAULT_WAIT_SECONDS
-        if wait > _THROTTLE_MAX_WAIT_SECONDS:
+    throttled = 0
+    transient = 0
+    while True:
+        try:
+            response = requests.request(**request_kwargs)
+        except (
+            requests.exceptions.ConnectionError,
+            requests.exceptions.Timeout,
+        ) as e:
+            if not retry_transient or transient >= _TRANSIENT_MAX_RETRIES:
+                raise
+            transient += 1
+            wait = _transient_wait(transient, None)
             logger.warning(
-                f"Throttled (429): Retry-After {wait:g}s exceeds the "
-                f"{_THROTTLE_MAX_WAIT_SECONDS:g}s limit, not retrying."
+                f"{type(e).__name__}: retrying in {wait:g}s (attempt "
+                f"{transient}/{_TRANSIENT_MAX_RETRIES})."
             )
-            break
+            time.sleep(wait)
+            continue
 
-        logger.warning(
-            f"Throttled (429): retrying in {wait:g}s "
-            f"(attempt {attempt}/{_THROTTLE_MAX_RETRIES})."
-        )
-        time.sleep(wait)
-        response = requests.request(**request_kwargs)
+        if response.status_code == 429:
+            if throttled >= _THROTTLE_MAX_RETRIES:
+                return response
+            wait = _retry_after_seconds(response.headers)
+            if wait is None:
+                wait = _THROTTLE_DEFAULT_WAIT_SECONDS
+            if wait > _THROTTLE_MAX_WAIT_SECONDS:
+                logger.warning(
+                    f"Throttled (429): Retry-After {wait:g}s exceeds the "
+                    f"{_THROTTLE_MAX_WAIT_SECONDS:g}s limit, not retrying."
+                )
+                return response
+            throttled += 1
+            logger.warning(
+                f"Throttled (429): retrying in {wait:g}s "
+                f"(attempt {throttled}/{_THROTTLE_MAX_RETRIES})."
+            )
+            time.sleep(wait)
+            continue
 
-    return response
+        if (
+            retry_transient
+            and transient < _TRANSIENT_MAX_RETRIES
+            and _is_transient(response)
+        ):
+            transient += 1
+            wait = _transient_wait(transient, response.headers)
+            logger.warning(
+                f"Transient failure ({response.status_code}): retrying in "
+                f"{wait:g}s (attempt {transient}/{_TRANSIENT_MAX_RETRIES})."
+            )
+            time.sleep(wait)
+            continue
+
+        return response
+
+
+def _is_transient(response: requests.Response) -> bool:
+    """Whether a failed response is worth trying again as it is."""
+    if response.ok:
+        return False
+    if response.status_code in _TRANSIENT_STATUS:
+        return True
+    try:
+        body = response.json()
+    except ValueError:
+        return False
+    return isinstance(body, dict) and body.get("isRetriable") is True
+
+
+def _transient_wait(attempt: int, headers: Mapping[str, str] | None) -> float:
+    """The Retry-After seconds, within the throttling limit, or a backoff."""
+    wait = _retry_after_seconds(headers)
+    if wait is not None:
+        return min(wait, _THROTTLE_MAX_WAIT_SECONDS)
+    return _TRANSIENT_BASE_WAIT_SECONDS * 2 ** (attempt - 1)
 
 
 def _base_api(
@@ -185,6 +256,7 @@ def _base_api(
     credential_type: Literal["spn", "user"] | None = None,
     method: Literal["get", "post", "patch", "delete"] = "get",
     return_raw: bool = False,
+    retry_transient: bool = False,
     **kwargs,
 ) -> ApiResult:
     """
@@ -264,7 +336,7 @@ def _base_api(
 
     # Request execution with proper error handling
     try:
-        response = _send(**request_kwargs)
+        response = _send(retry_transient=retry_transient, **request_kwargs)
     except requests.exceptions.ConnectionError as e:
         return ApiResult(
             success=False,
@@ -523,6 +595,7 @@ def api_request(
     support_lro: bool | None = False,
     return_raw: bool = False,
     return_result: bool = False,
+    retry: bool | None = None,
     **kwargs,
 ) -> list[dict[str, Any]] | dict[str, Any] | ApiResult | None:
     """
@@ -532,7 +605,8 @@ def api_request(
     It supports pagination by allowing query parameters to be passed in as a dictionary.
     It also supports long-running operations (LRO) by checking the response headers for a 'Location' header.
     It can return the raw response object or parsed JSON data based on the `return_raw` parameter.
-    Throttled requests (429) are retried after the `Retry-After` seconds the service returns.
+    Throttled requests (429) are retried after the `Retry-After` seconds the service returns,
+    and a request safe to repeat (see `retry`) is retried on a transient failure.
 
     Args:
         endpoint (str): The API endpoint to call.
@@ -549,6 +623,10 @@ def api_request(
         return_result (bool, optional): If True, returns the final `ApiResult`
             (after pagination or LRO polling) instead of its data, so the caller
             can tell a failure from a success without data. Defaults to False.
+        retry (bool, optional): Retry a transient failure (a connection
+            error, a 500, 502, 503 or 504, or an error marked `isRetriable`)
+            up to 3 times. Pass True only for a request that is safe to
+            repeat. Defaults to True for a GET, False otherwise.
 
     Returns:
         The parsed response data, or None on failure. With `return_result=True`,
@@ -589,6 +667,7 @@ def api_request(
         credential_type=credential_type,
         method=method,
         return_raw=return_raw,
+        retry_transient=method == "get" if retry is None else retry,
         **kwargs,
     )
     # If return_raw is True, return the raw response object
