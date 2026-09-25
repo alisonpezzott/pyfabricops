@@ -18,7 +18,7 @@ import json
 import os
 import time
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import asdict, dataclass, field, fields, replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -31,6 +31,7 @@ from ..core.folders import create_folder, list_folders
 from ..core.workspaces import resolve_workspace
 from ..helpers.content_hash import definition_hash
 from ..helpers.dependencies import (
+    CatalogItem,
     IdReference,
     LocalCatalog,
     pipeline_references,
@@ -437,6 +438,17 @@ def _parse_display_name(content: bytes, source: str) -> str:
     return display_name
 
 
+def _parse_logical_id(content: bytes) -> str | None:
+    """Read ``config.logicalId`` from a ``.platform`` file, if it has one."""
+    try:
+        platform = json.loads(content)
+    except ValueError:
+        return None
+    config = platform.get("config") if isinstance(platform, dict) else None
+    logical_id = config.get("logicalId") if isinstance(config, dict) else None
+    return logical_id if isinstance(logical_id, str) and logical_id else None
+
+
 def _read_source_items(
     local_items: Sequence[tuple[str, str]], *, start_path: str | None
 ) -> list[SourceItem]:
@@ -487,9 +499,9 @@ def _read_deleted_item(
     folder_path = extract_middle_path(item_path, start_path=start_path)
     platform = f"{change.path}/.platform"
     try:
+        content = detector.read_baseline_file(platform)
         display_name = _parse_display_name(
-            detector.read_baseline_file(platform),
-            f"{platform} at commit {detector.baseline[:12]}",
+            content, f"{platform} at commit {detector.baseline[:12]}"
         )
     except PyFabricOpsError as e:
         return SourceItem(
@@ -505,6 +517,7 @@ def _read_deleted_item(
         display_name=display_name,
         folder_path=folder_path,
         change=SourceChange.DELETED,
+        logical_id=_parse_logical_id(content),
     )
 
 
@@ -1492,6 +1505,7 @@ def _plan_all(
         dependencies=dependencies,
         item_types=types,
         warnings=_id_warnings(dependencies, index),
+        deletions=_read_deletions(path, items, index),
     )
     return planner.plan(
         items, available=dependencies.available if dependencies else ()
@@ -1919,6 +1933,117 @@ def _normal_id(value: str) -> str | None:
         return None
 
 
+@dataclass(frozen=True)
+class _Deletions:
+    """What stays in the source, for the items a run would delete."""
+
+    # Every item of the source, with its folder.
+    source: Mapping[ItemKey, str]
+    # For each item to delete, what still refers to it, and how.
+    referenced_by: Mapping[ItemKey, tuple[str, ...]]
+
+
+def _read_deletions(
+    path: str, items: Sequence[SourceItem], index: _WorkspaceIndex
+) -> _Deletions | None:
+    """
+    Read what stays in the source, when the run has an item to delete.
+
+    Nothing is read unless an item deleted from the source is still in the
+    workspace. Then every local item is listed, so that an item the source
+    still defines elsewhere is kept, and what still refers to an item to
+    delete is found: by the references the dependency scan reads, checked
+    against the item as it was at the baseline commit, and by the ID of the
+    item in the workspace (for a lakehouse, its SQL analytics endpoint's
+    too) in the files of the items that stay.
+    """
+    candidates = {
+        (item.item_type, item.display_name): item
+        for item in items
+        if item.change is SourceChange.DELETED
+        and item.error is None
+        and item.display_name is not None
+        and (item.item_type, item.display_name) in index.items
+    }
+    if not candidates:
+        return None
+
+    catalog = LocalCatalog.read(path, DEPLOY_ORDER)
+    source = {entry.key: entry.path for entry in catalog}
+    gone = {key: item for key, item in candidates.items() if key not in source}
+    if not gone:
+        return _Deletions(source=source, referenced_by={})
+
+    # For each item to delete, each item that refers to it, and how.
+    referrers: dict[ItemKey, dict[ItemKey, str]] = {}
+    scan = scan_references(
+        LocalCatalog(
+            [
+                *catalog,
+                *(
+                    CatalogItem(key, item.source_path, item.logical_id)
+                    for key, item in gone.items()
+                ),
+            ]
+        ),
+        list(source),
+    )
+    for dependency in scan.dependencies:
+        if dependency.target in gone:
+            referrers.setdefault(dependency.target, {}).setdefault(
+                dependency.source, dependency.via
+            )
+
+    ids: dict[str, tuple[ItemKey, str]] = {}
+    for key in gone:
+        owned = [(index.items[key], "its ID")]
+        # Fabric deletes a lakehouse's SQL analytics endpoint with it.
+        endpoint = (
+            index.items.get(("SQLEndpoint", key[1]))
+            if key[0] == "Lakehouse"
+            else None
+        )
+        if endpoint is not None:
+            owned.append((endpoint, "the ID of its SQL analytics endpoint"))
+        for entry, what in owned:
+            item_id = _normal_id(str(entry["id"]))
+            if item_id is not None:
+                ids[item_id] = (key, what)
+    if ids:
+        for local in catalog:
+            for item_id, file in _ids_in(local.path, ids).items():
+                key, what = ids[item_id]
+                referrers.setdefault(key, {}).setdefault(
+                    local.key, f"{what}, in {file}"
+                )
+
+    return _Deletions(
+        source=source,
+        referenced_by={
+            key: tuple(
+                f"{name}.{item_type} ({how})"
+                for (item_type, name), how in found.items()
+            )
+            for key, found in referrers.items()
+        },
+    )
+
+
+def _ids_in(folder: str, ids: Collection[str]) -> dict[str, str]:
+    """Find which IDs the files of an item folder hold, and the first file."""
+    base = Path(folder)
+    found: dict[str, str] = {}
+    for file in sorted(p for p in base.rglob("*") if p.is_file()):
+        try:
+            content = file.read_bytes().lower()
+        except OSError:
+            continue
+        for item_id in ids:
+            if item_id not in found and item_id.encode() in content:
+                found[item_id] = file.relative_to(base).as_posix()
+    return found
+
+
 def _created(
     report: DeploymentReport, dependencies: _Dependencies | None
 ) -> list[SourceItem]:
@@ -1945,6 +2070,7 @@ def _planner(
     dependencies: _Dependencies | None,
     item_types: Sequence[str] | None,
     warnings: Mapping[ItemKey, tuple[str, ...]] | None = None,
+    deletions: _Deletions | None = None,
 ) -> DeploymentPlanner:
     """Return the planner of a run, resolving dependencies when given."""
     return DeploymentPlanner(
@@ -1955,6 +2081,8 @@ def _planner(
         broken=dependencies.broken if dependencies else None,
         item_types=item_types if dependencies else None,
         warnings=warnings,
+        source=deletions.source if deletions else None,
+        referenced_by=deletions.referenced_by if deletions else None,
     )
 
 
@@ -2005,6 +2133,9 @@ def _deploy_items(
         dependencies=dependencies,
         item_types=item_types,
         warnings=warnings,
+        deletions=(
+            _read_deletions(root, items, index) if root is not None else None
+        ),
     )
     plan = planner.plan(
         items, available=dependencies.available if dependencies else ()

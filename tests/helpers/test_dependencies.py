@@ -80,6 +80,7 @@ def test_the_catalog_lists_items_by_identity_and_folder(
     assert (item.logical_id, Path(item.path)) == ("lid-sales", model)
     assert catalog.at(str(model)) == item
     assert catalog.get(("Notebook", "Broken")) is None
+    assert list(catalog) == [item]
 
 
 # ---------------------------------------------------------------------------

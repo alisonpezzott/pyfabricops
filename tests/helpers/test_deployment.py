@@ -2394,3 +2394,184 @@ def test_without_dependency_resolution_pipelines_are_not_checked(
     (action,) = _plan(root, resolve_dependencies=False).actions
 
     assert action.detail is None
+
+
+# ---------------------------------------------------------------------------
+# Deletions: what stays in the source
+# ---------------------------------------------------------------------------
+
+_LAKEHOUSE_ID = "00000000-0000-0000-0000-0000000000c1"
+_ENDPOINT_ID = "00000000-0000-0000-0000-0000000000c2"
+
+
+def _delete_folder(git_repo: GitRepo, item_dir: Path) -> None:
+    """Delete an item folder from the source and commit it."""
+    shutil.rmtree(item_dir)
+    git_repo.commit(f"delete {item_dir.name}")
+
+
+def _write_lakehouse(root: Path, name: str, logical_id: str) -> Path:
+    """A lakehouse whose .platform has a logical ID."""
+    lakehouse = root / f"{name}.Lakehouse"
+    lakehouse.mkdir()
+    platform = {
+        "metadata": {"type": "Lakehouse", "displayName": name},
+        "config": {"version": "2.0", "logicalId": logical_id},
+    }
+    (lakehouse / ".platform").write_text(
+        json.dumps(platform), encoding="utf-8"
+    )
+    return lakehouse
+
+
+def _write_notebook(
+    root: Path, relative: str, lakehouse: dict[str, str]
+) -> Path:
+    """A notebook whose metadata names its default lakehouse."""
+    notebook = _write_item(root, relative)
+    meta = json.dumps({"dependencies": {"lakehouse": lakehouse}}, indent=2)
+    (notebook / "notebook-content.py").write_text(
+        "# Fabric notebook source\n\n# METADATA ********************\n\n"
+        + "\n".join(f"# META {line}" for line in meta.splitlines())
+        + "\n",
+        encoding="utf-8",
+    )
+    return notebook
+
+
+def test_an_item_defined_in_another_folder_is_not_deleted(
+    git_repo: GitRepo, root: Path, fabric: SimpleNamespace
+) -> None:
+    """The copy left in the source is not selected, but still counts."""
+    fabric.list_items.return_value = [
+        {"id": "nb-old", "type": "Notebook", "displayName": "Old"},
+    ]
+    first = _write_item(root, "A/Old.Notebook")
+    _write_item(root, "B/Old.Notebook")
+    baseline = git_repo.commit("baseline")
+    _delete_folder(git_repo, first)
+
+    (action,) = _plan(root, baseline_commit=baseline).actions
+
+    assert (action.action, action.detail) == (
+        DeploymentActionType.NOOP,
+        "Still defined at B/Old.Notebook.",
+    )
+
+
+def test_a_model_a_report_still_reads_is_not_deleted(
+    git_repo: GitRepo, root: Path, fabric: SimpleNamespace
+) -> None:
+    """The report stays in the source, bound to the model by path."""
+    fabric.list_items.return_value = [
+        {"id": "sm-sales", "type": "SemanticModel", "displayName": "Sales"},
+        {"id": "rp-sales", "type": "Report", "displayName": "Sales"},
+    ]
+    _sales(root)
+    baseline = git_repo.commit("baseline")
+    _delete_folder(git_repo, root / "Sales.SemanticModel")
+
+    (action,) = _plan(root, baseline_commit=baseline).actions
+
+    assert (action.action, action.item_type) == (
+        DeploymentActionType.BLOCKED,
+        "SemanticModel",
+    )
+    assert action.detail == (
+        "Still referred to by Sales.Report (definition.pbir byPath)."
+    )
+
+
+def test_a_lakehouse_a_notebook_uses_by_logical_id_is_not_deleted(
+    git_repo: GitRepo, root: Path, fabric: SimpleNamespace
+) -> None:
+    """The logical ID the lakehouse had at the baseline is the match."""
+    fabric.list_items.return_value = [
+        {"id": _LAKEHOUSE_ID, "type": "Lakehouse", "displayName": "Gold"},
+        {"id": "nb-load", "type": "Notebook", "displayName": "Load"},
+    ]
+    lakehouse = _write_lakehouse(root, "Gold", "logical-gold")
+    _write_notebook(
+        root, "Load.Notebook", {"default_lakehouse": "logical-gold"}
+    )
+    baseline = git_repo.commit("baseline")
+    _delete_folder(git_repo, lakehouse)
+
+    (action,) = _plan(root, baseline_commit=baseline).actions
+
+    assert action.action == DeploymentActionType.BLOCKED
+    assert action.detail == (
+        "Still referred to by Load.Notebook (notebook default lakehouse)."
+    )
+
+
+def test_a_lakehouse_whose_endpoint_a_model_reads_by_id_is_not_deleted(
+    git_repo: GitRepo, root: Path, fabric: SimpleNamespace
+) -> None:
+    """A Direct Lake model holds the ID of the lakehouse's SQL endpoint."""
+    fabric.list_items.return_value = [
+        {"id": _LAKEHOUSE_ID, "type": "Lakehouse", "displayName": "Bronze"},
+        {"id": _ENDPOINT_ID, "type": "SQLEndpoint", "displayName": "Bronze"},
+        {"id": "sm-sales", "type": "SemanticModel", "displayName": "Sales"},
+    ]
+    lakehouse = _write_item(root, "Bronze.Lakehouse")
+    model = _write_item(root, "Sales.SemanticModel")
+    (model / "definition").mkdir()
+    (model / "definition" / "expressions.tmdl").write_text(
+        "expression DatabaseQuery =\n"
+        f'\t\tSql.Database("server", "{_ENDPOINT_ID.upper()}")\n',
+        encoding="utf-8",
+    )
+    baseline = git_repo.commit("baseline")
+    _delete_folder(git_repo, lakehouse)
+
+    (action,) = _plan(root, baseline_commit=baseline).actions
+
+    assert action.action == DeploymentActionType.BLOCKED
+    assert action.detail == (
+        "Still referred to by Sales.SemanticModel (the ID of its SQL "
+        "analytics endpoint, in definition/expressions.tmdl)."
+    )
+
+
+def test_a_notebook_a_pipeline_runs_by_id_is_not_deleted(
+    git_repo: GitRepo, root: Path, fabric: SimpleNamespace
+) -> None:
+    """The pipeline holds the notebook's ID in the workspace."""
+    fabric.list_items.return_value = [
+        {"id": _NOTEBOOK_ID, "type": "Notebook", "displayName": "Load"},
+        {"id": "pl-daily", "type": "DataPipeline", "displayName": "Daily"},
+    ]
+    notebook = _write_item(root, "Load.Notebook")
+    _write_pipeline(root, _NOTEBOOK_ID, _WORKSPACE_ID)
+    baseline = git_repo.commit("baseline")
+    _delete_folder(git_repo, notebook)
+
+    (action,) = _plan(root, baseline_commit=baseline).actions
+
+    assert action.action == DeploymentActionType.BLOCKED
+    assert action.detail == (
+        "Still referred to by Daily.DataPipeline (its ID, in "
+        "pipeline-content.json)."
+    )
+
+
+def test_items_deleted_together_do_not_block_each_other(
+    git_repo: GitRepo, root: Path, fabric: SimpleNamespace
+) -> None:
+    """A report deleted with its model leaves nothing that needs it."""
+    fabric.list_items.return_value = [
+        {"id": "sm-sales", "type": "SemanticModel", "displayName": "Sales"},
+        {"id": "rp-sales", "type": "Report", "displayName": "Sales"},
+    ]
+    _sales(root)
+    baseline = git_repo.commit("baseline")
+    shutil.rmtree(root / "Sales.Report")
+    _delete_folder(git_repo, root / "Sales.SemanticModel")
+
+    plan = _plan(root, baseline_commit=baseline)
+
+    assert [(a.action, a.item_type) for a in plan.actions] == [
+        (DeploymentActionType.DELETE, "Report"),
+        (DeploymentActionType.DELETE, "SemanticModel"),
+    ]

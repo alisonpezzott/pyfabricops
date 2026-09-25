@@ -371,6 +371,68 @@ def test_a_deleted_item_with_an_unreadable_baseline_is_blocked() -> None:
     )
 
 
+def test_an_item_the_source_still_defines_elsewhere_is_not_deleted() -> None:
+    """Deleting one of its folders is no evidence, even outside the run."""
+    planner = DeploymentPlanner(
+        existing_items={("Notebook", "Old")},
+        root="workspace",
+        source={("Notebook", "Old"): "workspace/Copy/Old.Notebook"},
+    )
+
+    (action,) = planner.plan([_changed("Old", SourceChange.DELETED)]).actions
+
+    assert (action.action, action.detail) == (
+        NOOP,
+        "Still defined at Copy/Old.Notebook.",
+    )
+
+
+def test_a_deletion_is_blocked_while_an_item_still_refers_to_it() -> None:
+    """Nothing is deleted from under an item that needs it."""
+    planner = DeploymentPlanner(
+        existing_items={("SemanticModel", "Sales")},
+        referenced_by={
+            ("SemanticModel", "Sales"): [
+                "Sales.Report (definition.pbir byPath)",
+                "Orders.DataPipeline (its ID, in pipeline-content.json)",
+            ]
+        },
+    )
+
+    (action,) = planner.plan(
+        [_changed("Sales", SourceChange.DELETED, "SemanticModel")]
+    ).actions
+
+    assert (action.action, action.reason) == (
+        BLOCKED,
+        DeploymentReason.ITEM_DELETED,
+    )
+    assert action.detail == (
+        "Still referred to by Sales.Report (definition.pbir byPath); "
+        "Orders.DataPipeline (its ID, in pipeline-content.json)."
+    )
+
+
+def test_a_reference_to_an_item_gone_from_the_workspace_blocks_nothing() -> (
+    None
+):
+    """With nothing to delete, what refers to the item does not matter."""
+    planner = DeploymentPlanner(
+        existing_items=(),
+        referenced_by={
+            ("SemanticModel", "Sales"): [
+                "Sales.Report (definition.pbir byPath)"
+            ]
+        },
+    )
+
+    (action,) = planner.plan(
+        [_changed("Sales", SourceChange.DELETED, "SemanticModel")]
+    ).actions
+
+    assert action.action == NOOP
+
+
 # ---------------------------------------------------------------------------
 # What the last successful deployment sent
 # ---------------------------------------------------------------------------

@@ -34,7 +34,13 @@ import json
 import os
 import re
 from collections import deque
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import (
+    Callable,
+    Iterable,
+    Iterator,
+    Mapping,
+    Sequence,
+)
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import MappingProxyType
@@ -118,6 +124,10 @@ class LocalCatalog:
                         )
                     )
         return cls(items)
+
+    def __iter__(self) -> Iterator[CatalogItem]:
+        """Iterate over the items, one per type and display name."""
+        return iter(self._by_key.values())
 
     def get(self, key: ItemKey) -> CatalogItem | None:
         """

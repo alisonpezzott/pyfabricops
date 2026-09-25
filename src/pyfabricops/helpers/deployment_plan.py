@@ -137,6 +137,10 @@ class SourceItem:
             baseline commit, or None when the run deploys every item.
         content_hash (str | None): The hash of the definition to deploy, or
             None when no deployment state can use it.
+        logical_id (str | None): ``config.logicalId`` from ``.platform``,
+            read for an item deleted from the source, as it was at the
+            baseline commit, so that what refers to it by logical ID is
+            found; None otherwise.
     """
 
     item_type: str
@@ -146,6 +150,7 @@ class SourceItem:
     error: str | None = None
     change: SourceChange | None = None
     content_hash: str | None = None
+    logical_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -302,6 +307,15 @@ class DeploymentPlanner:
             what to warn about, such as a reference by ID the workspace
             lacks. Added to the detail of the item's action; nothing is
             blocked for it.
+        source (Mapping[ItemKey, str], optional): Every item of the source,
+            whatever the run selects, with its folder. An item deleted from
+            one folder is not deleted from the workspace while the source
+            still defines it in another. Defaults to the selected items.
+        referenced_by (Mapping[ItemKey, Sequence[str]], optional): For each
+            item deleted from the source, the items that stay and still
+            refer to it, and how, such as ``"Sales.Report (definition.pbir
+            byPath)"``. Its deletion is blocked, so that nothing is deleted
+            from under an item that needs it.
 
     Examples:
         ```python
@@ -324,6 +338,8 @@ class DeploymentPlanner:
         broken: Mapping[ItemKey, Sequence[str]] | None = None,
         item_types: Collection[str] | None = None,
         warnings: Mapping[ItemKey, Sequence[str]] | None = None,
+        source: Mapping[ItemKey, str] | None = None,
+        referenced_by: Mapping[ItemKey, Sequence[str]] | None = None,
     ) -> None:
         self._existing_items = frozenset(existing_items)
         self._deployed_items = dict(deployed_items or {})
@@ -335,6 +351,10 @@ class DeploymentPlanner:
         self._item_types = None if item_types is None else set(item_types)
         self._warnings = {
             key: tuple(texts) for key, texts in (warnings or {}).items()
+        }
+        self._source = dict(source or {})
+        self._referenced_by = {
+            key: tuple(texts) for key, texts in (referenced_by or {}).items()
         }
 
     def plan(
@@ -349,9 +369,10 @@ class DeploymentPlanner:
         created. An item whose definition is the one its last successful
         deployment sent needs nothing, or only a move when its folder
         changed. An item deleted from the source is deleted from the
-        workspace, or needs nothing when the workspace no longer has it or
-        another item of the plan still defines it, as when its folder moved.
-        An item whose display name is unknown is blocked, and so is an item
+        workspace, unless an item that stays still refers to it, which
+        blocks it; it needs nothing when the workspace no longer has it or
+        the source still defines it, as when its folder moved. An item
+        whose display name is unknown is blocked, and so is an item
         with the same type and display name as an earlier one: deploying
         both would overwrite the same workspace item.
 
@@ -466,11 +487,12 @@ class DeploymentPlanner:
             return _blocked(item)
 
         identity = (item.item_type, display_name)
-        if identity in defined:
+        still_defined = defined.get(identity) or self._source.get(identity)
+        if still_defined is not None:
             return _action(
                 item,
                 DeploymentActionType.NOOP,
-                f"Still defined at {self._where(defined[identity])}.",
+                f"Still defined at {self._where(still_defined)}.",
             )
         if identity in deleted:
             return _action(
@@ -481,17 +503,24 @@ class DeploymentPlanner:
             )
         deleted[identity] = item.source_path
 
-        if identity in self._existing_items:
+        if identity not in self._existing_items:
             return _action(
                 item,
-                DeploymentActionType.DELETE,
-                "Refused until deletions are allowed: delete it from the "
-                "workspace by hand.",
+                DeploymentActionType.NOOP,
+                "Deleted from the source and not in the workspace.",
+            )
+        referrers = self._referenced_by.get(identity)
+        if referrers:
+            return _action(
+                item,
+                DeploymentActionType.BLOCKED,
+                f"Still referred to by {'; '.join(referrers)}.",
             )
         return _action(
             item,
-            DeploymentActionType.NOOP,
-            "Deleted from the source and not in the workspace.",
+            DeploymentActionType.DELETE,
+            "Refused until deletions are allowed: delete it from the "
+            "workspace by hand.",
         )
 
     def _resolve(
