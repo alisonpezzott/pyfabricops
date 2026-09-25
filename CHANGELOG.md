@@ -114,6 +114,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   service returns, up to 3 times and for waits of up to 60 s.
 - Pagination follows the `continuationUri` returned by the service, which
   keeps the original query parameters.
+- The error of a failed item in a `DeploymentReport`, and of a failed
+  long-running operation, goes on with the messages of the service's
+  `moreDetails`, which often hold the cause: `InvalidInput - The request has
+  an invalid input` is followed by, say, `DisplayName is Invalid for
+  ArtifactType. DisplayName: Bronze-Raw`.
 
 ### Fixed
 - `copy_to_staging()` refuses a staging folder that is the source folder,

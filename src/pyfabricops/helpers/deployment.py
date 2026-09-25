@@ -24,7 +24,7 @@ from typing import Any, Literal, TypeAlias, cast
 
 from pandas import DataFrame
 
-from ..api.api import ApiResult, api_request
+from ..api.api import ApiResult, _error_detail, api_request
 from ..core.folders import create_folder, list_folders
 from ..core.workspaces import resolve_workspace
 from ..helpers.content_hash import definition_hash
@@ -542,18 +542,18 @@ def _select_items(
 
 
 def _describe_error(result: ApiResult) -> str:
-    """Summarize a failed API result as ``status: errorCode - message``."""
+    """
+    Summarize a failed API result as ``status: errorCode - message``.
+
+    The messages of the error's ``moreDetails`` follow, when it has any.
+    """
     detail = result.error or ""
     try:
         body = json.loads(detail)
     except ValueError:
         body = None
     if isinstance(body, dict):
-        parts = [
-            str(body[key]) for key in ("errorCode", "message") if body.get(key)
-        ]
-        if parts:
-            detail = " - ".join(parts)
+        detail = _error_detail(body) or detail
     return (
         f"{result.status_code}: {detail}"
         if detail

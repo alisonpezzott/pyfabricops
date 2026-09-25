@@ -350,6 +350,35 @@ def test_a_failure_does_not_stop_the_run(
     assert not report.ok
 
 
+def test_a_failure_gives_the_details_of_the_error(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """The cause, often only in moreDetails, is in the error."""
+    body = {
+        "errorCode": "InvalidInput",
+        "message": "The request has an invalid input",
+        "moreDetails": [
+            {
+                "errorCode": "InvalidParameter",
+                "message": "DisplayName is Invalid for ArtifactType. "
+                "DisplayName: <pi>Bronze-Raw</pi>",
+            }
+        ],
+    }
+    fabric.create.return_value = ApiResult(
+        success=False, status_code=400, error=json.dumps(body)
+    )
+    _write_item(root, "Bronze-Raw.Lakehouse")
+
+    report = _deploy(root)
+
+    assert report.results[0].error == (
+        "Create failed with 400: InvalidInput - The request has an invalid "
+        "input - DisplayName is Invalid for ArtifactType. DisplayName: "
+        "Bronze-Raw"
+    )
+
+
 def test_fail_fast_skips_the_remaining_items(
     root: Path, fabric: SimpleNamespace
 ) -> None:
