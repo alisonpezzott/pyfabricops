@@ -92,7 +92,9 @@ python examples/03-deploy-full/deploy.py --workspace <workspace-name> --environm
 ```
 
 `03-deploy-full` and `04-deploy-selective` print the plan before they
-deploy, and exit with 1 when an item fails. `07-reconcile` prints what
+deploy, and exit with 1 when an item fails. `04-deploy-selective` deletes
+the items deleted in Git only with `--allow-deletions`; without it, such an
+item fails the run until it is deleted by hand. `07-reconcile` prints what
 differs, changing nothing, and exits with 1 when anything does: an item
 missing from the workspace, one changed or moved there by hand, or one the
 source lacks. The sample workspace is what

@@ -19,10 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the items changed in Git between that commit and HEAD, and
   `repository_path` names the repository folder to compare when `path` is a
   staging copy (as made by `copy_to_staging()`). An item deleted since the
-  baseline is reported as failed while the workspace still has it, because
-  deleting is not supported yet, and needs nothing once it is gone. Git must
-  be on PATH and the baseline commit in the local history; a shallow clone
-  may lack it.
+  baseline is deleted only with `allow_deletions` (below), and needs nothing
+  once the workspace no longer has it. Git must be on PATH and the baseline
+  commit in the local history; a shallow clone may lack it.
 - Deployment state: `deploy_all_items(state_backend=..., environment=...)`
   takes the baseline from the last successful deployment to the environment,
   instead of a manual `baseline_commit`. The state keeps one commit per item
@@ -100,6 +99,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the Fabric API accepts, using the model created earlier in the run or the
   one already there. The file is unchanged. Without such a model the report
   fails with the reason, and nothing is sent.
+- Deletions: with `allow_deletions=True`, `deploy_all_items()` deletes from
+  the workspace an item deleted in Git since the baseline, and
+  `plan_all_items()` plans it as `DELETE`.
+  - Without the flag the item is blocked and fails the run, so the state
+    stays and the deletion is not missed. Deleted by hand, it needs nothing.
+  - Flag or not, a deletion is blocked while an item that stays in the
+    source refers to the item: by a reference the engine reads (as for
+    dependencies), checked against the item as it was at the baseline, or
+    by its ID in the workspace in any file, a lakehouse's SQL analytics
+    endpoint included. Items deleted together do not block each other, and
+    nothing is deleted because another item is.
+  - An item the source still defines in another folder is not deleted,
+    even when the run does not select that folder.
+  - Deletions run last, dependents first, and only when every item before
+    them succeeded; otherwise they are skipped, and the next run plans them
+    again.
+  - A run without a baseline, or a type left out of `item_types`, deletes
+    nothing, and `reconcile_items()` never deletes.
+  - Fabric's default delete applies: an item whose type supports it goes to
+    the workspace recycle bin; semantic models, reports and dataflows are
+    deleted for good. `DeploymentReport` counts `deleted` items. The
+    Deletions page of the documentation explains each case.
 - A lakehouse to create under a name Fabric refuses is blocked in the plan,
   before anything is sent. Fabric's documented rule: start with a letter,
   hold only letters, digits and underscores, up to 123 characters. A

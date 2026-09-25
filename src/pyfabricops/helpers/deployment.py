@@ -8,7 +8,9 @@ builds a ``DeploymentPlan`` from them without changing anything.
 ``DeploymentExecutor`` then applies the plan, and the run returns a
 ``DeploymentReport`` with the outcome of each item, so a partial failure
 reaches the caller instead of being logged and lost. The state is recorded
-only when every item succeeded. Nothing is ever deleted.
+only when every item succeeded. An item deleted from Git is deleted from the
+workspace only when the run allows deletions, after every other item
+succeeded, and only while no item that stays in the source refers to it.
 """
 
 from __future__ import annotations
@@ -18,7 +20,7 @@ import json
 import os
 import time
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import asdict, dataclass, field, fields, replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -31,6 +33,7 @@ from ..core.folders import create_folder, list_folders
 from ..core.workspaces import resolve_workspace
 from ..helpers.content_hash import definition_hash
 from ..helpers.dependencies import (
+    CatalogItem,
     IdReference,
     LocalCatalog,
     pipeline_references,
@@ -96,13 +99,14 @@ DEPLOY_ORDER: tuple[str, ...] = (
 )
 
 DeploymentOutcome: TypeAlias = Literal[
-    "created", "updated", "moved", "failed", "skipped"
+    "created", "updated", "moved", "deleted", "failed", "skipped"
 ]
 
 _ACTIONS: tuple[DeploymentOutcome, ...] = (
     "created",
     "updated",
     "moved",
+    "deleted",
     "failed",
     "skipped",
 )
@@ -138,10 +142,11 @@ class DeploymentResult:
             None when it could not be read.
         path (str): The local item folder.
         action (str): ``"created"``, ``"updated"``, ``"moved"`` (only its
-            folder changed, so its definition was not sent), ``"failed"``,
-            or ``"skipped"`` when the item was not attempted: an item it
-            needs was not deployed, or an earlier one failed with
-            ``fail_fast=True``.
+            folder changed, so its definition was not sent), ``"deleted"``,
+            ``"failed"``, or ``"skipped"`` when the item was not attempted:
+            an item it needs was not deployed, an earlier one failed with
+            ``fail_fast=True``, or, for a deletion, an earlier item was not
+            deployed.
         item_id (str | None): The item ID in the workspace, when known.
         moved (bool): Whether the item was moved to another folder.
         duration_seconds (float): Wall-clock time spent on the item.
@@ -200,9 +205,10 @@ class DeploymentReport:
 
     @property
     def ok(self) -> bool:
-        """True when every item was created, updated or moved."""
+        """True when every item was created, updated, moved or deleted."""
         return all(
-            r.action in ("created", "updated", "moved") for r in self.results
+            r.action in ("created", "updated", "moved", "deleted")
+            for r in self.results
         )
 
     @property
@@ -216,7 +222,7 @@ class DeploymentReport:
 
         Returns:
             dict[str, int]: The number of items created, updated, moved,
-                failed and skipped.
+                deleted, failed and skipped.
         """
         counts: dict[str, int] = {action: 0 for action in _ACTIONS}
         for result in self.results:
@@ -434,6 +440,17 @@ def _parse_display_name(content: bytes, source: str) -> str:
     return display_name
 
 
+def _parse_logical_id(content: bytes) -> str | None:
+    """Read ``config.logicalId`` from a ``.platform`` file, if it has one."""
+    try:
+        platform = json.loads(content)
+    except ValueError:
+        return None
+    config = platform.get("config") if isinstance(platform, dict) else None
+    logical_id = config.get("logicalId") if isinstance(config, dict) else None
+    return logical_id if isinstance(logical_id, str) and logical_id else None
+
+
 def _read_source_items(
     local_items: Sequence[tuple[str, str]], *, start_path: str | None
 ) -> list[SourceItem]:
@@ -484,9 +501,9 @@ def _read_deleted_item(
     folder_path = extract_middle_path(item_path, start_path=start_path)
     platform = f"{change.path}/.platform"
     try:
+        content = detector.read_baseline_file(platform)
         display_name = _parse_display_name(
-            detector.read_baseline_file(platform),
-            f"{platform} at commit {detector.baseline[:12]}",
+            content, f"{platform} at commit {detector.baseline[:12]}"
         )
     except PyFabricOpsError as e:
         return SourceItem(
@@ -502,6 +519,7 @@ def _read_deleted_item(
         display_name=display_name,
         folder_path=folder_path,
         change=SourceChange.DELETED,
+        logical_id=_parse_logical_id(content),
     )
 
 
@@ -693,6 +711,25 @@ def _request_move_item(
     )
 
 
+def _request_delete_item(workspace_id: str, item_id: str) -> ApiResult:
+    """
+    Delete an item, as Fabric deletes it by default.
+
+    Fabric keeps a deleted item in the workspace recycle bin for a while
+    when its type supports it, and deletes any other at once.
+    """
+    return cast(
+        ApiResult,
+        api_request(
+            endpoint=f"/workspaces/{workspace_id}/items/{item_id}",
+            method="delete",
+            return_result=True,
+            # A deletion tried again finds the item gone, which it accepts.
+            retry=True,
+        ),
+    )
+
+
 def _request_item_definition(workspace_id: str, item_id: str) -> ApiResult:
     """Read an item's definition, polling the operation to the end."""
     return cast(
@@ -739,7 +776,7 @@ def _planned_target(
     index: _WorkspaceIndex, action: DeploymentAction
 ) -> dict[str, Any]:
     """
-    Return the workspace item an UPDATE or MOVE action changes.
+    Return the workspace item an UPDATE, MOVE or DELETE action changes.
 
     Raises:
         ConfigurationError: If the item is not in the workspace, which means
@@ -748,16 +785,19 @@ def _planned_target(
     item_type, display_name = _identity(action)
     existing = index.items.get((item_type, display_name))
     if existing is None:
-        planned = (
-            "a move"
-            if action.action is DeploymentActionType.MOVE
-            else "an update"
-        )
+        planned = _PLANNED_AS.get(action.action, "an update")
         raise ConfigurationError(
             f"{display_name}.{item_type} is planned as {planned} but is not "
             "in the workspace."
         )
     return existing
+
+
+# How an action that changes an existing item is named in an error.
+_PLANNED_AS: dict[DeploymentActionType, str] = {
+    DeploymentActionType.MOVE: "a move",
+    DeploymentActionType.DELETE: "a deletion",
+}
 
 
 def _definition_to_send(
@@ -892,6 +932,29 @@ def _create_planned_item(
     return item_id
 
 
+def _delete_planned_item(
+    index: _WorkspaceIndex, action: DeploymentAction
+) -> str:
+    """
+    Delete the item of a DELETE action and drop it from the index.
+
+    An item no longer in the workspace, as when someone deleted it since it
+    was listed, counts as deleted.
+    """
+    existing = _planned_target(index, action)
+    item_id = cast(str, existing["id"])
+    result = _request_delete_item(index.workspace_id, item_id)
+    if result.status_code == 404:
+        logger.info(
+            f"{action.display_name}.{action.item_type} was already gone from "
+            "the workspace."
+        )
+    else:
+        _raise_for_failure(result, "Delete")
+    del index.items[_identity(action)]
+    return item_id
+
+
 def _move_if_needed(
     index: _WorkspaceIndex,
     item_id: str,
@@ -926,20 +989,22 @@ def _move_to(
 
 
 def _apply_action(
-    index: _WorkspaceIndex, action: DeploymentAction
+    index: _WorkspaceIndex,
+    action: DeploymentAction,
+    *,
+    allow_deletions: bool = False,
 ) -> DeploymentResult:
     """Execute one planned action and report the outcome."""
     if action.action is DeploymentActionType.BLOCKED:
         return _action_result(action, "failed", error=action.detail)
-    if action.action is DeploymentActionType.DELETE:
-        # No policy allows deletions yet: refuse, and say what to do.
+    if action.action is DeploymentActionType.DELETE and not allow_deletions:
         return _action_result(
             action,
             "failed",
             error=(
-                "Deleting items is not supported yet; delete "
-                f"{action.display_name}.{action.item_type} from the "
-                "workspace by hand."
+                "Deletions are not allowed in this run: "
+                f"{action.display_name}.{action.item_type} stays in the "
+                "workspace."
             ),
         )
 
@@ -976,6 +1041,9 @@ def _apply_action(
             item_id = cast(str, existing["id"])
             moved = _move_to(index, item_id, existing, folder_id)
             outcome = "moved"
+        elif action.action is DeploymentActionType.DELETE:
+            item_id = _delete_planned_item(index, action)
+            outcome = "deleted"
         else:
             raise ConfigurationError(
                 f"Unsupported deployment action: {action.action.value}."
@@ -1028,7 +1096,8 @@ def _log_report(report: DeploymentReport) -> None:
             SUCCESS_LEVEL,
             f"{len(report.results)} item(s) deployed to workspace "
             f"'{report.workspace}' ({counts['created']} created, "
-            f"{counts['updated']} updated, {counts['moved']} moved) in "
+            f"{counts['updated']} updated, {counts['moved']} moved, "
+            f"{counts['deleted']} deleted) in "
             f"{report.duration_seconds:.1f}s.",
         )
         return
@@ -1076,28 +1145,37 @@ class DeploymentExecutor:
     The executor decides nothing: it creates the items planned as CREATE,
     updates the items planned as UPDATE (moving them first when their folder
     differs), moves the items planned as MOVE without sending their
-    definition, and reports BLOCKED items as failed, creating missing
-    folders on the way. It refuses DELETE, which no policy allows yet,
-    reporting it as failed, and a NOOP gets a log line but no result. An
-    item to create, update or move is skipped when an item of its
-    ``needs`` failed or was skipped, so nothing is deployed without what it
-    needs. A report that points to its semantic model by path is sent with
-    a connection to the model's ID in the workspace instead, since the
-    Fabric API accepts no path. Used by ``deploy_all_items``; not exported
-    from ``pyfabricops`` yet.
+    definition, deletes the items planned as DELETE, and reports BLOCKED
+    items as failed, creating missing folders on the way. A NOOP gets a log
+    line but no result. An item to create, update or move is skipped when
+    an item of its ``needs`` failed or was skipped, so nothing is deployed
+    without what it needs. A deletion is refused, and reported as failed,
+    unless ``allow_deletions`` is set; it is skipped when any action before
+    it failed or was skipped. A report that points to its semantic model by
+    path is sent with a connection to the model's ID in the workspace
+    instead, since the Fabric API accepts no path. Used by
+    ``deploy_all_items``; not exported from ``pyfabricops`` yet.
 
     Args:
         index (_WorkspaceIndex): The workspace items and folders the plan was
             built from.
         fail_fast (bool, optional): Stop at the first failed action and
             report the remaining ones as skipped. Defaults to False.
+        allow_deletions (bool, optional): Delete the items planned as
+            DELETE. Defaults to False: each is reported as failed and left
+            in the workspace.
     """
 
     def __init__(
-        self, index: _WorkspaceIndex, *, fail_fast: bool = False
+        self,
+        index: _WorkspaceIndex,
+        *,
+        fail_fast: bool = False,
+        allow_deletions: bool = False,
     ) -> None:
         self._index = index
         self._fail_fast = fail_fast
+        self._allow_deletions = allow_deletions
 
     def apply(self, plan: DeploymentPlan) -> list[DeploymentResult]:
         """
@@ -1114,6 +1192,8 @@ class DeploymentExecutor:
         # Each item of the run that was not deployed, as a detail for what
         # needs it: "Name.Type, which failed".
         not_deployed: dict[tuple[str, str], str] = {}
+        # Whether every action so far succeeded, which a deletion needs.
+        clean = True
         for position, action in enumerate(plan.actions):
             if action.action is DeploymentActionType.NOOP:
                 _log_noop(action)
@@ -1124,15 +1204,28 @@ class DeploymentExecutor:
                 result = _action_result(
                     action, "skipped", error=f"Needs {not_deployed[unmet[0]]}."
                 )
+            elif action.action is DeploymentActionType.DELETE and not clean:
+                result = _action_result(
+                    action,
+                    "skipped",
+                    error="Not deleted: an item before it failed or was "
+                    "skipped.",
+                )
             else:
-                result = _apply_action(self._index, action)
+                result = _apply_action(
+                    self._index,
+                    action,
+                    allow_deletions=self._allow_deletions,
+                )
             results.append(result)
             _log_result(result)
             which = _NOT_DEPLOYED.get(result.action)
-            if which is not None and action.display_name:
-                not_deployed[_identity(action)] = (
-                    f"{_label(result)}, which {which}"
-                )
+            if which is not None:
+                clean = False
+                if action.display_name:
+                    not_deployed[_identity(action)] = (
+                        f"{_label(result)}, which {which}"
+                    )
 
             if result.action == "failed" and self._fail_fast:
                 results.extend(
@@ -1312,6 +1405,7 @@ def _deploy_all(
     state_backend: DeploymentStateBackend | None = None,
     environment: str | None = None,
     resolve_dependencies: bool = True,
+    allow_deletions: bool = False,
 ) -> DeploymentReport:
     """
     Select, plan and apply; with a state backend, record the run.
@@ -1346,6 +1440,7 @@ def _deploy_all(
         root=path,
         dependencies=dependencies,
         item_types=types,
+        allow_deletions=allow_deletions,
     )
     if tracker is not None:
         tracker.record(
@@ -1365,6 +1460,7 @@ def _plan_all(
     state_backend: DeploymentStateBackend | None = None,
     environment: str | None = None,
     resolve_dependencies: bool = True,
+    allow_deletions: bool = False,
 ) -> DeploymentPlan:
     """
     Build the plan ``_deploy_all`` would apply, and stop there.
@@ -1414,6 +1510,8 @@ def _plan_all(
         dependencies=dependencies,
         item_types=types,
         warnings=_id_warnings(dependencies, index),
+        deletions=_read_deletions(path, items, index),
+        allow_deletions=allow_deletions,
     )
     return planner.plan(
         items, available=dependencies.available if dependencies else ()
@@ -1841,6 +1939,117 @@ def _normal_id(value: str) -> str | None:
         return None
 
 
+@dataclass(frozen=True)
+class _Deletions:
+    """What stays in the source, for the items a run would delete."""
+
+    # Every item of the source, with its folder.
+    source: Mapping[ItemKey, str]
+    # For each item to delete, what still refers to it, and how.
+    referenced_by: Mapping[ItemKey, tuple[str, ...]]
+
+
+def _read_deletions(
+    path: str, items: Sequence[SourceItem], index: _WorkspaceIndex
+) -> _Deletions | None:
+    """
+    Read what stays in the source, when the run has an item to delete.
+
+    Nothing is read unless an item deleted from the source is still in the
+    workspace. Then every local item is listed, so that an item the source
+    still defines elsewhere is kept, and what still refers to an item to
+    delete is found: by the references the dependency scan reads, checked
+    against the item as it was at the baseline commit, and by the ID of the
+    item in the workspace (for a lakehouse, its SQL analytics endpoint's
+    too) in the files of the items that stay.
+    """
+    candidates = {
+        (item.item_type, item.display_name): item
+        for item in items
+        if item.change is SourceChange.DELETED
+        and item.error is None
+        and item.display_name is not None
+        and (item.item_type, item.display_name) in index.items
+    }
+    if not candidates:
+        return None
+
+    catalog = LocalCatalog.read(path, DEPLOY_ORDER)
+    source = {entry.key: entry.path for entry in catalog}
+    gone = {key: item for key, item in candidates.items() if key not in source}
+    if not gone:
+        return _Deletions(source=source, referenced_by={})
+
+    # For each item to delete, each item that refers to it, and how.
+    referrers: dict[ItemKey, dict[ItemKey, str]] = {}
+    scan = scan_references(
+        LocalCatalog(
+            [
+                *catalog,
+                *(
+                    CatalogItem(key, item.source_path, item.logical_id)
+                    for key, item in gone.items()
+                ),
+            ]
+        ),
+        list(source),
+    )
+    for dependency in scan.dependencies:
+        if dependency.target in gone:
+            referrers.setdefault(dependency.target, {}).setdefault(
+                dependency.source, dependency.via
+            )
+
+    ids: dict[str, tuple[ItemKey, str]] = {}
+    for key in gone:
+        owned = [(index.items[key], "its ID")]
+        # Fabric deletes a lakehouse's SQL analytics endpoint with it.
+        endpoint = (
+            index.items.get(("SQLEndpoint", key[1]))
+            if key[0] == "Lakehouse"
+            else None
+        )
+        if endpoint is not None:
+            owned.append((endpoint, "the ID of its SQL analytics endpoint"))
+        for entry, what in owned:
+            item_id = _normal_id(str(entry["id"]))
+            if item_id is not None:
+                ids[item_id] = (key, what)
+    if ids:
+        for local in catalog:
+            for item_id, file in _ids_in(local.path, ids).items():
+                key, what = ids[item_id]
+                referrers.setdefault(key, {}).setdefault(
+                    local.key, f"{what}, in {file}"
+                )
+
+    return _Deletions(
+        source=source,
+        referenced_by={
+            key: tuple(
+                f"{name}.{item_type} ({how})"
+                for (item_type, name), how in found.items()
+            )
+            for key, found in referrers.items()
+        },
+    )
+
+
+def _ids_in(folder: str, ids: Collection[str]) -> dict[str, str]:
+    """Find which IDs the files of an item folder hold, and the first file."""
+    base = Path(folder)
+    found: dict[str, str] = {}
+    for file in sorted(p for p in base.rglob("*") if p.is_file()):
+        try:
+            content = file.read_bytes().lower()
+        except OSError:
+            continue
+        for item_id in ids:
+            if item_id not in found and item_id.encode() in content:
+                found[item_id] = file.relative_to(base).as_posix()
+    return found
+
+
 def _created(
     report: DeploymentReport, dependencies: _Dependencies | None
 ) -> list[SourceItem]:
@@ -1867,6 +2076,8 @@ def _planner(
     dependencies: _Dependencies | None,
     item_types: Sequence[str] | None,
     warnings: Mapping[ItemKey, tuple[str, ...]] | None = None,
+    deletions: _Deletions | None = None,
+    allow_deletions: bool = False,
 ) -> DeploymentPlanner:
     """Return the planner of a run, resolving dependencies when given."""
     return DeploymentPlanner(
@@ -1877,6 +2088,9 @@ def _planner(
         broken=dependencies.broken if dependencies else None,
         item_types=item_types if dependencies else None,
         warnings=warnings,
+        source=deletions.source if deletions else None,
+        referenced_by=deletions.referenced_by if deletions else None,
+        allow_deletions=allow_deletions,
     )
 
 
@@ -1889,14 +2103,16 @@ def _deploy_items(
     root: str | None = None,
     dependencies: _Dependencies | None = None,
     item_types: Sequence[str] | None = None,
+    allow_deletions: bool = False,
 ) -> DeploymentReport:
     """
     Plan, then apply, the deployment of the selected items.
 
     Until the plan is built the run only reads: one listing of the
-    workspace. Every change is made by the executor. ``root`` is the folder
-    the items were read from, for the plan details; with ``dependencies``,
-    the plan meets what the items need, within ``item_types``.
+    workspace, and the source when an item to delete must be checked.
+    Every change is made by the executor. ``root`` is the folder the items
+    were read from, for the plan details; with ``dependencies``, the plan
+    meets what the items need, within ``item_types``.
     """
     report = DeploymentReport(workspace=workspace)
     if not items:
@@ -1927,12 +2143,18 @@ def _deploy_items(
         dependencies=dependencies,
         item_types=item_types,
         warnings=warnings,
+        deletions=(
+            _read_deletions(root, items, index) if root is not None else None
+        ),
+        allow_deletions=allow_deletions,
     )
     plan = planner.plan(
         items, available=dependencies.available if dependencies else ()
     )
 
-    executor = DeploymentExecutor(index, fail_fast=fail_fast)
+    executor = DeploymentExecutor(
+        index, fail_fast=fail_fast, allow_deletions=allow_deletions
+    )
     report.results.extend(executor.apply(plan))
 
     _log_report(report)

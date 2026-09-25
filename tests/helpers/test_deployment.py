@@ -22,6 +22,7 @@ from pyfabricops.helpers.deployment import (
     DeploymentExecutor,
     DeploymentReport,
     DeploymentResult,
+    _request_delete_item,
     _WorkspaceIndex,
 )
 from pyfabricops.helpers.deployment_plan import (
@@ -106,6 +107,10 @@ def fabric() -> Iterator[SimpleNamespace]:
             f"{_ENGINE}._request_move_item",
             return_value=ApiResult(True, 200),
         ) as move,
+        patch(
+            f"{_ENGINE}._request_delete_item",
+            return_value=ApiResult(True, 200),
+        ) as delete,
     ):
         yield SimpleNamespace(
             resolve_workspace=resolve_workspace,
@@ -115,6 +120,7 @@ def fabric() -> Iterator[SimpleNamespace]:
             create=create,
             update=update,
             move=move,
+            delete=delete,
         )
 
 
@@ -486,6 +492,7 @@ def test_missing_platform_file_is_reported(
         "created": 1,
         "updated": 0,
         "moved": 0,
+        "deleted": 0,
         "failed": 1,
         "skipped": 0,
     }
@@ -553,6 +560,7 @@ def test_report_helpers() -> None:
         "created": 1,
         "updated": 1,
         "moved": 0,
+        "deleted": 0,
         "failed": 1,
         "skipped": 0,
     }
@@ -595,7 +603,8 @@ def test_a_report_describes_each_item_then_the_counts() -> None:
             "created  A.Notebook  (1.5s)",
             "failed   S.SemanticModel: Create failed.",
             "skipped  S.Report: Needs S.SemanticModel, which failed.",
-            "1 created, 0 updated, 0 moved, 1 failed, 1 skipped in 1.5s",
+            "1 created, 0 updated, 0 moved, 0 deleted, 1 failed, 1 skipped "
+            "in 1.5s",
         ]
     )
 
@@ -605,7 +614,7 @@ def test_an_empty_report_describes_its_counts() -> None:
     report = DeploymentReport(workspace="Sales-DEV")
 
     assert report.describe() == (
-        "0 created, 0 updated, 0 moved, 0 failed, 0 skipped in 0.0s"
+        "0 created, 0 updated, 0 moved, 0 deleted, 0 failed, 0 skipped in 0.0s"
     )
 
 
@@ -626,6 +635,17 @@ def test_a_moved_item_is_a_success() -> None:
 
     assert report.ok
     assert report.summary()["moved"] == 1
+
+
+def test_a_deleted_item_is_a_success() -> None:
+    """Deleting is what the plan asked for, so the run is still ok."""
+    report = DeploymentReport(
+        workspace="Sales-DEV",
+        results=[DeploymentResult("Notebook", "Old", "old", "deleted")],
+    )
+
+    assert report.ok
+    assert report.summary()["deleted"] == 1
 
 
 # ---------------------------------------------------------------------------
@@ -679,6 +699,7 @@ def test_deploy_all_items_delegates_to_the_engine() -> None:
             state_backend=backend,
             environment="dev",
             resolve_dependencies=False,
+            allow_deletions=True,
         )
 
     engine.assert_called_once_with(
@@ -692,6 +713,7 @@ def test_deploy_all_items_delegates_to_the_engine() -> None:
         state_backend=backend,
         environment="dev",
         resolve_dependencies=False,
+        allow_deletions=True,
     )
 
 
@@ -731,12 +753,13 @@ def _index(
 
 
 def _assert_no_change(fabric: SimpleNamespace) -> None:
-    """No folder or item was created, updated or moved."""
+    """No folder or item was created, updated, moved or deleted."""
     for mutation in (
         fabric.create_folder,
         fabric.create,
         fabric.update,
         fabric.move,
+        fabric.delete,
     ):
         mutation.assert_not_called()
 
@@ -945,10 +968,10 @@ def test_move_missing_from_the_workspace_fails_before_any_change(
     _assert_no_change(fabric)
 
 
-def test_executor_refuses_to_delete(
+def test_executor_refuses_to_delete_unless_allowed(
     root: Path, fabric: SimpleNamespace
 ) -> None:
-    """No policy allows deletions yet: the item is reported, not deleted."""
+    """Without allow_deletions the item is reported, not deleted."""
     index = _index({("Notebook", "Old"): {"id": "nb-old", "folderId": None}})
     plan = DeploymentPlan(
         actions=[_planned(DeploymentActionType.DELETE, root / "Old.Notebook")]
@@ -958,10 +981,162 @@ def test_executor_refuses_to_delete(
 
     assert result.action == "failed"
     assert result.error == (
-        "Deleting items is not supported yet; delete Old.Notebook from the "
-        "workspace by hand."
+        "Deletions are not allowed in this run: Old.Notebook stays in the "
+        "workspace."
     )
     _assert_no_change(fabric)
+
+
+def test_executor_deletes_when_deletions_are_allowed(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """A planned DELETE deletes the workspace item and drops it."""
+    index = _index({("Notebook", "Old"): {"id": "nb-old", "folderId": None}})
+    plan = DeploymentPlan(
+        actions=[_planned(DeploymentActionType.DELETE, root / "Old.Notebook")]
+    )
+
+    (result,) = DeploymentExecutor(index, allow_deletions=True).apply(plan)
+
+    assert (result.action, result.item_id, result.error) == (
+        "deleted",
+        "nb-old",
+        None,
+    )
+    fabric.delete.assert_called_once_with(_WORKSPACE_ID, "nb-old")
+    assert ("Notebook", "Old") not in index.items
+
+
+def test_a_deletion_is_sent_as_safe_to_repeat() -> None:
+    """Deleting twice leaves the same workspace, so it is retried."""
+    with patch(
+        f"{_ENGINE}.api_request", return_value=ApiResult(True, 200)
+    ) as api_request:
+        _request_delete_item(_WORKSPACE_ID, "nb-old")
+
+    assert api_request.call_args.kwargs == {
+        "endpoint": f"/workspaces/{_WORKSPACE_ID}/items/nb-old",
+        "method": "delete",
+        "return_result": True,
+        "retry": True,
+    }
+
+
+def test_an_item_already_gone_counts_as_deleted(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """Someone deleted it since the listing: the plan is met."""
+    fabric.delete.return_value = ApiResult(
+        success=False,
+        status_code=404,
+        error=json.dumps({"errorCode": "ItemNotFound", "message": "Gone."}),
+    )
+    index = _index({("Notebook", "Old"): {"id": "nb-old", "folderId": None}})
+    plan = DeploymentPlan(
+        actions=[_planned(DeploymentActionType.DELETE, root / "Old.Notebook")]
+    )
+
+    (result,) = DeploymentExecutor(index, allow_deletions=True).apply(plan)
+
+    assert result.action == "deleted"
+
+
+def test_a_failed_deletion_gives_the_details_of_the_error(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """Fabric's reason reaches the report, and the item stays listed."""
+    fabric.delete.return_value = _failure("InsufficientWorkspaceRole")
+    index = _index({("Notebook", "Old"): {"id": "nb-old", "folderId": None}})
+    plan = DeploymentPlan(
+        actions=[_planned(DeploymentActionType.DELETE, root / "Old.Notebook")]
+    )
+
+    (result,) = DeploymentExecutor(index, allow_deletions=True).apply(plan)
+
+    assert (result.action, result.error) == (
+        "failed",
+        "Delete failed with 400: InsufficientWorkspaceRole - Something went "
+        "wrong.",
+    )
+    assert ("Notebook", "Old") in index.items
+
+
+def test_a_deletion_missing_from_the_workspace_fails_before_any_change(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """Nothing to delete: the plan does not match the workspace."""
+    plan = DeploymentPlan(
+        actions=[_planned(DeploymentActionType.DELETE, root / "Old.Notebook")]
+    )
+
+    (result,) = DeploymentExecutor(_index(), allow_deletions=True).apply(plan)
+
+    assert result.action == "failed"
+    assert result.error == (
+        "Old.Notebook is planned as a deletion but is not in the workspace."
+    )
+    _assert_no_change(fabric)
+
+
+def test_a_deletion_is_skipped_when_an_item_before_it_failed(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """Deletions go only when every action before them succeeded."""
+    fabric.create.return_value = _failure("InvalidDefinition")
+    index = _index(
+        {
+            ("Report", "Old"): {"id": "rp-old", "folderId": None},
+            ("SemanticModel", "Old"): {"id": "sm-old", "folderId": None},
+        }
+    )
+    plan = DeploymentPlan(
+        actions=[
+            _planned(
+                DeploymentActionType.CREATE, _write_item(root, "A.Notebook")
+            ),
+            _planned(DeploymentActionType.DELETE, root / "Old.Report"),
+            _planned(DeploymentActionType.DELETE, root / "Old.SemanticModel"),
+        ]
+    )
+
+    results = DeploymentExecutor(index, allow_deletions=True).apply(plan)
+
+    assert [(r.display_name, r.item_type, r.action) for r in results] == [
+        ("A", "Notebook", "failed"),
+        ("Old", "Report", "skipped"),
+        ("Old", "SemanticModel", "skipped"),
+    ]
+    assert results[1].error == (
+        "Not deleted: an item before it failed or was skipped."
+    )
+    fabric.delete.assert_not_called()
+
+
+def test_a_refused_deletion_holds_back_the_next_ones(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """A deletion that failed stops the deletions after it."""
+    fabric.delete.side_effect = [_failure("InsufficientWorkspaceRole")]
+    index = _index(
+        {
+            ("Report", "Old"): {"id": "rp-old", "folderId": None},
+            ("SemanticModel", "Old"): {"id": "sm-old", "folderId": None},
+        }
+    )
+    plan = DeploymentPlan(
+        actions=[
+            _planned(DeploymentActionType.DELETE, root / "Old.Report"),
+            _planned(DeploymentActionType.DELETE, root / "Old.SemanticModel"),
+        ]
+    )
+
+    results = DeploymentExecutor(index, allow_deletions=True).apply(plan)
+
+    assert [(r.item_type, r.action) for r in results] == [
+        ("Report", "failed"),
+        ("SemanticModel", "skipped"),
+    ]
+    fabric.delete.assert_called_once_with(_WORKSPACE_ID, "rp-old")
 
 
 def test_noop_actions_get_no_result(
@@ -1139,7 +1314,7 @@ def test_selective_plan_says_why(
             DeploymentReason.ITEM_ADDED,
         ),
         (
-            DeploymentActionType.DELETE,
+            DeploymentActionType.BLOCKED,
             "Report",
             "Old",
             DeploymentReason.ITEM_DELETED,
@@ -1170,7 +1345,7 @@ def test_selective_reports_a_deleted_item_still_in_the_workspace(
     assert [(r.display_name, r.action) for r in report.results] == [
         ("Old", "failed")
     ]
-    assert "delete Old.Notebook from the workspace by hand" in (
+    assert "Deletions are not allowed in this run" in (
         report.results[0].error or ""
     )
     _assert_no_change(fabric)
@@ -1767,6 +1942,7 @@ def test_plan_all_items_delegates_to_the_engine() -> None:
             state_backend=backend,
             environment="dev",
             resolve_dependencies=False,
+            allow_deletions=True,
         )
 
     engine.assert_called_once_with(
@@ -1779,6 +1955,7 @@ def test_plan_all_items_delegates_to_the_engine() -> None:
         state_backend=backend,
         environment="dev",
         resolve_dependencies=False,
+        allow_deletions=True,
     )
 
 
@@ -2221,3 +2398,274 @@ def test_without_dependency_resolution_pipelines_are_not_checked(
     (action,) = _plan(root, resolve_dependencies=False).actions
 
     assert action.detail is None
+
+
+# ---------------------------------------------------------------------------
+# Deletions: what stays in the source
+# ---------------------------------------------------------------------------
+
+_LAKEHOUSE_ID = "00000000-0000-0000-0000-0000000000c1"
+_ENDPOINT_ID = "00000000-0000-0000-0000-0000000000c2"
+
+
+def _delete_folder(git_repo: GitRepo, item_dir: Path) -> None:
+    """Delete an item folder from the source and commit it."""
+    shutil.rmtree(item_dir)
+    git_repo.commit(f"delete {item_dir.name}")
+
+
+def _write_lakehouse(root: Path, name: str, logical_id: str) -> Path:
+    """A lakehouse whose .platform has a logical ID."""
+    lakehouse = root / f"{name}.Lakehouse"
+    lakehouse.mkdir()
+    platform = {
+        "metadata": {"type": "Lakehouse", "displayName": name},
+        "config": {"version": "2.0", "logicalId": logical_id},
+    }
+    (lakehouse / ".platform").write_text(
+        json.dumps(platform), encoding="utf-8"
+    )
+    return lakehouse
+
+
+def _write_notebook(
+    root: Path, relative: str, lakehouse: dict[str, str]
+) -> Path:
+    """A notebook whose metadata names its default lakehouse."""
+    notebook = _write_item(root, relative)
+    meta = json.dumps({"dependencies": {"lakehouse": lakehouse}}, indent=2)
+    (notebook / "notebook-content.py").write_text(
+        "# Fabric notebook source\n\n# METADATA ********************\n\n"
+        + "\n".join(f"# META {line}" for line in meta.splitlines())
+        + "\n",
+        encoding="utf-8",
+    )
+    return notebook
+
+
+def test_an_item_defined_in_another_folder_is_not_deleted(
+    git_repo: GitRepo, root: Path, fabric: SimpleNamespace
+) -> None:
+    """The copy left in the source is not selected, but still counts."""
+    fabric.list_items.return_value = [
+        {"id": "nb-old", "type": "Notebook", "displayName": "Old"},
+    ]
+    first = _write_item(root, "A/Old.Notebook")
+    _write_item(root, "B/Old.Notebook")
+    baseline = git_repo.commit("baseline")
+    _delete_folder(git_repo, first)
+
+    (action,) = _plan(root, baseline_commit=baseline).actions
+
+    assert (action.action, action.detail) == (
+        DeploymentActionType.NOOP,
+        "Still defined at B/Old.Notebook.",
+    )
+
+
+def test_a_model_a_report_still_reads_is_not_deleted(
+    git_repo: GitRepo, root: Path, fabric: SimpleNamespace
+) -> None:
+    """The report stays in the source, bound to the model by path."""
+    fabric.list_items.return_value = [
+        {"id": "sm-sales", "type": "SemanticModel", "displayName": "Sales"},
+        {"id": "rp-sales", "type": "Report", "displayName": "Sales"},
+    ]
+    _sales(root)
+    baseline = git_repo.commit("baseline")
+    _delete_folder(git_repo, root / "Sales.SemanticModel")
+
+    (action,) = _plan(
+        root, baseline_commit=baseline, allow_deletions=True
+    ).actions
+
+    assert (action.action, action.item_type) == (
+        DeploymentActionType.BLOCKED,
+        "SemanticModel",
+    )
+    assert action.detail == (
+        "Still referred to by Sales.Report (definition.pbir byPath)."
+    )
+
+
+def test_a_lakehouse_a_notebook_uses_by_logical_id_is_not_deleted(
+    git_repo: GitRepo, root: Path, fabric: SimpleNamespace
+) -> None:
+    """The logical ID the lakehouse had at the baseline is the match."""
+    fabric.list_items.return_value = [
+        {"id": _LAKEHOUSE_ID, "type": "Lakehouse", "displayName": "Gold"},
+        {"id": "nb-load", "type": "Notebook", "displayName": "Load"},
+    ]
+    lakehouse = _write_lakehouse(root, "Gold", "logical-gold")
+    _write_notebook(
+        root, "Load.Notebook", {"default_lakehouse": "logical-gold"}
+    )
+    baseline = git_repo.commit("baseline")
+    _delete_folder(git_repo, lakehouse)
+
+    (action,) = _plan(
+        root, baseline_commit=baseline, allow_deletions=True
+    ).actions
+
+    assert action.action == DeploymentActionType.BLOCKED
+    assert action.detail == (
+        "Still referred to by Load.Notebook (notebook default lakehouse)."
+    )
+
+
+def test_a_lakehouse_whose_endpoint_a_model_reads_by_id_is_not_deleted(
+    git_repo: GitRepo, root: Path, fabric: SimpleNamespace
+) -> None:
+    """A Direct Lake model holds the ID of the lakehouse's SQL endpoint."""
+    fabric.list_items.return_value = [
+        {"id": _LAKEHOUSE_ID, "type": "Lakehouse", "displayName": "Bronze"},
+        {"id": _ENDPOINT_ID, "type": "SQLEndpoint", "displayName": "Bronze"},
+        {"id": "sm-sales", "type": "SemanticModel", "displayName": "Sales"},
+    ]
+    lakehouse = _write_item(root, "Bronze.Lakehouse")
+    model = _write_item(root, "Sales.SemanticModel")
+    (model / "definition").mkdir()
+    (model / "definition" / "expressions.tmdl").write_text(
+        "expression DatabaseQuery =\n"
+        f'\t\tSql.Database("server", "{_ENDPOINT_ID.upper()}")\n',
+        encoding="utf-8",
+    )
+    baseline = git_repo.commit("baseline")
+    _delete_folder(git_repo, lakehouse)
+
+    (action,) = _plan(
+        root, baseline_commit=baseline, allow_deletions=True
+    ).actions
+
+    assert action.action == DeploymentActionType.BLOCKED
+    assert action.detail == (
+        "Still referred to by Sales.SemanticModel (the ID of its SQL "
+        "analytics endpoint, in definition/expressions.tmdl)."
+    )
+
+
+def test_a_notebook_a_pipeline_runs_by_id_is_not_deleted(
+    git_repo: GitRepo, root: Path, fabric: SimpleNamespace
+) -> None:
+    """The pipeline holds the notebook's ID in the workspace."""
+    fabric.list_items.return_value = [
+        {"id": _NOTEBOOK_ID, "type": "Notebook", "displayName": "Load"},
+        {"id": "pl-daily", "type": "DataPipeline", "displayName": "Daily"},
+    ]
+    notebook = _write_item(root, "Load.Notebook")
+    _write_pipeline(root, _NOTEBOOK_ID, _WORKSPACE_ID)
+    baseline = git_repo.commit("baseline")
+    _delete_folder(git_repo, notebook)
+
+    (action,) = _plan(
+        root, baseline_commit=baseline, allow_deletions=True
+    ).actions
+
+    assert action.action == DeploymentActionType.BLOCKED
+    assert action.detail == (
+        "Still referred to by Daily.DataPipeline (its ID, in "
+        "pipeline-content.json)."
+    )
+
+
+def test_items_deleted_together_do_not_block_each_other(
+    git_repo: GitRepo, root: Path, fabric: SimpleNamespace
+) -> None:
+    """A report deleted with its model leaves nothing that needs it."""
+    fabric.list_items.return_value = [
+        {"id": "sm-sales", "type": "SemanticModel", "displayName": "Sales"},
+        {"id": "rp-sales", "type": "Report", "displayName": "Sales"},
+    ]
+    _sales(root)
+    baseline = git_repo.commit("baseline")
+    shutil.rmtree(root / "Sales.Report")
+    _delete_folder(git_repo, root / "Sales.SemanticModel")
+
+    plan = _plan(root, baseline_commit=baseline, allow_deletions=True)
+
+    assert [(a.action, a.item_type) for a in plan.actions] == [
+        (DeploymentActionType.DELETE, "Report"),
+        (DeploymentActionType.DELETE, "SemanticModel"),
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Deletions: allow_deletions
+# ---------------------------------------------------------------------------
+
+
+def test_what_git_deleted_is_deleted_when_the_run_allows_it(
+    git_repo: GitRepo, root: Path, fabric: SimpleNamespace
+) -> None:
+    """The plan says DELETE, and the executor deletes."""
+    fabric.list_items.return_value = [
+        {"id": "nb-old", "type": "Notebook", "displayName": "Old"},
+    ]
+    old = _write_item(root, "Old.Notebook")
+    baseline = git_repo.commit("baseline")
+    _delete_folder(git_repo, old)
+
+    report = _deploy(root, baseline_commit=baseline, allow_deletions=True)
+
+    assert [(r.display_name, r.action) for r in report.results] == [
+        ("Old", "deleted")
+    ]
+    assert report.ok
+    fabric.delete.assert_called_once_with(_WORKSPACE_ID, "nb-old")
+
+
+def test_the_plan_shows_the_deletion_only_when_allowed(
+    git_repo: GitRepo, root: Path, fabric: SimpleNamespace
+) -> None:
+    """plan_all_items takes the flag too, so it shows what would happen."""
+    fabric.list_items.return_value = [
+        {"id": "nb-old", "type": "Notebook", "displayName": "Old"},
+    ]
+    old = _write_item(root, "Old.Notebook")
+    baseline = git_repo.commit("baseline")
+    _delete_folder(git_repo, old)
+
+    (refused,) = _plan(root, baseline_commit=baseline).actions
+    (allowed,) = _plan(
+        root, baseline_commit=baseline, allow_deletions=True
+    ).actions
+
+    assert (refused.action, allowed.action) == (
+        DeploymentActionType.BLOCKED,
+        DeploymentActionType.DELETE,
+    )
+    _assert_no_change(fabric)
+
+
+def test_the_state_forgets_an_item_once_it_is_deleted(
+    git_repo: GitRepo,
+    root: Path,
+    fabric: SimpleNamespace,
+    state: LocalJsonStateBackend,
+) -> None:
+    """Refused, the state stays; deleted, it moves on without the item."""
+    old = _write_item(root, "Old.Notebook")
+    _write_item(root, "Kept.Notebook")
+    git_repo.commit("first")
+    _deploy(root, state_backend=state, environment="dev")
+    first = _recorded(state, "dev")
+    fabric.list_items.return_value = [
+        {"id": "nb-old", "type": "Notebook", "displayName": "Old"},
+        {"id": "nb-kept", "type": "Notebook", "displayName": "Kept"},
+    ]
+    _delete_folder(git_repo, old)
+    head = git_repo.run("rev-parse", "HEAD")
+
+    refused = _deploy(root, state_backend=state, environment="dev")
+    assert not refused.ok
+    assert _recorded(state, "dev").source_commit == first.source_commit
+
+    deleted = _deploy(
+        root, state_backend=state, environment="dev", allow_deletions=True
+    )
+    assert [(r.display_name, r.action) for r in deleted.results] == [
+        ("Old", "deleted")
+    ]
+    recorded = _recorded(state, "dev")
+    assert recorded.source_commit == head
+    assert set(recorded.items) == {("Notebook", "Kept")}

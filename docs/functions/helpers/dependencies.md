@@ -100,6 +100,14 @@ UPDATE   Load.DataPipeline  SOURCE_CHANGED: Warning: Activity 'Run Orders' refer
 The pipeline is still deployed: an item created in the same run gets its ID
 only when it is created. References to other workspaces are not checked.
 
+## Deletions
+
+The same references keep an item deleted from Git in the workspace while
+an item that stays in the source refers to it, and so does the item's ID in
+the workspace when another item's files hold it: see
+[Deletions](deletions.md). That check runs whatever `resolve_dependencies`
+says.
+
 ## Turning it off
 
 `resolve_dependencies=False` deploys the selected items in `DEPLOY_ORDER`

@@ -67,8 +67,11 @@ def _plan(
     items: list[SourceItem],
     existing: Collection[tuple[str, str]] = (),
     root: str | None = None,
+    allow_deletions: bool = False,
 ) -> DeploymentPlan:
-    return DeploymentPlanner(existing_items=existing, root=root).plan(items)
+    return DeploymentPlanner(
+        existing_items=existing, root=root, allow_deletions=allow_deletions
+    ).plan(items)
 
 
 # ---------------------------------------------------------------------------
@@ -233,17 +236,35 @@ def test_a_changed_item_missing_from_the_workspace_is_created() -> None:
     assert action.action == CREATE
 
 
-def test_a_deleted_item_in_the_workspace_is_planned_for_deletion() -> None:
-    """The plan says DELETE; refusing it is the executor's business."""
+def test_a_deleted_item_in_the_workspace_is_blocked_by_default() -> None:
+    """Without allow_deletions the run fails, so the deletion is not missed."""
     (action,) = _plan(
         [_changed("Old", SourceChange.DELETED)],
         existing={("Notebook", "Old")},
     ).actions
 
-    assert action.action == DELETE
+    assert (action.action, action.reason) == (
+        BLOCKED,
+        DeploymentReason.ITEM_DELETED,
+    )
     assert action.detail == (
-        "Refused until deletions are allowed: delete it from the workspace "
-        "by hand."
+        "Deletions are not allowed in this run: pass allow_deletions=True, "
+        "or delete it from the workspace by hand."
+    )
+
+
+def test_a_deleted_item_in_the_workspace_is_deleted_when_allowed() -> None:
+    """Git deleted it and the run allows deletions: DELETE."""
+    (action,) = _plan(
+        [_changed("Old", SourceChange.DELETED)],
+        existing={("Notebook", "Old")},
+        allow_deletions=True,
+    ).actions
+
+    assert (action.action, action.reason, action.detail) == (
+        DELETE,
+        DeploymentReason.ITEM_DELETED,
+        None,
     )
 
 
@@ -264,6 +285,7 @@ def test_deletions_come_after_every_other_action() -> None:
             _changed("Sales", SourceChange.ADDED, "Report"),
         ],
         existing={("Notebook", "Old"), ("Notebook", "Orders")},
+        allow_deletions=True,
     )
 
     assert [(a.action, a.display_name) for a in plan.actions] == [
@@ -300,6 +322,7 @@ def test_a_workspace_item_is_deleted_once() -> None:
             _changed("Old", SourceChange.DELETED, folder="B"),
         ],
         existing={("Notebook", "Old")},
+        allow_deletions=True,
     )
 
     assert [a.action for a in plan.actions] == [DELETE, NOOP]
@@ -369,6 +392,92 @@ def test_a_deleted_item_with_an_unreadable_baseline_is_blocked() -> None:
         BLOCKED,
         DeploymentReason.ITEM_DELETED,
     )
+
+
+def test_an_item_the_source_still_defines_elsewhere_is_not_deleted() -> None:
+    """Deleting one of its folders is no evidence, even outside the run."""
+    planner = DeploymentPlanner(
+        existing_items={("Notebook", "Old")},
+        root="workspace",
+        source={("Notebook", "Old"): "workspace/Copy/Old.Notebook"},
+    )
+
+    (action,) = planner.plan([_changed("Old", SourceChange.DELETED)]).actions
+
+    assert (action.action, action.detail) == (
+        NOOP,
+        "Still defined at Copy/Old.Notebook.",
+    )
+
+
+def test_a_deletion_is_blocked_while_an_item_still_refers_to_it() -> None:
+    """Nothing is deleted from under an item that needs it."""
+    planner = DeploymentPlanner(
+        existing_items={("SemanticModel", "Sales")},
+        referenced_by={
+            ("SemanticModel", "Sales"): [
+                "Sales.Report (definition.pbir byPath)",
+                "Orders.DataPipeline (its ID, in pipeline-content.json)",
+            ]
+        },
+        allow_deletions=True,
+    )
+
+    (action,) = planner.plan(
+        [_changed("Sales", SourceChange.DELETED, "SemanticModel")]
+    ).actions
+
+    assert (action.action, action.reason) == (
+        BLOCKED,
+        DeploymentReason.ITEM_DELETED,
+    )
+    assert action.detail == (
+        "Still referred to by Sales.Report (definition.pbir byPath); "
+        "Orders.DataPipeline (its ID, in pipeline-content.json)."
+    )
+
+
+def test_a_deletion_referred_to_and_not_allowed_says_both() -> None:
+    """Both must change before it goes, so both are said at once."""
+    planner = DeploymentPlanner(
+        existing_items={("SemanticModel", "Sales")},
+        referenced_by={
+            ("SemanticModel", "Sales"): [
+                "Sales.Report (definition.pbir byPath)"
+            ]
+        },
+    )
+
+    (action,) = planner.plan(
+        [_changed("Sales", SourceChange.DELETED, "SemanticModel")]
+    ).actions
+
+    assert action.action == BLOCKED
+    assert action.detail == (
+        "Still referred to by Sales.Report (definition.pbir byPath). "
+        "Deletions are not allowed in this run: pass allow_deletions=True, "
+        "or delete it from the workspace by hand."
+    )
+
+
+def test_a_reference_to_an_item_gone_from_the_workspace_blocks_nothing() -> (
+    None
+):
+    """With nothing to delete, what refers to the item does not matter."""
+    planner = DeploymentPlanner(
+        existing_items=(),
+        referenced_by={
+            ("SemanticModel", "Sales"): [
+                "Sales.Report (definition.pbir byPath)"
+            ]
+        },
+    )
+
+    (action,) = planner.plan(
+        [_changed("Sales", SourceChange.DELETED, "SemanticModel")]
+    ).actions
+
+    assert action.action == NOOP
 
 
 # ---------------------------------------------------------------------------
