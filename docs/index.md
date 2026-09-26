@@ -17,6 +17,8 @@ Access to the repositoy on [GitHub](https://github.com/alisonpezzott/pyfabricops
 - Authenticate using environment variables (GitHub Secrets, ADO Secrets, .env ...)
 - Manage workspaces, capacities, semantic models, lakehouses, reports and connections
 - Execute Git operations and automate Fabric deployment flows (Power BI inclusive)
+- Deploy from Git with a plan: `plan_all_items()` shows what would change, and `deploy_all_items()` deploys only what changed since the last deployment, in dependency order, with the state and a lock per environment kept in OneLake ([Deployment](functions/helpers/deployment.md))
+- Tell how a workspace stands against the source with `reconcile_items()`, and restore what drifted with `restore_items()` ([Reconciliation](functions/helpers/reconciliation.md))
 - Capture and Manage Git branches automatically for CI/CD scenarios
 - Many use cases and scenarios including yaml for test and deploy using GitHub Actions
 
@@ -107,7 +109,16 @@ This file maps your local branches to Fabric branches, allowing the library to a
 
 ## 🪄 Examples
 
-Visit: [https://github.com/alisonpezzott/pyfabricops-examples](https://github.com/alisonpezzott/pyfabricops-examples)
+The [`examples/`](https://github.com/alisonpezzott/pyfabricops/tree/main/examples) folder has runnable examples:
+
+- a sample workspace with a lakehouse, notebooks, a pipeline, a semantic
+  model and a report;
+- scripts that authenticate, export a workspace and deploy the sample,
+  fully or only what changed;
+- a reconciliation that reports drift, and can restore it;
+- CI definitions for Azure DevOps and GitHub Actions.
+
+More examples: [https://github.com/alisonpezzott/pyfabricops-examples](https://github.com/alisonpezzott/pyfabricops-examples)
 
 
 ## 🧬 Project Structure  
@@ -228,12 +239,14 @@ For complete logging configuration options, refer to the [logging_system.md](fun
 
 To publish a new version to PyPI:
 
-1. Update the version in `pyproject.toml` and `src/pyfabricops/_version.py`
-2. Commit and push changes
-3. Create a new release on GitHub with a tag (e.g., `v0.1.0`)
-4. The GitHub Action will automatically:
+1. Update the version in `pyproject.toml` and `src/pyfabricops/_version.py`, then run `uv lock`
+2. Add the version's section to `CHANGELOG.md`
+3. Commit and push changes
+4. Create a new release on GitHub, tagged `v` and the version (e.g., `v0.7.0`)
+5. The GitHub Action will automatically:
+   - Check that the tag matches the version
    - Run tests
-   - Build the package
+   - Build and check the package
    - Publish to PyPI
 
 ### Testing with TestPyPI
