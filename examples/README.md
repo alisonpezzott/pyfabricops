@@ -9,13 +9,15 @@ them. Everything here is made up: no real tenant, workspace or data.
 
 ## Before you start
 
-- **pyfabricops.** These examples use features of the next release:
-  dependency resolution, deployment state and planning. Until it is out,
-  install from the repository:
+- **pyfabricops 0.7.0 or later**, the first release with the deployment
+  engine these examples use:
 
   ```bash
-  pip install "pyfabricops @ git+https://github.com/alisonpezzott/pyfabricops"
+  pip install -U "pyfabricops>=0.7.0"
   ```
+
+  The CI examples install `pyfabricops>=0.7.0,<0.8.0`: before 1.0, a new
+  minor version may change behavior, so move to one on purpose.
 
 - **A service principal** that can use the Fabric APIs, which is a tenant
   setting, and is a Contributor, or above, on the target workspace.
