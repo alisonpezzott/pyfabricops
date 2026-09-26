@@ -172,6 +172,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `shortcuts.metadata.json`. A difference names the parts that differ.
   `Reconciliation` and `UnmanagedItem` are exported. The Reconciliation
   page of the documentation explains each finding.
+- Journal and resume: with a state backend, `deploy_all_items()` writes
+  the journal of its run next to the state, each time an item ends: what
+  it did, and the hash and folder it sent.
+  - When a run fails, or dies, before it records the state, the next run
+    skips each item still in the workspace that it sent and that has not
+    changed since. The plan says so: "Definition and folder unchanged since
+    an interrupted run sent it at ...".
+  - The state is still recorded only when a whole run succeeds, with what
+    the interrupted runs sent. A run that resumes another carries that
+    run's entries over.
+  - A journal that cannot be written costs only the resume.
+    `LocalJsonStateBackend` and `OneLakeStateBackend` keep journals, as
+    `<environment>.journal.json`; a backend with `load_journal()` and
+    `save_journal()` is a `JournalingStateBackend`. `DeploymentJournal`,
+    `JournalEntry` and `JournalingStateBackend` are exported.
 - `restore_items()` brings a workspace back to the source where it
   drifted. It reconciles as `reconcile_items()` does, then applies what
   undoes the drift, as `deploy_all_items()` applies a plan: an item deleted

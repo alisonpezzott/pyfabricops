@@ -5,8 +5,8 @@ Creates a lakehouse in a sandbox workspace and keeps deployment states in
 it, as a deployment pipeline would. Steps: a state saved and read back; a
 save refused because another run saved first; a lock another run holds;
 an expired lock taken over; a lock removed with ``force_unlock``; and a
-deployment whose state lives in the lakehouse, which a second run then
-reads. At the end the script deletes what it created.
+deployment whose state and journal live in the lakehouse, which a second
+run then reads. At the end the script deletes what it created.
 
 Prerequisites, as for ``scripts/e2e_deployment.py``:
 
@@ -225,6 +225,14 @@ def _step_deployment(run: Run) -> None:
         and state.source_commit == head
         and ("Notebook", run.notebook) in state.items,
         "the state in the lakehouse records the deployment",
+    )
+    journal = run.backend().load_journal("deploy")
+    _check(
+        journal is not None
+        and not journal.interrupted
+        and [(e.display_name, e.outcome) for e in journal.entries]
+        == [(run.notebook, "created")],
+        "the lakehouse keeps the journal of the run",
     )
     _check(
         run.backend().force_unlock("deploy") is None,

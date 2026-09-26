@@ -83,12 +83,38 @@ DeploymentLockedError: Deployment state 'PRD' is locked, held by runner@ci-host 
 - A lock holds no secret: the user and host that took it, the CI run when
   there is one, and when it was taken.
 
+## Journal and resume
+
+A deployment writes the journal of its run next to the state, as
+`<environment>.journal.json`, each time an item ends: what it did to the
+item, and the hash and folder it sent. When a run fails, or dies, before
+it records the state, the next run knows what it already sent, and skips
+each item still in the workspace that has not changed since:
+
+```text
+NOOP     Orders.Notebook  SOURCE_CHANGED: Definition and folder unchanged since an interrupted run sent it at 2026-09-26T10:04:12Z.
+UPDATE   Daily.DataPipeline  SOURCE_CHANGED
+```
+
+- The state is still recorded only when a whole run succeeds; the journal
+  never takes its place. The run that succeeds records what the
+  interrupted runs sent, too.
+- The journal holds the last run. A run that resumes another carries its
+  entries over, so they are not lost if it is interrupted too.
+- Each item costs one small write of the journal, a request of its own in
+  OneLake. A journal that cannot be written costs only the resume: the run
+  warns and goes on.
+- `plan_all_items()` shows the resume; it writes no journal.
+
 ## Other backends
 
 Any object with `load(environment)` and `save(environment, state)` is a
 `DeploymentStateBackend`. One that also has `lock(environment)` and
 `force_unlock(environment)` is a `LockingStateBackend`, and deployments
-hold its lock; one without them works as well, without a lock.
+hold its lock; one with `load_journal(environment)` and
+`save_journal(environment, journal)` is a `JournalingStateBackend`, and
+deployments keep their journal there. One without them works as well,
+without a lock or a resume.
 
 ## Reference
 
