@@ -101,6 +101,8 @@ the items deleted in Git only with `--allow-deletions`; without it, such an
 item fails the run until it is deleted by hand. `07-reconcile` prints what
 differs, changing nothing, and exits with 1 when anything does: an item
 missing from the workspace, one changed or moved there by hand, or one the
-source lacks. The sample workspace is what
+source lacks. With `--restore` it brings back what drifted instead, and
+exits with 1 when an item fails; give it the deployment state, so that
+changes still to deploy are left alone. The sample workspace is what
 `tests/test_examples.py` checks: the plan it gives, what each item needs,
 and that no ID other than its own made-up ones gets into this folder.

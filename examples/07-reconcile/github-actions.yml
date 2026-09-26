@@ -7,6 +7,8 @@
 # - It uses the "prd" environment of 06-ci-github-actions, and reads the
 #   deployment state from the lakehouse that workflow keeps it in, to tell
 #   drift from a deployment still to run. It never saves the state.
+# - To bring back what drifted instead of failing, add --restore to the
+#   Reconcile step.
 # - Until the next pyfabricops release, install it from the repository, as
 #   below; then pin the release instead: pip install "pyfabricops==<version>".
 

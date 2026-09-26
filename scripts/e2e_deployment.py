@@ -22,9 +22,11 @@ workspace bound to the model's ID, when both are created and when only the
 report changes; a reconciliation: in sync after the deployments, then,
 after a notebook edited, another moved, the report deleted and a notebook
 created by hand, each change found with its reason, while a selective
-deployment has nothing to do, as Git did not change; last, the semantic
-model deleted from Git while the report that reads it stays, blocked even
-with deletions allowed, then deleted once the report is deleted too.
+deployment has nothing to do, as Git did not change, and a restore undoes
+the edit, the move and the deletion, leaving the notebook created by hand
+alone; last, the semantic model deleted from Git while the report that
+reads it stays, blocked even with deletions allowed, then deleted with
+the report once the report is deleted too.
 
 Prerequisites:
 
@@ -514,6 +516,26 @@ def _step_reconcile_drift(run: Run) -> None:
         results=[],
     )
 
+    restored = _restore(run, "Restored: each change by hand is undone")
+    _check(
+        [(r.display_name, r.action) for r in restored.results]
+        == [
+            (run.name("A"), "updated"),
+            (run.name("B"), "moved"),
+            (run.name("R"), "created"),
+        ],
+        "the edit, the move and the deletion are undone",
+    )
+    _check_bound(run, "R", model="M")
+    result = _reconcile(run, "Reconciled after the restore")
+    _check(
+        not result.plan.actions
+        and [(u.item_type, u.display_name) for u in result.unmanaged]
+        == [("Notebook", run.name("X"))],
+        "the workspace matches the source again; the notebook created by "
+        "hand is left alone",
+    )
+
 
 def _step_deletion_referenced(run: Run) -> None:
     before = _state(run).source_commit
@@ -539,14 +561,13 @@ def _step_deletion_referenced(run: Run) -> None:
         "semantic model M is still in the workspace",
     )
 
-    # Report R was deleted from the workspace by hand in the step before.
     shutil.rmtree(run.items / f"{report}.Report")
     head = _commit(run, "Delete report R too")
     _deploy_step(
         run,
-        "The report deleted too: the model goes, the report is gone already",
-        plan=[("NOOP", "R"), ("DELETE", "M")],
-        results=[("M", "deleted")],
+        "The report deleted too: the report goes, then the model",
+        plan=[("DELETE", "R"), ("DELETE", "M")],
+        results=[("R", "deleted"), ("M", "deleted")],
         allow_deletions=True,
     )
     state = _state(run)
@@ -557,8 +578,8 @@ def _step_deletion_referenced(run: Run) -> None:
         "the state forgets the model and the report",
     )
     _check(
-        _gone(run, "SemanticModel", model),
-        "semantic model M is gone from the workspace",
+        _gone(run, "SemanticModel", model) and _gone(run, "Report", report),
+        "the model and the report are gone from the workspace",
     )
 
 
@@ -662,6 +683,21 @@ def _reconcile(run: Run, title: str) -> pf.Reconciliation:
     )
     print(_indent(result.describe()))
     return result
+
+
+def _restore(run: Run, title: str) -> pf.DeploymentReport:
+    """Restore the workspace to the staged source, and print the report."""
+    print(f"\n== {title}")
+    staging = _stage(run)
+    report: pf.DeploymentReport = pf.restore_items(
+        run.workspace,
+        staging,
+        start_path=staging,
+        state_backend=run.state,
+        environment=_ENVIRONMENT,
+    )
+    print(_indent(report.describe()))
+    return report
 
 
 def _check(condition: bool, what: str) -> None:
