@@ -1,0 +1,61 @@
+# Reports drift on weekday mornings: compares main with the PRD workspace,
+# the active value sets included, and fails when anything differs, so that
+# someone looks. It never changes the workspace.
+#
+# Before using it:
+# - It uses the "fabric-prd" variable group of azure-pipelines.yml, and
+#   reads the deployment state from the same lakehouse, to tell drift from a
+#   deployment still to run. It never saves the state.
+# - To bring back what drifted instead of failing, replace --reconcile with
+#   --restore. Nothing is deleted either way.
+
+trigger: none
+
+schedules:
+  - cron: "0 6 * * 1-5"
+    displayName: Weekdays at 06:00 UTC
+    branches:
+      include:
+        - main
+    # Run even when main did not change: drift happens in the workspace.
+    always: true
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  - group: fabric-prd
+  - name: SOURCE_WORKSPACE
+    value: Adventure-Works-LT-DEV
+  - name: TARGET_WORKSPACE
+    value: Adventure-Works-LT-PRD
+  - name: STATE_WORKSPACE
+    value: Adventure-Works-LT-OPS
+  - name: STATE_LAKEHOUSE
+    value: deploy_state
+
+steps:
+  - checkout: self
+
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: "3.13"
+
+  - script: pip install "pyfabricops>=0.7.0,<0.8.0"
+    displayName: Install pyfabricops
+
+  - script: >
+      python deploy.py
+      --reconcile
+      --source-workspace "$(SOURCE_WORKSPACE)"
+      --workspace "$(TARGET_WORKSPACE)"
+      --environment PRD
+      --value-set Production
+      --state-workspace "$(STATE_WORKSPACE)"
+      --state-lakehouse "$(STATE_LAKEHOUSE)"
+    displayName: Reconcile
+    env:
+      # Secret variables reach a script only when mapped.
+      FAB_TENANT_ID: $(FAB_TENANT_ID)
+      FAB_CLIENT_ID: $(FAB_CLIENT_ID)
+      FAB_CLIENT_SECRET: $(FAB_CLIENT_SECRET)

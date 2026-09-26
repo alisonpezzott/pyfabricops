@@ -1,0 +1,146 @@
+{
+  "properties": {
+    "activities": [
+      {
+        "type": "ForEach",
+        "typeProperties": {
+          "items": {
+            "value": "@pipeline().parameters.tables",
+            "type": "Expression"
+          },
+          "activities": [
+            {
+              "type": "Copy",
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "partitionOption": "None",
+                  "queryTimeout": "02:00:00",
+                  "datasetSettings": {
+                    "type": "AzureSqlTable",
+                    "typeProperties": {
+                      "schema": "SalesLT",
+                      "table": {
+                        "value": "@item()",
+                        "type": "Expression"
+                      },
+                      "database": "adventureworkslt"
+                    },
+                    "schema": [],
+                    "externalReferences": {
+                      "connection": "@pipeline().libraryVariables.variables_datasource_connection_id"
+                    },
+                    "annotations": []
+                  }
+                },
+                "sink": {
+                  "type": "LakehouseTableSink",
+                  "tableActionOption": "OverwriteSchema",
+                  "applyVOrder": false,
+                  "enableTimestampNtz": false,
+                  "partitionOption": "None",
+                  "datasetSettings": {
+                    "type": "LakehouseTable",
+                    "typeProperties": {
+                      "schema": "SalesLT",
+                      "table": {
+                        "value": "@item()",
+                        "type": "Expression"
+                      }
+                    },
+                    "schema": [],
+                    "linkedService": {
+                      "name": "bronze",
+                      "properties": {
+                        "type": "Lakehouse",
+                        "typeProperties": {
+                          "artifactId": "00000000-0000-4000-8000-000000000101",
+                          "workspaceId": "00000000-0000-0000-0000-000000000000",
+                          "rootFolder": "Tables"
+                        },
+                        "annotations": []
+                      }
+                    },
+                    "annotations": []
+                  }
+                },
+                "translator": {
+                  "type": "TabularTranslator",
+                  "typeConversion": true,
+                  "typeConversionSettings": {
+                    "allowDataTruncation": true,
+                    "treatBooleanAsNumber": false
+                  }
+                },
+                "enableStaging": false
+              },
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureInput": false,
+                "secureOutput": false
+              },
+              "name": "copy_data",
+              "dependsOn": []
+            }
+          ]
+        },
+        "name": "ingest_each_table",
+        "dependsOn": []
+      },
+      {
+        "type": "TridentNotebook",
+        "typeProperties": {
+          "notebookId": "00000000-0000-4000-8000-000000000106",
+          "workspaceId": "00000000-0000-0000-0000-000000000000"
+        },
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureInput": false,
+          "secureOutput": false
+        },
+        "name": "silver_to_gold",
+        "dependsOn": [
+          {
+            "activity": "ingest_each_table",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ]
+      }
+    ],
+    "parameters": {
+      "tables": {
+        "type": "array",
+        "defaultValue": [
+          "Address",
+          "Customer",
+          "CustomerAddress",
+          "Product",
+          "ProductCategory",
+          "ProductDescription",
+          "ProductModel",
+          "ProductModelProductDescription",
+          "SalesOrderDetail",
+          "SalesOrderHeader"
+        ]
+      }
+    },
+    "libraryVariables": {
+      "variables_datasource_server": {
+        "type": "String",
+        "variableName": "datasource_server",
+        "libraryName": "variables"
+      },
+      "variables_datasource_connection_id": {
+        "type": "String",
+        "variableName": "datasource_connection_id",
+        "libraryName": "variables"
+      }
+    }
+  }
+}

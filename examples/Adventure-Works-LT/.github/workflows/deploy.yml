@@ -1,0 +1,62 @@
+# Deploys fabric-workspace/ to the PRD workspace when main changes, with the
+# IDs of PRD in place of those of DEV (see deploy.py).
+#
+# Before the first run:
+# - This folder is the root of the repository, and DEV is connected to its
+#   fabric-workspace folder with Fabric Git integration. GitHub runs the
+#   workflows of .github/workflows at the root only.
+# - An environment named "prd" (Settings > Environments) with the secrets
+#   FAB_TENANT_ID, FAB_CLIENT_ID and FAB_CLIENT_SECRET, of a service
+#   principal that is a Viewer of DEV and a Contributor of PRD and OPS, and
+#   the variables SOURCE_WORKSPACE, TARGET_WORKSPACE, STATE_WORKSPACE and
+#   STATE_LAKEHOUSE. The last two name the lakehouse that keeps the
+#   deployment state. Required reviewers on the environment make a
+#   deployment wait for an approval.
+
+name: Deploy to Fabric
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - fabric-workspace/**
+      - deploy.py
+  workflow_dispatch:
+
+# One deployment at a time: a second run would find the deployment state
+# locked, and fail.
+concurrency:
+  group: deploy-prd
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: prd
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The whole history: the run compares commits.
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install pyfabricops
+        run: pip install "pyfabricops>=0.7.0,<0.8.0"
+
+      - name: Deploy
+        run: >
+          python deploy.py
+          --source-workspace "${{ vars.SOURCE_WORKSPACE }}"
+          --workspace "${{ vars.TARGET_WORKSPACE }}"
+          --environment PRD
+          --value-set Production
+          --state-workspace "${{ vars.STATE_WORKSPACE }}"
+          --state-lakehouse "${{ vars.STATE_LAKEHOUSE }}"
+        env:
+          FAB_TENANT_ID: ${{ secrets.FAB_TENANT_ID }}
+          FAB_CLIENT_ID: ${{ secrets.FAB_CLIENT_ID }}
+          FAB_CLIENT_SECRET: ${{ secrets.FAB_CLIENT_SECRET }}

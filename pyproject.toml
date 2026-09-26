@@ -89,8 +89,8 @@ addopts = "--doctest-modules"
 [tool.ruff]
 line-length = 79
 target-version = "py310"
-# Fabric item sources: notebook cells use %run and the notebook's globals.
-extend-exclude = ["examples/sample-workspace"]
+# Fabric item sources: notebook cells use the notebook's globals.
+extend-exclude = ["examples/Adventure-Works-LT/fabric-workspace"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]

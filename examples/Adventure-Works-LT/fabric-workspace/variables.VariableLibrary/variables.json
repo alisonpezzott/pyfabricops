@@ -1,0 +1,17 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/variableLibrary/definition/variables/1.0.0/schema.json",
+  "variables": [
+    {
+      "name": "datasource_server",
+      "note": "",
+      "type": "String",
+      "value": "your-dev-server.database.windows.net"
+    },
+    {
+      "name": "datasource_connection_id",
+      "note": "",
+      "type": "String",
+      "value": "00000000-0000-4000-8000-000000000301"
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+# Reports drift on weekday mornings: compares main with the PRD workspace,
+# the active value sets included, and fails when anything differs, so that
+# someone looks. It never changes the workspace.
+#
+# It uses the "prd" environment of deploy.yml, and reads the deployment
+# state from the same lakehouse, to tell drift from a deployment still to
+# run. To bring back what drifted instead of failing, replace --reconcile
+# with --restore. Nothing is deleted either way.
+
+name: Reconcile Fabric
+
+on:
+  schedule:
+    - cron: "0 6 * * 1-5"
+  workflow_dispatch:
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    environment: prd
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install pyfabricops
+        run: pip install "pyfabricops>=0.7.0,<0.8.0"
+
+      - name: Reconcile
+        run: >
+          python deploy.py
+          --reconcile
+          --source-workspace "${{ vars.SOURCE_WORKSPACE }}"
+          --workspace "${{ vars.TARGET_WORKSPACE }}"
+          --environment PRD
+          --value-set Production
+          --state-workspace "${{ vars.STATE_WORKSPACE }}"
+          --state-lakehouse "${{ vars.STATE_LAKEHOUSE }}"
+        env:
+          FAB_TENANT_ID: ${{ secrets.FAB_TENANT_ID }}
+          FAB_CLIENT_ID: ${{ secrets.FAB_CLIENT_ID }}
+          FAB_CLIENT_SECRET: ${{ secrets.FAB_CLIENT_SECRET }}
