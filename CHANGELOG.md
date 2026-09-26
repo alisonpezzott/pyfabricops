@@ -172,6 +172,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `shortcuts.metadata.json`. A difference names the parts that differ.
   `Reconciliation` and `UnmanagedItem` are exported. The Reconciliation
   page of the documentation explains each finding.
+- `restore_items()` brings a workspace back to the source where it
+  drifted. It reconciles as `reconcile_items()` does, then applies what
+  undoes the drift, as `deploy_all_items()` applies a plan: an item deleted
+  from the workspace is created again, one edited or moved there is
+  updated or moved back, and a report goes back bound to its model's ID.
+  - An item changed in the source since the last deployment
+    (`SOURCE_CHANGED`) is left to the next deployment. Without a
+    deployment state every difference counts as drift.
+  - Nothing is deleted, and an item whose definition could not be compared
+    is left alone.
+  - It holds the lock of the environment and never records the state. It
+    returns a `DeploymentReport`.
+  - `examples/07-reconcile` takes `--restore`.
 - An `examples/` folder, in the repository but not in the package:
   - a sample workspace in Fabric's Git format, with a lakehouse, notebooks,
     a pipeline, a semantic model and a report that refer to one another;

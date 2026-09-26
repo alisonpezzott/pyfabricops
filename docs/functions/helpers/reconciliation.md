@@ -84,10 +84,50 @@ sent. With it, a difference tells where it comes from:
 
 It tells the same of a folder: moved in the workspace, or in the source.
 
+## Restoring what drifted
+
+`restore_items()` takes the same arguments, and brings the workspace back
+to the source where it drifted: it reconciles, then applies what undoes
+the drift, as `deploy_all_items()` applies a plan.
+
+```python
+report = restore_items(
+    "Sales-PRD",
+    staging,
+    start_path=staging,
+    state_backend=OneLakeStateBackend("Ops", "DeploymentState"),
+    environment="PRD",
+)
+print(report.describe())
+```
+
+```text
+updated  Orders.Notebook  (2.4s)
+moved    Utils.Notebook  (0.6s)
+created  Sales.Report  (3.1s)
+1 created, 1 updated, 1 moved, 0 deleted, 0 failed, 0 skipped in 6.1s
+```
+
+- An item deleted from the workspace is created again (`TARGET_MISSING`),
+  and one edited or moved there is updated or moved back
+  (`WORKSPACE_DRIFT`). A report goes back bound to its semantic model's ID.
+- An item changed in the source since the last deployment
+  (`SOURCE_CHANGED`) is left to the next deployment, which records the
+  state. Without a deployment state every difference counts as drift, so
+  the workspace gets the source as it is, pending deployments included:
+  pass the state to leave those alone.
+- Nothing is deleted: an unmanaged item is only reported. An item whose
+  definition could not be compared is not touched.
+- It holds the lock of the environment, as a deployment does, and never
+  records the state: what goes back is what the last deployment sent.
+- It returns a `DeploymentReport`; a local item that cannot be read is
+  reported as failed.
+
 ## What it does not do
 
-- It never changes the workspace. Deploy to bring back what differs, and
-  delete unmanaged items by hand when they should go.
+- `reconcile_items()` never changes the workspace; `restore_items()`
+  changes only what drifted. Delete unmanaged items by hand when they
+  should go.
 - It reads the definitions one after the other, which takes a while on a
   large workspace.
 

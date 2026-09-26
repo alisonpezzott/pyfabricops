@@ -47,6 +47,7 @@ from ..helpers.deployment_plan import (
     DeploymentActionType,
     DeploymentPlan,
     DeploymentPlanner,
+    DeploymentReason,
     SourceChange,
     SourceItem,
 )
@@ -1562,6 +1563,105 @@ def _reconcile_all(
             invalid.
         RequestError: If its items and folders cannot be listed.
     """
+    reconciliation, _ = _reconcile(
+        workspace,
+        path,
+        start_path=start_path,
+        item_types=item_types,
+        state_backend=state_backend,
+        environment=environment,
+    )
+    _log_reconciliation(workspace, reconciliation)
+    return reconciliation
+
+
+def _restore_all(
+    workspace: str,
+    path: str,
+    *,
+    start_path: str | None = None,
+    item_types: Sequence[str] | None = None,
+    state_backend: DeploymentStateBackend | None = None,
+    environment: str | None = None,
+) -> DeploymentReport:
+    """
+    Reconcile, then bring back what drifted in the workspace.
+
+    With a backend that locks, the run holds the lock of the environment
+    from before it reads the state until the last item is back. The state
+    is never recorded. See ``restore_items`` for the public contract.
+
+    Raises:
+        ConfigurationError: If the workspace is not found, or the state is
+            invalid.
+        RequestError: If its items and folders cannot be listed.
+        DeploymentLockedError: If another run holds the lock.
+    """
+    with _environment_lock(state_backend, environment or workspace):
+        reconciliation, index = _reconcile(
+            workspace,
+            path,
+            start_path=start_path,
+            item_types=item_types,
+            state_backend=state_backend,
+            environment=environment,
+        )
+        _log_reconciliation(workspace, reconciliation)
+        report = DeploymentReport(
+            workspace=workspace, workspace_id=index.workspace_id
+        )
+        report.results.extend(
+            DeploymentExecutor(index).apply(_drift_to_undo(reconciliation))
+        )
+    _log_report(report)
+    return report
+
+
+# The reasons of the reconciliation actions that undo drift.
+_DRIFT = frozenset(
+    {DeploymentReason.TARGET_MISSING, DeploymentReason.WORKSPACE_DRIFT}
+)
+
+
+def _drift_to_undo(reconciliation: Reconciliation) -> DeploymentPlan:
+    """
+    Keep the actions of a reconciliation that undo drift, and the blocked.
+
+    An item changed in the source since the last deployment is left to the
+    next deployment, which records the state.
+    """
+    kept: list[DeploymentAction] = []
+    for action in reconciliation.plan.actions:
+        if action.action is DeploymentActionType.BLOCKED or (
+            action.reason in _DRIFT
+        ):
+            kept.append(action)
+        else:
+            logger.info(
+                f"{action.display_name}.{action.item_type}: changed in the "
+                "source since the last deployment; left to the next "
+                "deployment."
+            )
+    return DeploymentPlan(actions=kept)
+
+
+def _reconcile(
+    workspace: str,
+    path: str,
+    *,
+    start_path: str | None,
+    item_types: Sequence[str] | None,
+    state_backend: DeploymentStateBackend | None,
+    environment: str | None,
+) -> tuple[Reconciliation, _WorkspaceIndex]:
+    """
+    Reconcile, and return the workspace listing the reconciliation used.
+
+    Raises:
+        ConfigurationError: If the workspace is not found, or the state is
+            invalid.
+        RequestError: If its items and folders cannot be listed.
+    """
     types = _ordered_types(item_types)
     # Every local item, whatever the scope: what the source holds is never
     # unmanaged.
@@ -1615,8 +1715,7 @@ def _reconcile_all(
         deployable_types=DEPLOY_ORDER,
         root=path,
     )
-    _log_reconciliation(workspace, reconciliation)
-    return reconciliation
+    return reconciliation, index
 
 
 def _deployed_items(

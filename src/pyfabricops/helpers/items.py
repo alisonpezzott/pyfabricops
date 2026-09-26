@@ -11,6 +11,7 @@ from ..helpers.deployment import (
     _deploy_all,
     _plan_all,
     _reconcile_all,
+    _restore_all,
 )
 from ..helpers.deployment_plan import DeploymentPlan
 from ..helpers.deployment_state import DeploymentStateBackend
@@ -562,6 +563,85 @@ def reconcile_items(
         ```
     """
     return _reconcile_all(
+        workspace,
+        path,
+        start_path=start_path,
+        item_types=item_types,
+        state_backend=state_backend,
+        environment=environment,
+    )
+
+
+def restore_items(
+    workspace: str,
+    path: str,
+    start_path: str | None = None,
+    *,
+    item_types: Sequence[str] | None = None,
+    state_backend: DeploymentStateBackend | None = None,
+    environment: str | None = None,
+) -> DeploymentReport:
+    """
+    Bring a workspace back to the source where it drifted.
+
+    The workspace is reconciled as ``reconcile_items`` does, then what
+    undoes the drift is applied as ``deploy_all_items`` applies a plan: an
+    item deleted from the workspace is created again (``TARGET_MISSING``),
+    and one edited or moved there is updated or moved back
+    (``WORKSPACE_DRIFT``). A report goes back bound to its semantic model's
+    ID in the workspace.
+
+    What is not drift is left alone. An item changed in the source since
+    the last deployment (``SOURCE_CHANGED``) waits for the next deployment,
+    which records the state. Nothing is deleted: an item only the
+    workspace holds is only reported, as unmanaged. An item whose
+    definition could not be compared is not touched. Without
+    ``state_backend`` every difference counts as drift, so the workspace
+    gets the source as it is, pending deployments included.
+
+    With a state backend that locks, the run holds the lock of the
+    environment, as a deployment does. The state is read, never recorded:
+    what goes back is what the last deployment sent.
+
+    Args:
+        workspace (str): The name or ID of the workspace.
+        path (str): The path to the items, such as a staging copy with the
+            placeholders of the environment replaced.
+        start_path (Optional[str]): The local path that maps to the
+            workspace root, used to derive each item's folder.
+        item_types (Sequence[str], optional): The item types to bring back.
+            Defaults to every type in ``DEPLOY_ORDER``.
+        state_backend (DeploymentStateBackend, optional): Where the
+            deployment state is kept. Defaults to None: no state.
+        environment (str, optional): The name the state is kept under.
+            Defaults to ``workspace``.
+
+    Returns:
+        DeploymentReport: The outcome of each item brought back; a local
+            item that cannot be read is reported as failed.
+
+    Raises:
+        ConfigurationError: If the workspace is not found, or the state is
+            invalid.
+        RequestError: If the workspace items and folders cannot be listed.
+        DeploymentLockedError: If another run holds the lock of the
+            environment; nothing was changed.
+
+    Examples:
+        ```python
+        report = restore_items(
+            'Sales-PRD',
+            staging,
+            start_path=staging,
+            state_backend=OneLakeStateBackend('Ops', 'DeploymentState'),
+            environment='prod',
+        )
+        print(report.describe())
+        if not report.ok:
+            raise SystemExit(1)
+        ```
+    """
+    return _restore_all(
         workspace,
         path,
         start_path=start_path,

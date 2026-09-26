@@ -17,6 +17,12 @@ It exits with 1 when anything differs, so that a scheduled CI job fails
 and someone looks. Nothing in the workspace changes: deploy to bring back
 what differs, and delete unmanaged items by hand when they should go.
 
+With ``--restore`` it brings back what drifted instead: what was deleted,
+edited or moved in the workspace goes back, pipelines last, once the items
+they refer to by ID are back. Items changed in the source since the last
+deployment are left to the next one, which takes the deployment state.
+Nothing is deleted. It exits with 1 when an item fails.
+
 Usage::
 
     python examples/07-reconcile/reconcile.py \\
@@ -32,6 +38,7 @@ import sys
 import tempfile
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 from dotenv import load_dotenv
 
@@ -76,6 +83,22 @@ def set_pipeline_ids(staging: str, workspace: str) -> None:
         if key in ids:
             replacements[(PIPELINES, re.escape(placeholder))] = ids[key]
     pf.find_and_replace(staging, replacements)
+
+
+def restore(workspace: str, staging: str, arguments: dict[str, Any]) -> int:
+    """Bring back what drifted, pipelines last; 1 when an item fails."""
+    others = [t for t in pf.DEPLOY_ORDER if t != "DataPipeline"]
+    first = pf.restore_items(
+        workspace, staging, item_types=others, **arguments
+    )
+    print(first.describe())
+    # The pipelines refer to items by ID: set the IDs once those are back.
+    set_pipeline_ids(staging, workspace)
+    pipelines = pf.restore_items(
+        workspace, staging, item_types=["DataPipeline"], **arguments
+    )
+    print(pipelines.describe())
+    return 0 if first.ok and pipelines.ok else 1
 
 
 def state_backend(
@@ -123,6 +146,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         type=Path,
         help="The folder of the state, without a lakehouse.",
     )
+    parser.add_argument(
+        "--restore",
+        action="store_true",
+        help="Bring back what drifted, instead of only reporting it.",
+    )
     args = parser.parse_args(argv)
     if bool(args.state_workspace) != bool(args.state_lakehouse):
         parser.error("--state-workspace and --state-lakehouse go together")
@@ -132,13 +160,16 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     with tempfile.TemporaryDirectory(prefix="pyfabricops-") as staging_dir:
         staging = stage(args.source, staging_dir, args.environment)
+        arguments: dict[str, Any] = {
+            "start_path": staging,
+            "state_backend": state_backend(args),
+            "environment": args.environment,
+        }
+        if args.restore:
+            return restore(args.workspace, staging, arguments)
         set_pipeline_ids(staging, args.workspace)
         reconciliation = pf.reconcile_items(
-            args.workspace,
-            staging,
-            start_path=staging,
-            state_backend=state_backend(args),
-            environment=args.environment,
+            args.workspace, staging, **arguments
         )
     print(reconciliation.describe())
     return 0 if reconciliation.ok else 1
