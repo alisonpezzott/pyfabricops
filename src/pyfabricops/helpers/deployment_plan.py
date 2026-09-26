@@ -163,10 +163,14 @@ class DeployedItem:
         content_hash (str): The hash of the item definition.
         folder_path (str | None): The workspace folder the item was placed
             in, or None for the workspace root.
+        sent_by (str | None): Who sent it, when not the last successful
+            deployment, such as ``"an interrupted run sent it at
+            2026-09-26T10:00:00Z"``; a plan detail tells it.
     """
 
     content_hash: str
     folder_path: str | None = None
+    sent_by: str | None = None
 
 
 @dataclass(frozen=True)

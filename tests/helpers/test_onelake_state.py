@@ -14,8 +14,11 @@ import pytest
 import requests
 
 from pyfabricops.helpers.deployment_state import (
+    DeploymentJournal,
     DeploymentLock,
     DeploymentState,
+    JournalEntry,
+    JournalingStateBackend,
     LockingStateBackend,
 )
 from pyfabricops.helpers.onelake_state import OneLakeStateBackend
@@ -545,3 +548,54 @@ def test_a_lock_timeout_waits_on_onelake_too(
             assert held.lock_id != "other-run"
 
     released.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Journals
+# ---------------------------------------------------------------------------
+
+
+def test_the_onelake_backend_keeps_journals() -> None:
+    """It resumes runs, as the local backend does."""
+    assert isinstance(_backend(), JournalingStateBackend)
+
+
+def test_a_journal_survives_a_round_trip_through_onelake(
+    onelake: SimpleNamespace,
+) -> None:
+    """Next to the state, as <environment>.journal.json."""
+    journal = DeploymentJournal(
+        environment="prod",
+        workspace="Sales-PRD",
+        run_id="run-1",
+        source_commit="a" * 40,
+        started_at_utc="2026-09-26T10:00:00Z",
+        entries=[
+            JournalEntry(
+                item_type="Notebook",
+                display_name="A",
+                outcome="updated",
+                at_utc="2026-09-26T10:01:00Z",
+                content_hash="h",
+            )
+        ],
+    )
+
+    _backend().save_journal("prod", journal)
+
+    assert _backend().load_journal("prod") == journal
+    assert f"{_FOLDER}/prod.journal.json" in onelake.fake.blobs
+
+
+def test_no_journal_in_onelake_loads_none(onelake: SimpleNamespace) -> None:
+    """No run yet kept one."""
+    assert _backend().load_journal("prod") is None
+
+
+def test_a_blob_that_holds_no_journal_is_left_alone(
+    onelake: SimpleNamespace,
+) -> None:
+    """A journal only saves work, so a bad one stops nothing."""
+    onelake.fake.write(f"{_FOLDER}/prod.journal.json", b"{not json")
+
+    assert _backend().load_journal("prod") is None

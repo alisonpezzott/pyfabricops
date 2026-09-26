@@ -33,6 +33,7 @@ from pyfabricops.helpers.deployment_plan import (
     DeploymentReason,
 )
 from pyfabricops.helpers.deployment_state import (
+    DeploymentJournal,
     DeploymentLock,
     DeploymentState,
     LocalJsonStateBackend,
@@ -2827,3 +2828,120 @@ def test_planning_takes_no_lock(
     )
 
     assert [a.display_name for a in plan.actions] == ["A"]
+
+
+# ---------------------------------------------------------------------------
+# Journal: what a run did, item by item
+# ---------------------------------------------------------------------------
+
+
+class _JournalingBackend(LocalJsonStateBackend):
+    """A local backend that keeps a copy of each journal it stores."""
+
+    def __init__(self, folder: Path) -> None:
+        super().__init__(folder)
+        self.journals: list[DeploymentJournal] = []
+
+    def save_journal(
+        self, environment: str, journal: DeploymentJournal
+    ) -> None:
+        self.journals.append(journal)
+        super().save_journal(environment, journal)
+
+
+def test_a_run_journals_each_item_as_it_ends(
+    git_repo: GitRepo,
+    root: Path,
+    fabric: SimpleNamespace,
+    tmp_path_factory: pytest.TempPathFactory,
+) -> None:
+    """Stored at the start, after each item, and at the end."""
+    backend = _JournalingBackend(tmp_path_factory.mktemp("state"))
+    a = _write_item(root, "A.Notebook")
+    _write_item(root, "Sales/B.Notebook")
+    head = git_repo.commit("first")
+
+    _deploy(root, state_backend=backend, environment="dev")
+
+    assert [len(j.entries) for j in backend.journals] == [0, 1, 2, 2]
+    journal = backend.load_journal("dev")
+    assert journal is not None
+    assert (journal.source_commit, journal.ok) == (head, True)
+    assert [
+        (e.display_name, e.outcome, e.folder_path) for e in journal.entries
+    ] == [("A", "created", None), ("B", "created", "Sales")]
+    assert journal.entries[0].content_hash == definition_hash(
+        pack_item_definition(str(a))
+    )
+
+
+def test_a_failed_run_leaves_its_journal_unfinished_as_failed(
+    git_repo: GitRepo,
+    root: Path,
+    fabric: SimpleNamespace,
+    state: LocalJsonStateBackend,
+) -> None:
+    """The state stays; the journal tells what went and what did not."""
+    fabric.create.side_effect = [
+        ApiResult(True, 201, data={"id": "nb-a"}),
+        _failure("InvalidDefinition"),
+    ]
+    _write_item(root, "A.Notebook")
+    _write_item(root, "B.Notebook")
+    git_repo.commit("first")
+
+    report = _deploy(root, state_backend=state, environment="dev")
+
+    assert not report.ok
+    journal = state.load_journal("dev")
+    assert journal is not None and journal.interrupted
+    assert [(e.display_name, e.outcome) for e in journal.entries] == [
+        ("A", "created"),
+        ("B", "failed"),
+    ]
+    assert state.load("dev") is None
+
+
+def test_a_journal_that_cannot_be_stored_does_not_stop_the_run(
+    git_repo: GitRepo,
+    root: Path,
+    fabric: SimpleNamespace,
+    tmp_path_factory: pytest.TempPathFactory,
+) -> None:
+    """It only saves work: the run warns once and goes on without it."""
+    backend = LocalJsonStateBackend(tmp_path_factory.mktemp("state"))
+    _write_item(root, "A.Notebook")
+    _write_item(root, "B.Notebook")
+    git_repo.commit("first")
+
+    with (
+        patch.object(
+            LocalJsonStateBackend,
+            "save_journal",
+            side_effect=OSError("disk full"),
+        ) as save_journal,
+        patch(f"{_ENGINE}.logger") as logger,
+    ):
+        report = _deploy(root, state_backend=backend, environment="dev")
+
+    assert report.ok
+    save_journal.assert_called_once()
+    logger.warning.assert_any_call(
+        "The journal of deployment state 'dev' could not be written (disk "
+        "full); if this run fails, the next one cannot resume it."
+    )
+
+
+def test_planning_writes_no_journal(
+    git_repo: GitRepo,
+    root: Path,
+    fabric: SimpleNamespace,
+    state: LocalJsonStateBackend,
+) -> None:
+    """plan_all_items only reads."""
+    _write_item(root, "A.Notebook")
+    git_repo.commit("first")
+
+    _plan(root, state_backend=state, environment="dev")
+
+    assert state.load_journal("dev") is None
