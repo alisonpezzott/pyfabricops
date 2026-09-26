@@ -174,9 +174,11 @@ from .helpers.deployment_plan import (
     DeploymentReason,
 )
 from .helpers.deployment_state import (
+    DeploymentLock,
     DeploymentState,
     DeploymentStateBackend,
     LocalJsonStateBackend,
+    LockingStateBackend,
 )
 from .helpers.environments import (
     add_environment_external_library_from_pypi,
@@ -409,6 +411,7 @@ from .utils.decorators import df
 from .utils.exceptions import (
     AuthenticationError,
     ConfigurationError,
+    DeploymentLockedError,
     InvalidParameterError,
     OptionNotAvailableError,
     PyFabricOpsError,
@@ -457,6 +460,8 @@ __all__ = [
     "DEPLOY_ORDER",
     "DeploymentAction",
     "DeploymentActionType",
+    "DeploymentLock",
+    "DeploymentLockedError",
     "DeploymentPlan",
     "DeploymentReason",
     "DeploymentReport",
@@ -464,6 +469,7 @@ __all__ = [
     "DeploymentState",
     "DeploymentStateBackend",
     "LocalJsonStateBackend",
+    "LockingStateBackend",
     "Reconciliation",
     "UnmanagedItem",
     "PyFabricOpsFileNotFoundError",

@@ -3,17 +3,26 @@
 from __future__ import annotations
 
 import json
+import os
+import time
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 
 from pyfabricops.helpers.deployment_plan import DeployedItem
 from pyfabricops.helpers.deployment_state import (
+    DeploymentLock,
     DeploymentState,
+    DeploymentStateBackend,
     LocalJsonStateBackend,
+    LockingStateBackend,
 )
-from pyfabricops.utils.exceptions import ConfigurationError
+from pyfabricops.utils.exceptions import (
+    ConfigurationError,
+    DeploymentLockedError,
+)
 
 _WORKSPACE_ID = "00000000-0000-0000-0000-000000000001"
 _OLD = "a" * 40
@@ -229,3 +238,227 @@ def test_commits_must_map_types_to_commit_ids(tmp_path: Path) -> None:
 
     with pytest.raises(ConfigurationError, match="no valid commits"):
         LocalJsonStateBackend(folder).load("prod")
+
+
+# ---------------------------------------------------------------------------
+# Locks
+# ---------------------------------------------------------------------------
+
+
+def _lock_file(backend: LocalJsonStateBackend, environment: str) -> Path:
+    """Where the backend keeps the lock of an environment."""
+    return backend._lock_path(environment)
+
+
+def _write_lock(path: Path, **changes: str) -> DeploymentLock:
+    """Write a lock of another run, with some fields changed."""
+    fields = {
+        "environment": "prod",
+        "lock_id": "other-run",
+        "holder": "ci@runner (GitHub Actions run 42)",
+        "acquired_at_utc": "2026-09-25T10:00:00Z",
+        "expires_at_utc": "2999-01-01T00:00:00Z",
+    }
+    fields.update(changes)
+    lock = DeploymentLock(**fields)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(lock.to_dict()), encoding="utf-8")
+    return lock
+
+
+def test_the_local_backend_locks() -> None:
+    """Both kinds are state backends; only a locking one has a lock."""
+
+    class LoadSaveOnly:
+        def load(self, environment: str) -> DeploymentState | None:
+            return None
+
+        def save(self, environment: str, state: DeploymentState) -> None:
+            pass
+
+    plain: DeploymentStateBackend = LoadSaveOnly()
+
+    assert isinstance(LocalJsonStateBackend("state"), LockingStateBackend)
+    assert not isinstance(plain, LockingStateBackend)
+
+
+def test_a_lock_is_held_for_the_block_and_released_after(
+    backend: LocalJsonStateBackend,
+) -> None:
+    """The lock file says who holds it, and goes when the block ends."""
+    path = _lock_file(backend, "prod")
+
+    with backend.lock("prod") as held:
+        recorded = json.loads(path.read_text(encoding="utf-8"))
+        assert recorded == held.to_dict()
+        assert held.environment == "prod"
+        assert "@" in held.holder
+
+    assert not path.exists()
+
+
+def test_the_holder_names_the_ci_run(
+    backend: LocalJsonStateBackend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A lock taken in a pipeline says which run took it."""
+    monkeypatch.setenv("GITHUB_RUN_ID", "1234")
+
+    with backend.lock("prod") as held:
+        assert held.holder.endswith("(GitHub Actions run 1234)")
+
+
+def test_a_lock_is_released_when_the_block_fails(
+    backend: LocalJsonStateBackend,
+) -> None:
+    """A failed deployment does not leave the environment locked."""
+    with pytest.raises(RuntimeError), backend.lock("prod"):
+        raise RuntimeError("the deployment failed")
+
+    assert not _lock_file(backend, "prod").exists()
+
+
+def test_a_lock_another_run_holds_fails_at_once(
+    backend: LocalJsonStateBackend,
+) -> None:
+    """The error says who holds it, until when, and what to do."""
+    _write_lock(_lock_file(backend, "prod"))
+
+    with pytest.raises(DeploymentLockedError) as caught:
+        with backend.lock("prod"):
+            pass
+
+    assert str(caught.value) == (
+        "Deployment state 'prod' is locked, held by ci@runner (GitHub "
+        "Actions run 42) since 2026-09-25T10:00:00Z, until "
+        "2999-01-01T00:00:00Z. Wait for that run to finish; if it is gone, "
+        "call force_unlock('prod') on the state backend."
+    )
+
+
+def test_a_lock_timeout_waits_for_the_other_run(tmp_path: Path) -> None:
+    """With lock_timeout, the lock is taken once the other run releases it."""
+    backend = LocalJsonStateBackend(tmp_path / "state", lock_timeout=60)
+    path = _lock_file(backend, "prod")
+    _write_lock(path)
+
+    with (
+        patch(
+            "pyfabricops.helpers.deployment_state.time.sleep",
+            side_effect=lambda seconds: path.unlink(),
+        ) as sleep,
+        backend.lock("prod") as held,
+    ):
+        assert held.lock_id != "other-run"
+
+    sleep.assert_called_once()
+
+
+def test_a_lock_timeout_gives_up_in_the_end(tmp_path: Path) -> None:
+    """The other run never releases it: the error comes after the wait."""
+    backend = LocalJsonStateBackend(tmp_path / "state", lock_timeout=10)
+    _write_lock(_lock_file(backend, "prod"))
+    clock = iter([0.0, 5.0, 11.0])
+
+    with (
+        patch(
+            "pyfabricops.helpers.deployment_state.time.monotonic",
+            side_effect=lambda: next(clock),
+        ),
+        patch("pyfabricops.helpers.deployment_state.time.sleep") as sleep,
+        pytest.raises(DeploymentLockedError),
+    ):
+        with backend.lock("prod"):
+            pass
+
+    sleep.assert_called_once_with(5.0)
+
+
+def test_an_expired_lock_is_taken_over(
+    backend: LocalJsonStateBackend,
+) -> None:
+    """Its run never released it; after its validity it no longer counts."""
+    _write_lock(
+        _lock_file(backend, "prod"), expires_at_utc="2026-09-25T12:00:00Z"
+    )
+
+    with backend.lock("prod") as held:
+        assert held.lock_id != "other-run"
+
+    assert not _lock_file(backend, "prod").exists()
+
+
+def test_a_lock_expires_after_its_ttl(tmp_path: Path) -> None:
+    """lock_ttl sets how long a lock holds unless released."""
+    backend = LocalJsonStateBackend(tmp_path / "state", lock_ttl=60)
+
+    with backend.lock("prod") as held:
+        pass
+
+    assert not held.expired
+    assert DeploymentLock.new("prod", -1).expired
+
+
+def test_an_unreadable_lock_counts_as_held_until_its_ttl(
+    tmp_path: Path,
+) -> None:
+    """A lock file caught while written is a lock, not garbage."""
+    backend = LocalJsonStateBackend(tmp_path / "state", lock_ttl=60)
+    path = _lock_file(backend, "prod")
+    path.parent.mkdir(parents=True)
+    path.write_text("", encoding="utf-8")
+
+    with pytest.raises(DeploymentLockedError, match="an unknown run"):
+        with backend.lock("prod"):
+            pass
+
+    hours_ago = time.time() - 2 * 60 * 60
+    os.utime(path, (hours_ago, hours_ago))
+    with backend.lock("prod") as held:
+        assert held.holder != "an unknown run"
+
+
+def test_a_lock_taken_over_meanwhile_is_left_alone(
+    backend: LocalJsonStateBackend,
+) -> None:
+    """The release removes only this run's lock."""
+    path = _lock_file(backend, "prod")
+
+    with backend.lock("prod"):
+        other = _write_lock(path)
+
+    assert json.loads(path.read_text(encoding="utf-8")) == other.to_dict()
+
+
+def test_force_unlock_removes_the_lock_whoever_holds_it(
+    backend: LocalJsonStateBackend,
+) -> None:
+    """For a run that is gone; it says whose lock it was."""
+    other = _write_lock(_lock_file(backend, "prod"))
+
+    assert backend.force_unlock("prod") == other
+    assert backend.force_unlock("prod") is None
+    with backend.lock("prod"):
+        pass
+
+
+def test_each_environment_has_its_own_lock(
+    backend: LocalJsonStateBackend,
+) -> None:
+    """Deploying to prod does not hold back dev."""
+    with backend.lock("prod"), backend.lock("dev"):
+        assert _lock_file(backend, "prod") != _lock_file(backend, "dev")
+
+
+def test_a_lock_file_that_is_no_lock_is_rejected() -> None:
+    """Every field must be there, and the times must be UTC times."""
+    with pytest.raises(ConfigurationError, match="not a deployment lock"):
+        DeploymentLock.from_dict(
+            {
+                "environment": "prod",
+                "lock_id": "x",
+                "holder": "me",
+                "acquired_at_utc": "yesterday",
+                "expires_at_utc": "2999-01-01T00:00:00Z",
+            },
+            source="prod.lock",
+        )

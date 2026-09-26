@@ -7,6 +7,7 @@ import importlib
 import json
 import shutil
 from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -32,11 +33,16 @@ from pyfabricops.helpers.deployment_plan import (
     DeploymentReason,
 )
 from pyfabricops.helpers.deployment_state import (
+    DeploymentLock,
     DeploymentState,
     LocalJsonStateBackend,
 )
 from pyfabricops.helpers.items import deploy_all_items, plan_all_items
-from pyfabricops.utils.exceptions import ConfigurationError, RequestError
+from pyfabricops.utils.exceptions import (
+    ConfigurationError,
+    DeploymentLockedError,
+    RequestError,
+)
 from pyfabricops.utils.utils import pack_item_definition
 from tests.helpers.git_repo import GitRepo
 
@@ -2669,3 +2675,155 @@ def test_the_state_forgets_an_item_once_it_is_deleted(
     recorded = _recorded(state, "dev")
     assert recorded.source_commit == head
     assert set(recorded.items) == {("Notebook", "Kept")}
+
+
+# ---------------------------------------------------------------------------
+# Locks: one deployment to an environment at a time
+# ---------------------------------------------------------------------------
+
+
+class _RecordingBackend(LocalJsonStateBackend):
+    """A local backend that records when the engine uses it."""
+
+    def __init__(self, folder: Path) -> None:
+        super().__init__(folder)
+        self.events: list[str] = []
+
+    def load(self, environment: str) -> DeploymentState | None:
+        self.events.append("load")
+        return super().load(environment)
+
+    def save(self, environment: str, state: DeploymentState) -> None:
+        self.events.append("save")
+        super().save(environment, state)
+
+    @contextmanager
+    def lock(self, environment: str) -> Iterator[DeploymentLock]:
+        self.events.append(f"lock {environment}")
+        with super().lock(environment) as held:
+            yield held
+        self.events.append("unlock")
+
+
+class _MemoryBackend:
+    """A backend with load and save only, and so no lock."""
+
+    def __init__(self) -> None:
+        self.states: dict[str, DeploymentState] = {}
+
+    def load(self, environment: str) -> DeploymentState | None:
+        return self.states.get(environment)
+
+    def save(self, environment: str, state: DeploymentState) -> None:
+        self.states[environment] = state
+
+
+def _lock_of_another_run(folder: Path, environment: str) -> None:
+    """Write the lock of a run still deploying to an environment."""
+    folder.mkdir(parents=True, exist_ok=True)
+    lock = DeploymentLock(
+        environment=environment,
+        lock_id="other-run",
+        holder="ci@runner",
+        acquired_at_utc="2026-09-25T10:00:00Z",
+        expires_at_utc="2999-01-01T00:00:00Z",
+    )
+    (folder / f"{environment}.lock").write_text(
+        json.dumps(lock.to_dict()), encoding="utf-8"
+    )
+
+
+def test_a_deployment_holds_the_lock_from_reading_to_recording(
+    git_repo: GitRepo,
+    root: Path,
+    fabric: SimpleNamespace,
+    tmp_path_factory: pytest.TempPathFactory,
+) -> None:
+    """The state is read and recorded inside the lock, never outside."""
+    backend = _RecordingBackend(tmp_path_factory.mktemp("state"))
+    _write_item(root, "A.Notebook")
+    git_repo.commit("first")
+
+    report = _deploy(root, state_backend=backend, environment="dev")
+
+    assert report.ok
+    assert backend.events == ["lock dev", "load", "save", "unlock"]
+
+
+def test_a_locked_environment_gets_nothing_deployed(
+    git_repo: GitRepo,
+    root: Path,
+    fabric: SimpleNamespace,
+    tmp_path_factory: pytest.TempPathFactory,
+) -> None:
+    """Another run holds the lock: the run stops before any Fabric call."""
+    folder = tmp_path_factory.mktemp("state")
+    _lock_of_another_run(folder, "dev")
+    _write_item(root, "A.Notebook")
+    git_repo.commit("first")
+
+    with pytest.raises(DeploymentLockedError, match="held by ci@runner"):
+        _deploy(
+            root,
+            state_backend=LocalJsonStateBackend(folder),
+            environment="dev",
+        )
+
+    fabric.list_items.assert_not_called()
+    _assert_no_change(fabric)
+
+
+def test_the_lock_is_released_when_the_run_fails(
+    git_repo: GitRepo,
+    root: Path,
+    fabric: SimpleNamespace,
+    state: LocalJsonStateBackend,
+) -> None:
+    """A failed item does not leave the environment locked."""
+    fabric.create.return_value = _failure("InvalidDefinition")
+    _write_item(root, "A.Notebook")
+    git_repo.commit("first")
+
+    report = _deploy(root, state_backend=state, environment="dev")
+
+    assert not report.ok
+    with state.lock("dev"):
+        pass
+
+
+def test_a_backend_without_a_lock_still_deploys(
+    git_repo: GitRepo, root: Path, fabric: SimpleNamespace
+) -> None:
+    """load and save are enough; the log says nothing keeps runs apart."""
+    backend = _MemoryBackend()
+    _write_item(root, "A.Notebook")
+    git_repo.commit("first")
+
+    with patch(f"{_ENGINE}.logger") as logger:
+        report = _deploy(root, state_backend=backend, environment="dev")
+
+    assert report.ok
+    assert "dev" in backend.states
+    logger.info.assert_any_call(
+        "The state backend of environment 'dev' has no lock: nothing keeps "
+        "another run from deploying to it meanwhile."
+    )
+
+
+def test_planning_takes_no_lock(
+    git_repo: GitRepo,
+    root: Path,
+    fabric: SimpleNamespace,
+    tmp_path_factory: pytest.TempPathFactory,
+) -> None:
+    """plan_all_items only reads, so it runs while a deployment does."""
+    folder = tmp_path_factory.mktemp("state")
+    _lock_of_another_run(folder, "dev")
+    _write_item(root, "A.Notebook")
+    git_repo.commit("first")
+
+    plan = _plan(
+        root, state_backend=LocalJsonStateBackend(folder), environment="dev"
+    )
+
+    assert [a.display_name for a in plan.actions] == ["A"]
