@@ -174,9 +174,12 @@ from .helpers.deployment_plan import (
     DeploymentReason,
 )
 from .helpers.deployment_state import (
+    DeploymentJournal,
     DeploymentLock,
     DeploymentState,
     DeploymentStateBackend,
+    JournalEntry,
+    JournalingStateBackend,
     LocalJsonStateBackend,
     LockingStateBackend,
 )
@@ -462,6 +465,7 @@ __all__ = [
     "DEPLOY_ORDER",
     "DeploymentAction",
     "DeploymentActionType",
+    "DeploymentJournal",
     "DeploymentLock",
     "DeploymentLockedError",
     "DeploymentPlan",
@@ -470,6 +474,8 @@ __all__ = [
     "DeploymentResult",
     "DeploymentState",
     "DeploymentStateBackend",
+    "JournalEntry",
+    "JournalingStateBackend",
     "LocalJsonStateBackend",
     "LockingStateBackend",
     "OneLakeStateBackend",

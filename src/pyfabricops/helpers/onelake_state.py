@@ -29,12 +29,15 @@ from ..utils.exceptions import (
 )
 from .deployment_state import (
     LOCK_TTL_SECONDS,
+    DeploymentJournal,
     DeploymentLock,
     DeploymentState,
     _force_unlock,
     _hold_lock,
     _lock_json,
+    _parse_journal,
     _unknown_lock,
+    journal_json,
     state_file_name,
 )
 
@@ -56,7 +59,8 @@ class OneLakeStateBackend:
 
     Each environment gets ``Files/<folder>/<environment>.json`` in the
     lakehouse, named as ``LocalJsonStateBackend`` names its files, and its
-    lock ``<environment>.lock`` next to it. The lakehouse can be in any
+    lock ``<environment>.lock`` and the journal of its last run
+    ``<environment>.journal.json`` next to it. The lakehouse can be in any
     workspace the identity can write to, such as one kept for operations.
 
     A state is saved only over the one ``load`` read, or where there was
@@ -205,6 +209,54 @@ class OneLakeStateBackend:
         else:
             self._check(response, "write", file)
         self._etags[environment] = response.headers.get("ETag")
+
+    def load_journal(self, environment: str) -> DeploymentJournal | None:
+        """
+        Return the journal of the environment's last run, if any.
+
+        A file that holds no journal of the environment is left alone with
+        a warning: a journal only saves work, and its loss costs none.
+
+        Args:
+            environment (str): The environment name.
+
+        Returns:
+            DeploymentJournal | None: The journal, or None.
+
+        Raises:
+            RequestError: If OneLake cannot be read.
+        """
+        file = _journal_file(environment)
+        response = self._request("GET", file)
+        if response.status_code == 404:
+            return None
+        self._check(response, "read the journal", file)
+        return _parse_journal(response.content, self._where(file), environment)
+
+    def save_journal(
+        self, environment: str, journal: DeploymentJournal
+    ) -> None:
+        """
+        Store the journal of a run, replacing the one before.
+
+        Only the run that holds the lock writes the journal, so it is
+        written whatever the file holds.
+
+        Args:
+            environment (str): The environment name.
+            journal (DeploymentJournal): The journal.
+
+        Raises:
+            RequestError: If OneLake cannot be written.
+        """
+        file = _journal_file(environment)
+        response = self._request(
+            "PUT",
+            file,
+            data=journal_json(journal).encode("utf-8"),
+            headers=dict(_LOCK_HEADERS),
+        )
+        self._check(response, "write the journal", file)
 
     def lock(self, environment: str) -> AbstractContextManager[DeploymentLock]:
         """
@@ -400,7 +452,7 @@ class _OneLakeLocks:
         return True
 
 
-# The headers of a lock written as a block blob.
+# The headers of a lock or a journal, written as a block blob.
 _LOCK_HEADERS = {
     "x-ms-blob-type": "BlockBlob",
     "Content-Type": "application/json",
@@ -410,6 +462,11 @@ _LOCK_HEADERS = {
 def _lock_file(environment: str) -> str:
     """Name the file that holds the lock of an environment."""
     return f"{state_file_name(environment)}.lock"
+
+
+def _journal_file(environment: str) -> str:
+    """Name the file that keeps the journal of an environment."""
+    return f"{state_file_name(environment)}.journal.json"
 
 
 def _last_modified(response: requests.Response) -> datetime:

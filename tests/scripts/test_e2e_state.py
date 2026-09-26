@@ -120,6 +120,7 @@ def test_every_step_passes_and_the_run_cleans_up(
     assert workspace.items == {}
     assert not [url for url in onelake.blobs if url.endswith(".lock")]
     assert sorted(url.rsplit("/", 1)[1] for url in onelake.blobs) == [
+        "deploy.journal.json",
         "deploy.json",
         "e2e.json",
     ]

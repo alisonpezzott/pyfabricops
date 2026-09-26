@@ -18,6 +18,12 @@ deploying to one environment at a time: a run holds a ``DeploymentLock``
 from before it reads the state until after it records it. A lock has a
 validity, after which another run may take it over, so a run that died
 holding it does not block the environment for good.
+
+A backend that also keeps journals (``JournalingStateBackend``) holds the
+``DeploymentJournal`` of the last run of each environment: what it did,
+item by item, written as it went. The state is still recorded only when a
+whole run succeeds; the journal tells the next run what a run that failed,
+or died, already sent.
 """
 
 from __future__ import annotations
@@ -30,7 +36,7 @@ import socket
 import tempfile
 import time
 import uuid
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime, timedelta, timezone
@@ -43,9 +49,12 @@ from ..utils.exceptions import ConfigurationError, DeploymentLockedError
 from ..utils.logging import get_logger
 
 __all__ = [
+    "DeploymentJournal",
     "DeploymentLock",
     "DeploymentState",
     "DeploymentStateBackend",
+    "JournalEntry",
+    "JournalingStateBackend",
     "LocalJsonStateBackend",
     "LockingStateBackend",
 ]
@@ -324,6 +333,248 @@ class DeploymentLock:
         return cls(**{name: data[name] for name in (*names, *times)})
 
 
+# The outcomes of a journal entry, and those that sent a definition.
+_OUTCOMES = frozenset(
+    {"created", "updated", "moved", "deleted", "failed", "skipped"}
+)
+_SENT = frozenset({"created", "updated", "moved"})
+
+
+@dataclass(frozen=True)
+class JournalEntry:
+    """
+    What one action of a deployment run did.
+
+    Attributes:
+        item_type (str): The Fabric item type.
+        display_name (str): The item display name.
+        outcome (str): ``"created"``, ``"updated"``, ``"moved"``,
+            ``"deleted"``, ``"failed"`` or ``"skipped"``, as the report says.
+        at_utc (str): When the action ended, as ``YYYY-MM-DDTHH:MM:SSZ``.
+        content_hash (str | None): The hash of the definition the action
+            sent, when known.
+        folder_path (str | None): The workspace folder the item belongs in,
+            or None for the workspace root.
+    """
+
+    item_type: str
+    display_name: str
+    outcome: str
+    at_utc: str
+    content_hash: str | None = None
+    folder_path: str | None = None
+
+
+@dataclass(frozen=True)
+class DeploymentJournal:
+    """
+    The journal of a deployment run: what it did, item by item.
+
+    A run writes its journal as it goes, next to the state, so that when it
+    fails, or dies, before it records the state, the next run knows what it
+    already sent. The journal never takes the place of the state, which is
+    recorded only when a whole run succeeds. It holds no secret.
+
+    Attributes:
+        environment (str): The environment the run deployed to.
+        workspace (str): The workspace name or ID, as given to
+            ``deploy_all_items``.
+        run_id (str): A random ID of the run.
+        source_commit (str): The commit the run deployed.
+        started_at_utc (str): When the run started, as
+            ``YYYY-MM-DDTHH:MM:SSZ``.
+        entries (Sequence[JournalEntry]): What each action did, in the order
+            the actions ended; the first ones may come from the interrupted
+            run this one resumed. Stored as a tuple.
+        finished_at_utc (str | None): When the run ended, or None while it
+            runs, or when it died.
+        ok (bool | None): Whether every item succeeded, once the run ended.
+    """
+
+    environment: str
+    workspace: str
+    run_id: str
+    source_commit: str
+    started_at_utc: str
+    entries: Sequence[JournalEntry] = ()
+    finished_at_utc: str | None = None
+    ok: bool | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "entries", tuple(self.entries))
+
+    @classmethod
+    def start(
+        cls,
+        environment: str,
+        workspace: str,
+        source_commit: str,
+        *,
+        resumed: DeploymentJournal | None = None,
+    ) -> DeploymentJournal:
+        """
+        Begin the journal of a run.
+
+        Args:
+            environment (str): The environment of the run.
+            workspace (str): The workspace, as given to ``deploy_all_items``.
+            source_commit (str): The commit the run deploys.
+            resumed (DeploymentJournal, optional): The journal of the
+                interrupted run this one resumes: its entries are carried
+                over, so that what it sent is not lost if this run is
+                interrupted too.
+
+        Returns:
+            DeploymentJournal: The journal, with no finish yet.
+        """
+        return cls(
+            environment=environment,
+            workspace=workspace,
+            run_id=uuid.uuid4().hex,
+            source_commit=source_commit,
+            started_at_utc=_utc_text(datetime.now(timezone.utc)),
+            entries=resumed.entries if resumed is not None else (),
+        )
+
+    @property
+    def interrupted(self) -> bool:
+        """Whether the run failed, or ended before finishing."""
+        return self.ok is not True
+
+    def with_entry(self, entry: JournalEntry) -> DeploymentJournal:
+        """
+        Add what one more action did.
+
+        Args:
+            entry (JournalEntry): The entry.
+
+        Returns:
+            DeploymentJournal: A journal with the entry last.
+        """
+        return replace(self, entries=(*self.entries, entry))
+
+    def finish(self, ok: bool) -> DeploymentJournal:
+        """
+        Mark the run ended.
+
+        Args:
+            ok (bool): Whether every item succeeded.
+
+        Returns:
+            DeploymentJournal: A journal with its finish.
+        """
+        return replace(
+            self,
+            finished_at_utc=_utc_text(datetime.now(timezone.utc)),
+            ok=ok,
+        )
+
+    def sent(self) -> dict[tuple[str, str], DeployedItem]:
+        """
+        Return what the journaled runs sent successfully, by item.
+
+        Returns:
+            dict[tuple[str, str], DeployedItem]: For each item created,
+                updated or moved, the hash and folder it was sent with, as
+                of its last entry; an item deleted since is left out.
+        """
+        sent: dict[tuple[str, str], DeployedItem] = {}
+        for entry in self.entries:
+            key = (entry.item_type, entry.display_name)
+            if entry.outcome in _SENT and entry.content_hash:
+                sent[key] = DeployedItem(
+                    entry.content_hash,
+                    entry.folder_path,
+                    sent_by=f"an interrupted run sent it at {entry.at_utc}",
+                )
+            elif entry.outcome == "deleted":
+                sent.pop(key, None)
+        return sent
+
+    def to_dict(self) -> dict[str, Any]:
+        """
+        Return the journal as JSON-ready data.
+
+        Returns:
+            dict[str, Any]: The fields, with each entry as a dict.
+        """
+        return {
+            **{name: getattr(self, name) for name in _JOURNAL_FIELDS},
+            "finished_at_utc": self.finished_at_utc,
+            "ok": self.ok,
+            "entries": [asdict(entry) for entry in self.entries],
+        }
+
+    @classmethod
+    def from_dict(cls, data: Any, *, source: str) -> DeploymentJournal:
+        """
+        Read a journal from JSON data.
+
+        Args:
+            data (Any): The parsed JSON.
+            source (str): Where the data came from, for error messages.
+
+        Returns:
+            DeploymentJournal: The journal.
+
+        Raises:
+            ConfigurationError: If the data is not a journal.
+        """
+        if not isinstance(data, dict) or not all(
+            isinstance(data.get(name), str) and data[name]
+            for name in _JOURNAL_FIELDS
+        ):
+            raise ConfigurationError(f"{source} is not a deployment journal.")
+        finished, ok = data.get("finished_at_utc"), data.get("ok")
+        raw = data.get("entries")
+        if not (
+            (finished is None or isinstance(finished, str))
+            and (ok is None or isinstance(ok, bool))
+            and isinstance(raw, list)
+        ):
+            raise ConfigurationError(f"{source} is not a deployment journal.")
+        return cls(
+            **{name: data[name] for name in _JOURNAL_FIELDS},
+            entries=[_read_entry(entry, source) for entry in raw],
+            finished_at_utc=finished,
+            ok=ok,
+        )
+
+
+_JOURNAL_FIELDS = (
+    "environment",
+    "workspace",
+    "run_id",
+    "source_commit",
+    "started_at_utc",
+)
+
+
+def _read_entry(raw: Any, source: str) -> JournalEntry:
+    """Read one entry of a journal."""
+    if not (
+        isinstance(raw, dict)
+        and all(
+            isinstance(raw.get(name), str) and raw[name]
+            for name in ("item_type", "display_name", "outcome", "at_utc")
+        )
+        and raw["outcome"] in _OUTCOMES
+        and all(
+            raw.get(name) is None or isinstance(raw[name], str)
+            for name in ("content_hash", "folder_path")
+        )
+    ):
+        raise ConfigurationError(f"{source} is not a deployment journal.")
+    return JournalEntry(
+        item_type=raw["item_type"],
+        display_name=raw["display_name"],
+        outcome=raw["outcome"],
+        at_utc=raw["at_utc"],
+        content_hash=raw.get("content_hash"),
+        folder_path=raw.get("folder_path"),
+    )
+
+
 class DeploymentStateBackend(Protocol):
     """
     Where deployment states are kept, one per environment.
@@ -367,6 +618,28 @@ class LockingStateBackend(DeploymentStateBackend, Protocol):
         ...
 
 
+@runtime_checkable
+class JournalingStateBackend(DeploymentStateBackend, Protocol):
+    """
+    A state backend that also keeps the journal of each environment's last
+    run.
+
+    ``deploy_all_items`` writes the journal as each item ends. The backends
+    of pyfabricops keep journals; a backend without these methods still
+    works, and a run that fails is then not resumed.
+    """
+
+    def load_journal(self, environment: str) -> DeploymentJournal | None:
+        """Return the journal of the last run, or None without one."""
+        ...
+
+    def save_journal(
+        self, environment: str, journal: DeploymentJournal
+    ) -> None:
+        """Store the journal of a run, replacing the one before."""
+        ...
+
+
 class LocalJsonStateBackend:
     """
     Keep deployment states as JSON files in a local folder.
@@ -380,7 +653,8 @@ class LocalJsonStateBackend:
     The lock of an environment is ``<folder>/<environment>.lock``, created
     only when there is none. It says who holds it and until when; once
     expired, another run takes it over. It keeps apart runs that share the
-    folder, such as two on one machine.
+    folder, such as two on one machine. The journal of the environment's
+    last run is ``<folder>/<environment>.journal.json``.
 
     Args:
         folder (str | Path): The folder of the state files, created on the
@@ -507,9 +781,50 @@ class LocalJsonStateBackend:
         """
         return _force_unlock(self._locks, environment)
 
+    def load_journal(self, environment: str) -> DeploymentJournal | None:
+        """
+        Return the journal of the environment's last run, if any.
+
+        A file that holds no journal of the environment is left alone with
+        a warning: a journal only saves work, and its loss costs none.
+
+        Args:
+            environment (str): The environment name.
+
+        Returns:
+            DeploymentJournal | None: The journal, or None.
+        """
+        path = self._journal_path(environment)
+        try:
+            content = path.read_bytes()
+        except FileNotFoundError:
+            return None
+        return _parse_journal(content, str(path), environment)
+
+    def save_journal(
+        self, environment: str, journal: DeploymentJournal
+    ) -> None:
+        """
+        Store the journal of a run, replacing the one before.
+
+        Args:
+            environment (str): The environment name.
+            journal (DeploymentJournal): The journal.
+
+        Raises:
+            OSError: If the file cannot be written.
+        """
+        path = self._journal_path(environment)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        _replace(path, journal_json(journal))
+
     def _path(self, environment: str) -> Path:
         """Return the file that keeps the state of an environment."""
         return self._folder / f"{state_file_name(environment)}.json"
+
+    def _journal_path(self, environment: str) -> Path:
+        """Return the file that keeps the journal of an environment."""
+        return self._folder / f"{state_file_name(environment)}.journal.json"
 
     def _lock_path(self, environment: str) -> Path:
         """Return the file that holds the lock of an environment."""
@@ -700,6 +1015,36 @@ class _LocalLocks:
             return False
         self._path_of(environment).unlink(missing_ok=True)
         return True
+
+
+def journal_json(journal: DeploymentJournal) -> str:
+    """Write a journal as the JSON its file holds."""
+    return json.dumps(journal.to_dict(), indent=2) + "\n"
+
+
+def _parse_journal(
+    content: bytes, source: str, environment: str
+) -> DeploymentJournal | None:
+    """
+    Read a journal file of an environment.
+
+    A file that holds no journal of the environment is left alone with a
+    warning: a journal only saves work, and its loss costs none.
+    """
+    try:
+        journal = DeploymentJournal.from_dict(
+            json.loads(content), source=source
+        )
+    except (ValueError, ConfigurationError) as e:
+        logger.warning(f"{e} It is left alone; nothing is resumed from it.")
+        return None
+    if journal.environment != environment:
+        logger.warning(
+            f"{source} holds the journal of environment "
+            f"'{journal.environment}', not '{environment}'; it is left alone."
+        )
+        return None
+    return journal
 
 
 def state_file_name(environment: str) -> str:

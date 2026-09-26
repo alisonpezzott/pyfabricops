@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import time
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
@@ -13,9 +14,12 @@ import pytest
 
 from pyfabricops.helpers.deployment_plan import DeployedItem
 from pyfabricops.helpers.deployment_state import (
+    DeploymentJournal,
     DeploymentLock,
     DeploymentState,
     DeploymentStateBackend,
+    JournalEntry,
+    JournalingStateBackend,
     LocalJsonStateBackend,
     LockingStateBackend,
 )
@@ -462,3 +466,145 @@ def test_a_lock_file_that_is_no_lock_is_rejected() -> None:
             },
             source="prod.lock",
         )
+
+
+# ---------------------------------------------------------------------------
+# Journals
+# ---------------------------------------------------------------------------
+
+
+def _journal(
+    *entries: JournalEntry, ok: bool | None = None
+) -> DeploymentJournal:
+    """A journal of prod, with some entries, finished when ok is given."""
+    journal = DeploymentJournal(
+        environment="prod",
+        workspace="Sales-PRD",
+        run_id="run-1",
+        source_commit=_NEW,
+        started_at_utc="2026-09-26T10:00:00Z",
+        entries=entries,
+    )
+    return journal if ok is None else journal.finish(ok)
+
+
+def _entry(
+    name: str, outcome: str, content_hash: str | None = "h"
+) -> JournalEntry:
+    return JournalEntry(
+        item_type="Notebook",
+        display_name=name,
+        outcome=outcome,
+        at_utc="2026-09-26T10:01:00Z",
+        content_hash=content_hash,
+        folder_path="Sales",
+    )
+
+
+def test_a_run_not_finished_or_failed_is_interrupted() -> None:
+    """Only a run that ended with every item done is not."""
+    assert _journal().interrupted
+    assert _journal(ok=False).interrupted
+    assert not _journal(ok=True).interrupted
+
+
+def test_a_journal_tells_what_was_sent_by_the_last_entry_of_each_item() -> (
+    None
+):
+    """Failures send nothing, and a deletion takes the item out."""
+    journal = _journal(
+        _entry("A", "updated", "h1"),
+        _entry("B", "failed", "h2"),
+        _entry("C", "created", "h3"),
+        _entry("C", "deleted", None),
+        _entry("A", "moved", "h4"),
+    )
+
+    sent = journal.sent()
+
+    assert list(sent) == [("Notebook", "A")]
+    assert sent[("Notebook", "A")].content_hash == "h4"
+    assert sent[("Notebook", "A")].folder_path == "Sales"
+    assert sent[("Notebook", "A")].sent_by == (
+        "an interrupted run sent it at 2026-09-26T10:01:00Z"
+    )
+
+
+def test_a_journal_that_resumes_another_carries_its_entries() -> None:
+    """What the interrupted run sent stays known if this one fails too."""
+    interrupted = _journal(_entry("A", "updated"), ok=False)
+
+    journal = DeploymentJournal.start(
+        "prod", "Sales-PRD", _NEW, resumed=interrupted
+    )
+
+    assert journal.entries == interrupted.entries
+    assert journal.run_id != interrupted.run_id
+    assert journal.finished_at_utc is None
+
+
+def test_a_journal_survives_a_round_trip(
+    backend: LocalJsonStateBackend,
+) -> None:
+    """As a JSON file next to the state."""
+    journal = _journal(_entry("A", "updated"), _entry("B", "failed", None))
+
+    backend.save_journal("prod", journal)
+
+    assert backend.load_journal("prod") == journal
+    assert (
+        json.loads(backend._journal_path("prod").read_text(encoding="utf-8"))
+        == journal.to_dict()
+    )
+
+
+def test_an_environment_without_a_journal_loads_none(
+    backend: LocalJsonStateBackend,
+) -> None:
+    """No run yet, or none that kept one."""
+    assert backend.load_journal("prod") is None
+
+
+def test_a_file_that_holds_no_journal_is_left_alone(
+    backend: LocalJsonStateBackend,
+) -> None:
+    """A journal only saves work, so a bad one stops nothing."""
+    path = backend._journal_path("prod")
+    path.parent.mkdir(parents=True)
+    path.write_text('{"environment": "prod"}', encoding="utf-8")
+
+    assert backend.load_journal("prod") is None
+
+
+def test_a_journal_of_another_environment_is_left_alone(
+    backend: LocalJsonStateBackend,
+) -> None:
+    """Two names that map to one file are caught, as for states."""
+    backend.save_journal("prod", replace(_journal(), environment="dev"))
+
+    assert backend.load_journal("prod") is None
+
+
+def test_a_journal_with_an_unknown_outcome_is_rejected() -> None:
+    """Each entry must say what the report would say."""
+    data = _journal(_entry("A", "updated")).to_dict()
+    data["entries"][0]["outcome"] = "maybe"
+
+    with pytest.raises(ConfigurationError, match="not a deployment journal"):
+        DeploymentJournal.from_dict(data, source="prod.journal.json")
+
+
+def test_the_local_backend_keeps_journals() -> None:
+    """It is a journaling backend; one with only load and save is not."""
+
+    class LoadSaveOnly:
+        def load(self, environment: str) -> DeploymentState | None:
+            return None
+
+        def save(self, environment: str, state: DeploymentState) -> None:
+            pass
+
+    plain: DeploymentStateBackend = LoadSaveOnly()
+
+    assert isinstance(LocalJsonStateBackend("state"), JournalingStateBackend)
+    assert not isinstance(plain, JournalingStateBackend)

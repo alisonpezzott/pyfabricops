@@ -163,10 +163,14 @@ class DeployedItem:
         content_hash (str): The hash of the item definition.
         folder_path (str | None): The workspace folder the item was placed
             in, or None for the workspace root.
+        sent_by (str | None): Who sent it, when not the last successful
+            deployment, such as ``"an interrupted run sent it at
+            2026-09-26T10:00:00Z"``; a plan detail tells it.
     """
 
     content_hash: str
     folder_path: str | None = None
+    sent_by: str | None = None
 
 
 @dataclass(frozen=True)
@@ -453,19 +457,18 @@ class DeploymentPlanner:
         sent = self._sent_before(identity, item)
         if sent is None:
             return _action(item, DeploymentActionType.UPDATE)
+        since = sent.sent_by or "the last successful deployment"
         if sent.folder_path == item.folder_path:
             return _action(
                 item,
                 DeploymentActionType.NOOP,
-                "Definition and folder unchanged since the last successful "
-                "deployment.",
+                f"Definition and folder unchanged since {since}.",
             )
         return _action(
             item,
             DeploymentActionType.MOVE,
-            "Definition unchanged since the last successful deployment; "
-            f"folder changed from {_folder(sent.folder_path)} to "
-            f"{_folder(item.folder_path)}.",
+            f"Definition unchanged since {since}; folder changed from "
+            f"{_folder(sent.folder_path)} to {_folder(item.folder_path)}.",
         )
 
     def _sent_before(

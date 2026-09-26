@@ -20,7 +20,7 @@ import json
 import os
 import time
 import uuid
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from contextlib import AbstractContextManager, nullcontext
 from dataclasses import asdict, dataclass, field, fields, replace
 from datetime import datetime, timezone
@@ -52,8 +52,11 @@ from ..helpers.deployment_plan import (
     SourceItem,
 )
 from ..helpers.deployment_state import (
+    DeploymentJournal,
     DeploymentState,
     DeploymentStateBackend,
+    JournalEntry,
+    JournalingStateBackend,
     LockingStateBackend,
 )
 from ..helpers.drift import comparable_parts, differing_parts
@@ -1167,6 +1170,9 @@ class DeploymentExecutor:
         allow_deletions (bool, optional): Delete the items planned as
             DELETE. Defaults to False: each is reported as failed and left
             in the workspace.
+        on_result (Callable, optional): Called with each action and its
+            result as soon as the result is known, such as to write a
+            journal. Defaults to none.
     """
 
     def __init__(
@@ -1175,10 +1181,13 @@ class DeploymentExecutor:
         *,
         fail_fast: bool = False,
         allow_deletions: bool = False,
+        on_result: Callable[[DeploymentAction, DeploymentResult], None]
+        | None = None,
     ) -> None:
         self._index = index
         self._fail_fast = fail_fast
         self._allow_deletions = allow_deletions
+        self._on_result = on_result
 
     def apply(self, plan: DeploymentPlan) -> list[DeploymentResult]:
         """
@@ -1222,6 +1231,7 @@ class DeploymentExecutor:
                 )
             results.append(result)
             _log_result(result)
+            self._tell(action, result)
             which = _NOT_DEPLOYED.get(result.action)
             if which is not None:
                 clean = False
@@ -1231,13 +1241,20 @@ class DeploymentExecutor:
                     )
 
             if result.action == "failed" and self._fail_fast:
-                results.extend(
-                    _action_result(skipped, "skipped")
-                    for skipped in plan.actions[position + 1 :]
-                    if skipped.action is not DeploymentActionType.NOOP
-                )
+                for skipped in plan.actions[position + 1 :]:
+                    if skipped.action is not DeploymentActionType.NOOP:
+                        left = _action_result(skipped, "skipped")
+                        results.append(left)
+                        self._tell(skipped, left)
                 break
         return results
+
+    def _tell(
+        self, action: DeploymentAction, result: DeploymentResult
+    ) -> None:
+        """Pass a result on, to whoever asked to know."""
+        if self._on_result is not None:
+            self._on_result(action, result)
 
 
 def _utc_now() -> str:
@@ -1280,6 +1297,10 @@ class _StateTracker:
     workspace: str
     head: str
     previous: DeploymentState | None
+    # The journal of the interrupted run this one resumes, if any.
+    resumed: DeploymentJournal | None = None
+    # The journal of this run, while the backend can keep it.
+    journal: DeploymentJournal | None = None
 
     @classmethod
     def open(
@@ -1313,7 +1334,14 @@ class _StateTracker:
                 f"'{previous.workspace}', not '{workspace}'; ignoring it."
             )
             previous = None
-        return cls(backend, environment, workspace, head, previous)
+        return cls(
+            backend,
+            environment,
+            workspace,
+            head,
+            previous,
+            resumed=_interrupted_run(backend, environment, workspace),
+        )
 
     def baselines(
         self, item_types: Sequence[str], baseline_commit: str | None
@@ -1340,8 +1368,80 @@ class _StateTracker:
 
     @property
     def deployed_items(self) -> Mapping[tuple[str, str], DeployedItem]:
-        """What the last successful deployment sent for each item."""
-        return self.previous.items if self.previous is not None else {}
+        """
+        What was last sent for each item.
+
+        What the last successful deployment sent, and over it what the
+        interrupted run this one resumes sent successfully.
+        """
+        items = dict(self.previous.items) if self.previous is not None else {}
+        if self.resumed is not None:
+            items.update(self.resumed.sent())
+        return items
+
+    def start_journal(self) -> None:
+        """
+        Begin the journal of the run, when the backend keeps journals.
+
+        It carries the entries of the interrupted run this one resumes, so
+        that what that run sent is not lost if this one is interrupted too.
+        """
+        if isinstance(self.backend, JournalingStateBackend):
+            self.journal = DeploymentJournal.start(
+                self.environment,
+                self.workspace,
+                self.head,
+                resumed=self.resumed,
+            )
+            self._save_journal()
+
+    def journal_result(
+        self,
+        action: DeploymentAction,
+        result: DeploymentResult,
+        content_hash: str | None,
+    ) -> None:
+        """Add what an action did to the journal, and store it at once."""
+        if self.journal is None or action.display_name is None:
+            return
+        self.journal = self.journal.with_entry(
+            JournalEntry(
+                item_type=action.item_type,
+                display_name=action.display_name,
+                outcome=result.action,
+                at_utc=_utc_now(),
+                content_hash=content_hash,
+                folder_path=action.folder_path,
+            )
+        )
+        self._save_journal()
+
+    def finish_journal(self, ok: bool) -> None:
+        """Mark the journal of the run ended, and store it."""
+        if self.journal is not None:
+            self.journal = self.journal.finish(ok)
+            self._save_journal()
+
+    def _save_journal(self) -> None:
+        """
+        Store the journal of the run.
+
+        A journal that cannot be stored costs only a resume: the run goes
+        on without it.
+        """
+        if self.journal is None or not isinstance(
+            self.backend, JournalingStateBackend
+        ):
+            return
+        try:
+            self.backend.save_journal(self.environment, self.journal)
+        except (PyFabricOpsError, OSError) as e:
+            logger.warning(
+                f"The journal of deployment state '{self.environment}' "
+                f"could not be written ({e}); if this run fails, the next "
+                "one cannot resume it."
+            )
+            self.journal = None
 
     def record(
         self,
@@ -1437,6 +1537,8 @@ def _deploy_all(
             if resolve_dependencies and items
             else None
         )
+        if tracker is not None:
+            tracker.start_journal()
         report = _deploy_items(
             workspace,
             items,
@@ -1446,12 +1548,71 @@ def _deploy_all(
             dependencies=dependencies,
             item_types=types,
             allow_deletions=allow_deletions,
+            on_result=(
+                _journal_writer(
+                    tracker,
+                    [
+                        *items,
+                        *(dependencies.available if dependencies else []),
+                    ],
+                )
+                if tracker is not None
+                else None
+            ),
         )
         if tracker is not None:
             tracker.record(
                 report, types, [*items, *_created(report, dependencies)]
             )
+            tracker.finish_journal(report.ok)
     return report
+
+
+def _interrupted_run(
+    backend: DeploymentStateBackend, environment: str, workspace: str
+) -> DeploymentJournal | None:
+    """
+    Return the journal of the environment's last run, if it was interrupted.
+
+    A run that failed, or died, before recording the state left what it
+    sent in its journal: items unchanged since then need not go again.
+    """
+    if not isinstance(backend, JournalingStateBackend):
+        return None
+    journal = backend.load_journal(environment)
+    if journal is None or not journal.interrupted:
+        return None
+    if journal.workspace != workspace:
+        logger.warning(
+            f"The last run of deployment state '{environment}' deployed to "
+            f"workspace '{journal.workspace}', not '{workspace}'; it is not "
+            "resumed."
+        )
+        return None
+    sent = journal.sent()
+    if sent:
+        logger.info(
+            f"Resuming the interrupted run of {journal.started_at_utc}: "
+            f"{len(sent)} item(s) it sent are not sent again while unchanged."
+        )
+    return journal
+
+
+def _journal_writer(
+    tracker: _StateTracker, items: Sequence[SourceItem]
+) -> Callable[[DeploymentAction, DeploymentResult], None]:
+    """Write each result of a run to its journal, with the hash it sent."""
+    hashes = {
+        (item.item_type, item.display_name): item.content_hash
+        for item in items
+        if item.display_name is not None
+    }
+
+    def write(action: DeploymentAction, result: DeploymentResult) -> None:
+        key = (action.item_type, action.display_name or "")
+        tracker.journal_result(action, result, hashes.get(key))
+
+    return write
 
 
 def _environment_lock(
@@ -2226,6 +2387,8 @@ def _deploy_items(
     dependencies: _Dependencies | None = None,
     item_types: Sequence[str] | None = None,
     allow_deletions: bool = False,
+    on_result: Callable[[DeploymentAction, DeploymentResult], None]
+    | None = None,
 ) -> DeploymentReport:
     """
     Plan, then apply, the deployment of the selected items.
@@ -2275,7 +2438,10 @@ def _deploy_items(
     )
 
     executor = DeploymentExecutor(
-        index, fail_fast=fail_fast, allow_deletions=allow_deletions
+        index,
+        fail_fast=fail_fast,
+        allow_deletions=allow_deletions,
+        on_result=on_result,
     )
     report.results.extend(executor.apply(plan))
 

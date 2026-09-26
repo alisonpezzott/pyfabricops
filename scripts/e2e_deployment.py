@@ -11,7 +11,9 @@ Steps: bootstrap without a state; nothing changed; one notebook changed;
 only the layout of a file changed (content hash); a notebook moved to a
 folder, then back to the root, without sending its definition; a run
 limited to notebooks, then a full one; a broken pipeline that fails and
-leaves the state alone; a notebook deleted from Git, blocked until a run
+leaves the state alone; a notebook changed with a pipeline broken in one
+commit, then the next run resuming the failed one from its journal, and
+sending only the pipeline; a notebook deleted from Git, blocked until a run
 allows deletions, which deletes it; a notebook and its default lakehouse:
 the lakehouse created
 first, then only checked when the notebook changes, and once deleted by
@@ -349,6 +351,31 @@ def _step_failure(run: Run) -> None:
     _check(_state(run).source_commit == head, "the state moves to HEAD")
 
 
+def _step_resume(run: Run) -> None:
+    before = _state(run).source_commit
+    _write_notebook(run, "A", version=4)
+    _write_pipeline(run, "P", wait_seconds=None)
+    _commit(run, "Change notebook A and break pipeline P")
+
+    _deploy_step(
+        run,
+        "Notebook A changed and pipeline P broken: A goes, P fails",
+        plan=[("UPDATE", "A"), ("UPDATE", "P")],
+        results=[("A", "updated"), ("P", "failed")],
+    )
+    _check(_state(run).source_commit == before, "the state did not move")
+
+    _write_pipeline(run, "P", wait_seconds=4)
+    head = _commit(run, "Fix pipeline P again")
+    _deploy_step(
+        run,
+        "Fixed: the run resumes the failed one, and sends only P",
+        plan=[("NOOP", "A"), ("UPDATE", "P")],
+        results=[("P", "updated")],
+    )
+    _check(_state(run).source_commit == head, "the state moves to HEAD")
+
+
 def _step_deletion(run: Run) -> None:
     before = _state(run).source_commit
     name = run.name("C")
@@ -592,6 +619,7 @@ _STEPS: tuple[Callable[[Run], None], ...] = (
     _step_move_back,
     _step_partial_run,
     _step_failure,
+    _step_resume,
     _step_deletion,
     _step_dependency,
     _step_dependency_in_place,
