@@ -7,11 +7,11 @@ semantic model by connection; this script turns them back into a path to
 the model's folder, the form a repository keeps and the deployment engine
 reads.
 
-Before committing, look through the exported files. They hold the IDs of
-that workspace, such as a pipeline's notebook or a notebook's default
-lakehouse: replace them with placeholders, as in
-``examples/sample-workspace``, and keep client data out of the
-repository.
+Before committing, look through the exported files, and keep client data
+out of the repository. They hold the IDs of that workspace, such as a
+pipeline's notebook or a notebook's default lakehouse. Leave them: the
+deployment of ``examples/Adventure-Works-LT``, given that workspace as its
+source, turns them into the IDs of the workspace it deploys to.
 
 Usage::
 

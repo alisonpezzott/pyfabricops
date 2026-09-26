@@ -1,11 +1,10 @@
 # pyfabricops examples
 
-Runnable examples of pyfabricops, and a sample workspace to deploy with
-them. Everything here is made up: no real tenant, workspace or data.
+Runnable examples of pyfabricops. Everything here is made up: no real
+tenant, workspace or data.
 
 > Never commit credentials, real workspace IDs or client data. Keep
-> secrets in a `.env` file outside Git, or in your CI secret store, and
-> use placeholders in item definitions.
+> secrets in a `.env` file outside Git, or in your CI secret store.
 
 ## Before you start
 
@@ -16,11 +15,11 @@ them. Everything here is made up: no real tenant, workspace or data.
   pip install -U "pyfabricops>=0.7.0"
   ```
 
-  The CI examples install `pyfabricops>=0.7.0,<0.8.0`: before 1.0, a new
-  minor version may change behavior, so move to one on purpose.
+  The CI definitions install `pyfabricops>=0.7.0,<0.8.0`: before 1.0, a
+  new minor version may change behavior, so move to one on purpose.
 
 - **A service principal** that can use the Fabric APIs, which is a tenant
-  setting, and is a Contributor, or above, on the target workspace.
+  setting, with a role on the workspaces it works on.
 - **A `.env` file** with its credentials, kept out of Git:
 
   ```text
@@ -29,82 +28,22 @@ them. Everything here is made up: no real tenant, workspace or data.
   FAB_TENANT_ID=<tenant-id>
   ```
 
-- **A workspace on a Fabric capacity** to deploy to: a sandbox, the first
-  time.
-- **A lakehouse for the deployment state**, for `04-deploy-selective`, the
-  CI examples and `07-reconcile`: in a workspace of its own, such as one
-  for operations, where the service principal is a Contributor too. On
-  your machine, `--state-dir` keeps the state in a local folder instead.
-
-## The sample workspace
-
-`sample-workspace/` holds six items in the format Fabric Git integration
-writes. Its folders become workspace folders.
-
-```text
-sample-workspace/
-├── Data/
-│   ├── Bronze.Lakehouse         raw data, with schemas
-│   ├── Utils.Notebook           helpers, loaded with %run Utils
-│   ├── LoadOrders.Notebook      loads the sample orders into Bronze
-│   └── DailyLoad.DataPipeline   runs LoadOrders
-└── Reports/
-    ├── Sales.SemanticModel      a sales model, with its data inline
-    └── Sales.Report             one page on the Sales model
-```
-
-The items refer to one another, and the deployment engine follows these
-references:
-
-| Item | Needs | Through |
-| :--- | :--- | :--- |
-| LoadOrders.Notebook | Bronze.Lakehouse | its default lakehouse, by logical ID |
-| LoadOrders.Notebook | Utils.Notebook | `%run Utils` |
-| Sales.Report | Sales.SemanticModel | `definition.pbir`, by path |
-| DailyLoad.DataPipeline | LoadOrders.Notebook | the notebook ID, known once it is deployed |
-
-So the lakehouse and Utils are deployed before LoadOrders, and the model
-before the report. The report, which points to the model by path in Git,
-is sent bound to the model's ID in the target workspace.
-
-Placeholders are replaced in a staging copy, never in Git:
-
-| Placeholder | In | Replaced with |
-| :--- | :--- | :--- |
-| `#{environment}#` | `Sales.SemanticModel/definition/expressions.tmdl` | the environment name, which the report shows |
-| `#{workspace_id}#` | `DailyLoad.DataPipeline/pipeline-content.json` | the ID of the target workspace |
-| `#{load_orders_notebook_id}#` | `DailyLoad.DataPipeline/pipeline-content.json` | the ID of LoadOrders in the target workspace |
-
-The model holds its data inline, so it deploys and refreshes without a
-data source. A real model would read the lakehouse, with its connection in
-`expressions.tmdl` replaced the same way.
-
 ## The examples
 
 | Folder | What it shows |
 | :--- | :--- |
 | `01-authentication/` | Authenticating with a service principal from `.env`, and the other ways to sign in. |
 | `02-export/` | Exporting a workspace to a folder, to start a repository from it. |
-| `03-deploy-full/` | Deploying a folder of items: staging, placeholders, plan, then deploy, pipelines last. |
-| `04-deploy-selective/` | Deploying only what changed in Git since the last successful deployment, with a deployment state in a lakehouse or a local folder. |
-| `05-ci-azure-devops/` | An Azure Pipelines definition that runs the selective deployment. |
-| `06-ci-github-actions/` | A GitHub Actions workflow that runs it. |
-| `07-reconcile/` | Reporting drift: how the workspace stands against the source, with scheduled Azure DevOps and GitHub Actions definitions that fail when anything differs. |
+| `Adventure-Works-LT/` | A medallion project as Fabric Git integration writes it, deployed from a DEV workspace connected to Git to PRD: the IDs of DEV become those of PRD, the value set of PRD is made active, and a drift report can restore what changed by hand. With CI for Azure DevOps and GitHub Actions. |
 
-Run the scripts from the repository root, for example:
+Run the first two from the repository root, for example:
 
 ```bash
-python examples/03-deploy-full/deploy.py --workspace <workspace-name> --environment DEV
+python examples/02-export/export_workspace.py --workspace <workspace-name> --path exported
 ```
 
-`03-deploy-full` and `04-deploy-selective` print the plan before they
-deploy, and exit with 1 when an item fails. `04-deploy-selective` deletes
-the items deleted in Git only with `--allow-deletions`; without it, such an
-item fails the run until it is deleted by hand. `07-reconcile` prints what
-differs, changing nothing, and exits with 1 when anything does: an item
-missing from the workspace, one changed or moved there by hand, or one the
-source lacks. With `--restore` it brings back what drifted instead, and
-exits with 1 when an item fails; give it the deployment state, so that
-changes still to deploy are left alone. The sample workspace is what
-`tests/test_examples.py` checks: the plan it gives, what each item needs,
-and that no ID other than its own made-up ones gets into this folder.
+`Adventure-Works-LT/` is the root of a repository of its own: its README
+tells how to set it up and run it. `tests/test_examples.py` checks it: what
+the deployment engine plans for it, how its script translates each
+reference, and that no ID other than its made-up ones gets into this
+folder.

@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- The examples deploy from a workspace connected to Git.
+  `examples/Adventure-Works-LT` holds a medallion project on Adventure
+  Works LT, as Fabric Git integration writes it, and `deploy.py`, which
+  deploys it to another workspace:
+  - in a staging copy, each ID of the source workspace becomes the ID of
+    the same item in the target, whether a definition holds its ID or its
+    logical ID; a shortcut to an item of the same workspace gets the
+    logical ID of that item in the target;
+  - the item types go one at a time, pipelines last, and within a type the
+    items the others refer to go first;
+  - the variable libraries are sent as they are, and the value set of the
+    target is made active in them;
+  - `--plan`, `--reconcile` and `--restore`, with CI definitions for Azure
+    DevOps and GitHub Actions.
+
+### Removed
+- The sample workspace with placeholders, and the examples built on it
+  (`03-deploy-full` to `07-reconcile`): `examples/Adventure-Works-LT` does
+  what they did.
+
 ---
 
 ## [0.7.0] - 2026-09-26
