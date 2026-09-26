@@ -205,6 +205,7 @@ from .helpers.items import (
     export_item,
     plan_all_items,
     reconcile_items,
+    restore_items,
 )
 from .helpers.lakehouses import (
     export_all_lakehouses,
@@ -754,6 +755,7 @@ __all__ = [
     "publish_environment",
     "read_json",
     "reconcile_items",
+    "restore_items",
     "refresh_dataflow_gen1",
     "refresh_semantic_model",
     "replace_data_pipeline_placeholders_with_variables",
