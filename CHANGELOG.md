@@ -32,6 +32,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   states as JSON files in a folder; any object with `load(environment)` and
   `save(environment, state)` is a `DeploymentStateBackend`. States hold no
   secrets.
+- `OneLakeStateBackend(workspace, lakehouse)` keeps deployment states in
+  the Files of a lakehouse, where they outlive any CI run.
+  - The workspace and the lakehouse are given by name or ID, looked up once
+    and then reached by ID. `folder` sets the folder under `Files`, and
+    `endpoint` a regional endpoint, to keep the state in its region.
+  - A state is saved only over the one the run read. When another run
+    saved one in between, the save fails and leaves that state as it is.
+  - It needs no new dependency. Its token comes from `set_auth_provider()`,
+    which now gets tokens for OneLake (the Azure Storage audience) in the
+    `env`, `oauth` and `fabric` modes.
+  - The CI examples keep their state there, instead of in a cache, which
+    GitHub drops after 7 days unused and Azure DevOps keeps per pipeline.
+- Locks: `deploy_all_items()` holds the lock of its environment from before
+  it reads the state until after it records it, so two runs never deploy
+  to one environment at a time.
+  - `LocalJsonStateBackend` and `OneLakeStateBackend` keep the lock next to
+    the state; it says who holds it and until when. A run the lock is held
+    against fails at once with `DeploymentLockedError`, before it deploys
+    anything; `lock_timeout` makes it wait.
+  - A lock holds for `lock_ttl` seconds, two hours by default, unless its
+    run releases it; then another run takes it over. `force_unlock()`
+    removes it, for a run that is gone.
+  - `plan_all_items()` and `reconcile_items()` take no lock.
+  - A backend with `lock()` and `force_unlock()` is a `LockingStateBackend`;
+    one with only `load()` and `save()` still works, without a lock.
+    `DeploymentLock`, `LockingStateBackend`, `OneLakeStateBackend` and
+    `DeploymentLockedError` are exported.
 - Content hash: with a deployment state, an item whose definition and
   folder are those its last successful deployment sent is skipped, even
   when Git lists it as changed, and one whose folder only changed is moved

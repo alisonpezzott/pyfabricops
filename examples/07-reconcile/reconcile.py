@@ -6,10 +6,12 @@ their placeholders as a deployment would, then compares every item with
 the workspace: an item missing there, one changed by hand, one in another
 folder, and the items the workspace holds that the source does not.
 
-With the deployment state of ``04-deploy-selective``, a difference tells
-where it comes from: changed in the workspace since the last deployment
-(``WORKSPACE_DRIFT``), or in the source, a deployment still to run
-(``SOURCE_CHANGED``). Without it, every difference counts as drift.
+With the deployment state of ``04-deploy-selective``, read from its
+lakehouse (``--state-workspace`` and ``--state-lakehouse``) or its folder
+(``--state-dir``), a difference tells where it comes from: changed in the
+workspace since the last deployment (``WORKSPACE_DRIFT``), or in the
+source, a deployment still to run (``SOURCE_CHANGED``). Without it, every
+difference counts as drift. The state is only read, and not locked.
 
 It exits with 1 when anything differs, so that a scheduled CI job fails
 and someone looks. Nothing in the workspace changes: deploy to bring back
@@ -19,7 +21,7 @@ Usage::
 
     python examples/07-reconcile/reconcile.py \\
         --workspace <workspace-name> --environment PRD \\
-        --state-dir .deploy-state
+        --state-workspace <ops-workspace> --state-lakehouse <lakehouse>
 """
 
 from __future__ import annotations
@@ -76,6 +78,19 @@ def set_pipeline_ids(staging: str, workspace: str) -> None:
     pf.find_and_replace(staging, replacements)
 
 
+def state_backend(
+    args: argparse.Namespace,
+) -> pf.DeploymentStateBackend | None:
+    """The state in a lakehouse or a folder, when either is given."""
+    if args.state_lakehouse:
+        return pf.OneLakeStateBackend(
+            args.state_workspace, args.state_lakehouse
+        )
+    if args.state_dir:
+        return pf.LocalJsonStateBackend(args.state_dir)
+    return None
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Reconcile the source with the workspace; 1 when anything differs."""
     parser = argparse.ArgumentParser(
@@ -96,11 +111,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="The folder of items. Default: the sample workspace",
     )
     parser.add_argument(
+        "--state-workspace",
+        help="The workspace, by name or ID, of the lakehouse of the state.",
+    )
+    parser.add_argument(
+        "--state-lakehouse",
+        help="The lakehouse, by name or ID, that keeps the state.",
+    )
+    parser.add_argument(
         "--state-dir",
         type=Path,
-        help="Where the deployment state is kept, if anywhere.",
+        help="The folder of the state, without a lakehouse.",
     )
     args = parser.parse_args(argv)
+    if bool(args.state_workspace) != bool(args.state_lakehouse):
+        parser.error("--state-workspace and --state-lakehouse go together")
 
     load_dotenv()
     pf.set_auth_provider("env")
@@ -112,11 +137,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.workspace,
             staging,
             start_path=staging,
-            state_backend=(
-                pf.LocalJsonStateBackend(args.state_dir)
-                if args.state_dir
-                else None
-            ),
+            state_backend=state_backend(args),
             environment=args.environment,
         )
     print(reconciliation.describe())

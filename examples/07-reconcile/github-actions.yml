@@ -5,8 +5,8 @@
 # Before using it:
 # - Copy this file to .github/workflows/ (it does not run from here).
 # - It uses the "prd" environment of 06-ci-github-actions, and reads the
-#   deployment state that workflow caches, to tell drift from a deployment
-#   still to run. It never saves the state.
+#   deployment state from the lakehouse that workflow keeps it in, to tell
+#   drift from a deployment still to run. It never saves the state.
 # - Until the next pyfabricops release, install it from the repository, as
 #   below; then pin the release instead: pip install "pyfabricops==<version>".
 
@@ -29,14 +29,6 @@ jobs:
         with:
           python-version: "3.13"
 
-      # The state of the last successful deployment, read only.
-      - name: Restore the deployment state
-        uses: actions/cache/restore@v4
-        with:
-          path: .deploy-state
-          key: deploy-state-${{ github.run_id }}
-          restore-keys: deploy-state-
-
       - name: Install pyfabricops
         run: pip install "pyfabricops @ git+https://github.com/alisonpezzott/pyfabricops"
 
@@ -45,7 +37,8 @@ jobs:
           python examples/07-reconcile/reconcile.py
           --workspace "${{ vars.FABRIC_WORKSPACE }}"
           --environment PRD
-          --state-dir .deploy-state
+          --state-workspace "${{ vars.STATE_WORKSPACE }}"
+          --state-lakehouse "${{ vars.STATE_LAKEHOUSE }}"
         env:
           FAB_CLIENT_ID: ${{ secrets.FAB_CLIENT_ID }}
           FAB_CLIENT_SECRET: ${{ secrets.FAB_CLIENT_SECRET }}

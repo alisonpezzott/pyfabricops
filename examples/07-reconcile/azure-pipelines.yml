@@ -3,12 +3,10 @@
 # never changes the workspace.
 #
 # Before using it:
-# - It uses the "fabric-prd" variable group of 05-ci-azure-devops.
-# - In Azure DevOps a cache belongs to one pipeline, so this pipeline has no
-#   deployment state, and every difference counts as drift. To tell drift
-#   from a deployment still to run, add this schedule and the Reconcile step
-#   to the pipeline of 05-ci-azure-devops, which caches the state, and pass
-#   --state-dir "$(STATE_DIR)".
+# - It uses the "fabric-prd" variable group of 05-ci-azure-devops, and
+#   reads the deployment state from the lakehouse that pipeline keeps it
+#   in, to tell drift from a deployment still to run. It never saves the
+#   state.
 # - Until the next pyfabricops release, install it from the repository, as
 #   below; then pin the release instead: pip install "pyfabricops==<version>".
 
@@ -43,6 +41,8 @@ steps:
       python examples/07-reconcile/reconcile.py
       --workspace "$(FABRIC_WORKSPACE)"
       --environment PRD
+      --state-workspace "$(STATE_WORKSPACE)"
+      --state-lakehouse "$(STATE_LAKEHOUSE)"
     displayName: Reconcile
     env:
       # Secret variables reach a script only when mapped.

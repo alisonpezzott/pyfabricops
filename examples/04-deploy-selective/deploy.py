@@ -2,9 +2,10 @@
 Deploy only what changed in Git since the last successful deployment.
 
 Run it in a deployment pipeline, from a clone of the repository with its
-history. A deployment state, a JSON file per environment in
-``--state-dir``, records the commit and a hash of each item a successful
-run deployed. The next run starts from there:
+history. A deployment state records the commit and a hash of each item a
+successful run deployed: in a lakehouse, with ``--state-workspace`` and
+``--state-lakehouse``, as the CI examples keep it, or else as a JSON file
+per environment in ``--state-dir``. The next run starts from there:
 
 - items changed in Git since then are deployed; the others are left alone;
 - an item whose definition hash is unchanged needs nothing, even when its
@@ -16,15 +17,22 @@ run deployed. The next run starts from there:
   without the option, the run fails on it, so the deletion is not missed.
 
 A run with a failed item records nothing, so the next one compares from
-the same commits. Keep ``--state-dir`` between runs, as the CI examples
-do with a cache: without it, a run deploys every item, which is safe but
-slower. The steps are those of ``03-deploy-full``, pipelines last.
+the same commits. A run holds the lock of its environment's state, so two
+runs never deploy to it at a time. A lakehouse keeps the state between
+runs; a ``--state-dir`` must be kept between them, or a run deploys every
+item, which is safe but slower. The steps are those of
+``03-deploy-full``, pipelines last.
 
 Usage::
 
     python examples/04-deploy-selective/deploy.py \\
         --workspace <workspace-name> --environment PRD \\
-        --state-dir .deploy-state [--allow-deletions]
+        --state-workspace <ops-workspace> --state-lakehouse <lakehouse> \\
+        [--allow-deletions]
+
+    python examples/04-deploy-selective/deploy.py \\
+        --workspace <workspace-name> --environment PRD \\
+        --state-dir .deploy-state
 """
 
 from __future__ import annotations
@@ -78,6 +86,15 @@ def set_pipeline_ids(staging: str, workspace: str) -> None:
     pf.find_and_replace(staging, replacements)
 
 
+def state_backend(args: argparse.Namespace) -> pf.DeploymentStateBackend:
+    """The state in a lakehouse when one is given, else in a folder."""
+    if args.state_lakehouse:
+        return pf.OneLakeStateBackend(
+            args.state_workspace, args.state_lakehouse
+        )
+    return pf.LocalJsonStateBackend(args.state_dir)
+
+
 def deploy(workspace: str, staging: str, arguments: dict[str, Any]) -> bool:
     """Plan and deploy; True when every item succeeded."""
     print(pf.plan_all_items(workspace, staging, **arguments).describe())
@@ -107,10 +124,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="The folder of items, in a Git repository. Default: the sample",
     )
     parser.add_argument(
+        "--state-workspace",
+        help="The workspace, by name or ID, of the lakehouse of the state.",
+    )
+    parser.add_argument(
+        "--state-lakehouse",
+        help="The lakehouse, by name or ID, that keeps the state.",
+    )
+    parser.add_argument(
         "--state-dir",
         type=Path,
         default=Path(".deploy-state"),
-        help="Where the deployment state is kept. Default: .deploy-state",
+        help="The folder of the state, without a lakehouse. "
+        "Default: .deploy-state",
     )
     parser.add_argument(
         "--allow-deletions",
@@ -118,6 +144,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="Delete from the workspace the items deleted in Git.",
     )
     args = parser.parse_args(argv)
+    if bool(args.state_workspace) != bool(args.state_lakehouse):
+        parser.error("--state-workspace and --state-lakehouse go together")
 
     load_dotenv()
     pf.set_auth_provider("env")
@@ -128,7 +156,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             "start_path": staging,
             # The items in Git, which the staging copy came from.
             "repository_path": str(args.source),
-            "state_backend": pf.LocalJsonStateBackend(args.state_dir),
+            "state_backend": state_backend(args),
             "environment": args.environment,
             "allow_deletions": args.allow_deletions,
         }
