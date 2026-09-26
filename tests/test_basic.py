@@ -22,6 +22,16 @@ def test_package_has_version():
     assert pf.__version__ is not None
 
 
+def test_version_matches_pyproject() -> None:
+    """The version the package reports is the one it is published as."""
+    tomllib = pytest.importorskip("tomllib")
+    pyproject = os.path.join(os.path.dirname(__file__), "..", "pyproject.toml")
+    with open(pyproject, "rb") as file:
+        project = tomllib.load(file)["project"]
+
+    assert pf.__version__ == project["version"]
+
+
 def test_set_auth_provider():
     """Test that auth provider can be set."""
     # This should not raise an exception
