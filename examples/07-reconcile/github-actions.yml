@@ -32,7 +32,7 @@ jobs:
           python-version: "3.13"
 
       - name: Install pyfabricops
-        run: pip install "pyfabricops @ git+https://github.com/alisonpezzott/pyfabricops"
+        run: pip install "pyfabricops>=0.7.0,<0.8.0"
 
       - name: Reconcile
         run: >

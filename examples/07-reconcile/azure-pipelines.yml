@@ -36,7 +36,7 @@ steps:
     inputs:
       versionSpec: "3.13"
 
-  - script: pip install "pyfabricops @ git+https://github.com/alisonpezzott/pyfabricops"
+  - script: pip install "pyfabricops>=0.7.0,<0.8.0"
     displayName: Install pyfabricops
 
   - script: >

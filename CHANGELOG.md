@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.7.0] - 2026-09-26
+
 ### Added
 - `deploy_all_items()` accepts `item_types`, to deploy only some item types
   (e.g. `["Notebook", "DataPipeline"]` on every merge), and `fail_fast`. It
@@ -15,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `report.to_df()` and `report.describe()`, which gives it as text.
 - `DEPLOY_ORDER` — the item types `deploy_all_items()` deploys by default, in
   dependency order.
+- `plan_all_items()` shows what `deploy_all_items()` would do with the
+  same arguments, without doing it: it returns the `DeploymentPlan`, one
+  action per item saying what would happen and why (`plan.describe()` gives
+  it as text), and only reads the local items, Git and one listing of the
+  workspace. The deployment state is read, never updated.
+  `DeploymentPlan`, `DeploymentAction`, `DeploymentActionType` and
+  `DeploymentReason` are exported.
 - Selective deployment: `deploy_all_items(baseline_commit=...)` deploys only
   the items changed in Git between that commit and HEAD, and
   `repository_path` names the repository folder to compare when `path` is a
@@ -32,6 +43,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   states as JSON files in a folder; any object with `load(environment)` and
   `save(environment, state)` is a `DeploymentStateBackend`. States hold no
   secrets.
+- Content hash: with a deployment state, an item whose definition and
+  folder are those its last successful deployment sent is skipped, even
+  when Git lists it as changed, and one whose folder only changed is moved
+  (`MOVE` in the plan, `"moved"` in the report) without sending its
+  definition again, to the workspace root too. The hash is taken on what
+  would be sent (after placeholders are replaced, so it is per environment)
+  and ignores part order, UTF-8 byte order marks, Windows line endings and
+  the layout and key order of JSON files. The state records it per item;
+  states written without it still load. Without a state, nothing is
+  skipped or moved without its definition.
 - `OneLakeStateBackend(workspace, lakehouse)` keeps deployment states in
   the Files of a lakehouse, where they outlive any CI run.
   - The workspace and the lakehouse are given by name or ID, looked up once
@@ -59,36 +80,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     one with only `load()` and `save()` still works, without a lock.
     `DeploymentLock`, `LockingStateBackend`, `OneLakeStateBackend` and
     `DeploymentLockedError` are exported.
-- Content hash: with a deployment state, an item whose definition and
-  folder are those its last successful deployment sent is skipped, even
-  when Git lists it as changed, and one whose folder only changed is moved
-  (`MOVE` in the plan, `"moved"` in the report) without sending its
-  definition again, to the workspace root too. The hash is taken on what
-  would be sent (after placeholders are replaced, so it is per environment)
-  and ignores part order, UTF-8 byte order marks, Windows line endings and
-  the layout and key order of JSON files. The state records it per item;
-  states written without it still load. Without a state, nothing is
-  skipped or moved without its definition.
-- `plan_all_items()` shows what `deploy_all_items()` would do with the
-  same arguments, without doing it: it returns the `DeploymentPlan`, one
-  action per item saying what would happen and why (`plan.describe()` gives
-  it as text), and only reads the local items, Git and one listing of the
-  workspace. The deployment state is read, never updated.
-  `DeploymentPlan`, `DeploymentAction`, `DeploymentActionType` and
-  `DeploymentReason` are exported.
-- `set_lro_options()` — configures the long-running operation timeout
-  (default 600 s) and the maximum polling interval (default 5 s).
-- `get_item_definition()` accepts an optional `format` (e.g. `"TMDL"`).
-- `create_item()` accepts `item_type`, sent as the `type` property the Create
-  Item API documents as required. `deploy_item()` now passes it.
-- `api_request()` accepts `return_result=True` to get the final `ApiResult`
-  after pagination or LRO polling, so callers can tell a failure from a
-  success without data.
-- `copy_to_staging()` accepts `staging_dir`, the folder to copy into (as
-  `<staging_dir>/<folder name>`), such as a temporary folder of the CI run.
-  Without it the copy still goes to `_stg` inside the installed package,
-  which every run using the installation shares and which cannot be
-  written on a read-only install.
+- Journal and resume: with a state backend, `deploy_all_items()` writes
+  the journal of its run next to the state, each time an item ends: what
+  it did, and the hash and folder it sent.
+  - When a run fails, or dies, before it records the state, the next run
+    skips each item still in the workspace that it sent and that has not
+    changed since. The plan says so: "Definition and folder unchanged since
+    an interrupted run sent it at ...".
+  - The state is still recorded only when a whole run succeeds, with what
+    the interrupted runs sent. A run that resumes another carries that
+    run's entries over.
+  - A journal that cannot be written costs only the resume.
+    `LocalJsonStateBackend` and `OneLakeStateBackend` keep journals, as
+    `<environment>.journal.json`; a backend with `load_journal()` and
+    `save_journal()` is a `JournalingStateBackend`. `DeploymentJournal`,
+    `JournalEntry` and `JournalingStateBackend` are exported.
 - Dependency resolution: `deploy_all_items()` and `plan_all_items()` read
   the references between local items:
   - a report's semantic model;
@@ -172,21 +178,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `shortcuts.metadata.json`. A difference names the parts that differ.
   `Reconciliation` and `UnmanagedItem` are exported. The Reconciliation
   page of the documentation explains each finding.
-- Journal and resume: with a state backend, `deploy_all_items()` writes
-  the journal of its run next to the state, each time an item ends: what
-  it did, and the hash and folder it sent.
-  - When a run fails, or dies, before it records the state, the next run
-    skips each item still in the workspace that it sent and that has not
-    changed since. The plan says so: "Definition and folder unchanged since
-    an interrupted run sent it at ...".
-  - The state is still recorded only when a whole run succeeds, with what
-    the interrupted runs sent. A run that resumes another carries that
-    run's entries over.
-  - A journal that cannot be written costs only the resume.
-    `LocalJsonStateBackend` and `OneLakeStateBackend` keep journals, as
-    `<environment>.journal.json`; a backend with `load_journal()` and
-    `save_journal()` is a `JournalingStateBackend`. `DeploymentJournal`,
-    `JournalEntry` and `JournalingStateBackend` are exported.
 - `restore_items()` brings a workspace back to the source where it
   drifted. It reconciles as `reconcile_items()` does, then applies what
   undoes the drift, as `deploy_all_items()` applies a plan: an item deleted
@@ -200,6 +191,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - It holds the lock of the environment and never records the state. It
     returns a `DeploymentReport`.
   - `examples/07-reconcile` takes `--restore`.
+- `set_lro_options()` — configures the long-running operation timeout
+  (default 600 s) and the maximum polling interval (default 5 s).
+- `get_item_definition()` accepts an optional `format` (e.g. `"TMDL"`).
+- `create_item()` accepts `item_type`, sent as the `type` property the Create
+  Item API documents as required. `deploy_item()` now passes it.
+- `api_request()` accepts `return_result=True` to get the final `ApiResult`
+  after pagination or LRO polling, so callers can tell a failure from a
+  success without data.
+- `copy_to_staging()` accepts `staging_dir`, the folder to copy into (as
+  `<staging_dir>/<folder name>`), such as a temporary folder of the CI run.
+  Without it the copy still goes to `_stg` inside the installed package,
+  which every run using the installation shares and which cannot be
+  written on a read-only install.
 - An `examples/` folder, in the repository but not in the package:
   - a sample workspace in Fabric's Git format, with a lakehouse, notebooks,
     a pipeline, a semantic model and a report that refer to one another;
@@ -217,6 +221,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `deploy_all_items()` and the `deploy_all_*` helpers for notebooks, semantic
   models, reports, environments, data pipelines and dataflows gen2 share one
   engine and now return a `DeploymentReport` instead of `None`:
+  - the engine plans before it deploys: a planner decides what happens to
+    each item, and why, without changing the workspace, and an executor
+    then applies the plan, the one `plan_all_items()` returns;
   - the workspace items and folders are listed once per run, not once per
     item;
   - item types are deployed in dependency order (VariableLibrary → Lakehouse
@@ -226,12 +233,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - existing items are moved only when their folder differs;
   - a failed item no longer aborts the run, and the final message is a
     success only when every item succeeded.
-- The engine behind `deploy_all_items()` now plans before it deploys: a
-  planner decides, from the local items and the workspace listing, whether
-  each item is created, updated or blocked (and why), without changing the
-  workspace; an executor then applies that plan. Functions, arguments and
-  `DeploymentReport` are unchanged. The plan model
-  (`pyfabricops.helpers.deployment_plan`) is internal for now.
 - Long-running operations are polled with a backoff (1 s, 2 s, 4 s, up to
   5 s) until a 600 s timeout, instead of every 5 s for at most 50 s.
 - Throttled requests (429) are retried after the `Retry-After` seconds the
@@ -826,7 +827,9 @@ Internal build.
 ### Added
 - Initial release.
 
-[Unreleased]: https://github.com/alisonpezzott/pyfabricops/compare/v0.5.4...HEAD
+[Unreleased]: https://github.com/alisonpezzott/pyfabricops/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/alisonpezzott/pyfabricops/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/alisonpezzott/pyfabricops/compare/v0.5.4...v0.6.0
 [0.5.4]: https://github.com/alisonpezzott/pyfabricops/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/alisonpezzott/pyfabricops/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/alisonpezzott/pyfabricops/compare/v0.5.1...v0.5.2
