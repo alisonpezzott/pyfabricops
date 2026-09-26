@@ -21,6 +21,7 @@ import os
 import time
 import uuid
 from collections.abc import Collection, Mapping, Sequence
+from contextlib import AbstractContextManager, nullcontext
 from dataclasses import asdict, dataclass, field, fields, replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -52,6 +53,7 @@ from ..helpers.deployment_plan import (
 from ..helpers.deployment_state import (
     DeploymentState,
     DeploymentStateBackend,
+    LockingStateBackend,
 )
 from ..helpers.drift import comparable_parts, differing_parts
 from ..helpers.reconciliation import (
@@ -1411,42 +1413,63 @@ def _deploy_all(
     Select, plan and apply; with a state backend, record the run.
 
     The run is recorded only when every item succeeded, with the items it
-    created to meet dependencies. See ``deploy_all_items`` for the public
-    contract.
+    created to meet dependencies. With a backend that locks, the run holds
+    the lock of its environment from before it reads the state until after
+    it records it. See ``deploy_all_items`` for the public contract.
     """
     types = _ordered_types(item_types)
-    items, tracker = _select_run(
-        workspace,
-        path,
-        types,
-        start_path=start_path,
-        baseline_commit=baseline_commit,
-        repository_path=repository_path,
-        state_backend=state_backend,
-        environment=environment,
-    )
-    dependencies = (
-        _read_dependencies(
-            path, items, start_path=start_path, hashes=tracker is not None
+    with _environment_lock(state_backend, environment or workspace):
+        items, tracker = _select_run(
+            workspace,
+            path,
+            types,
+            start_path=start_path,
+            baseline_commit=baseline_commit,
+            repository_path=repository_path,
+            state_backend=state_backend,
+            environment=environment,
         )
-        if resolve_dependencies and items
-        else None
-    )
-    report = _deploy_items(
-        workspace,
-        items,
-        fail_fast=fail_fast,
-        deployed_items=tracker.deployed_items if tracker else None,
-        root=path,
-        dependencies=dependencies,
-        item_types=types,
-        allow_deletions=allow_deletions,
-    )
-    if tracker is not None:
-        tracker.record(
-            report, types, [*items, *_created(report, dependencies)]
+        dependencies = (
+            _read_dependencies(
+                path, items, start_path=start_path, hashes=tracker is not None
+            )
+            if resolve_dependencies and items
+            else None
         )
+        report = _deploy_items(
+            workspace,
+            items,
+            fail_fast=fail_fast,
+            deployed_items=tracker.deployed_items if tracker else None,
+            root=path,
+            dependencies=dependencies,
+            item_types=types,
+            allow_deletions=allow_deletions,
+        )
+        if tracker is not None:
+            tracker.record(
+                report, types, [*items, *_created(report, dependencies)]
+            )
     return report
+
+
+def _environment_lock(
+    backend: DeploymentStateBackend | None, environment: str
+) -> AbstractContextManager[object]:
+    """
+    Hold the lock of an environment's state, when its backend locks.
+
+    Raises:
+        DeploymentLockedError: If another run holds the lock.
+    """
+    if isinstance(backend, LockingStateBackend):
+        return backend.lock(environment)
+    if backend is not None:
+        logger.info(
+            f"The state backend of environment '{environment}' has no lock: "
+            "nothing keeps another run from deploying to it meanwhile."
+        )
+    return nullcontext()
 
 
 def _plan_all(

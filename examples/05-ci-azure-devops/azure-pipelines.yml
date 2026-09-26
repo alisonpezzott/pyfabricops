@@ -4,9 +4,13 @@
 #
 # Before using it:
 # - Create a variable group named "fabric-prd" with FAB_CLIENT_ID,
-#   FAB_TENANT_ID, FAB_CLIENT_SECRET (as a secret) and FABRIC_WORKSPACE.
+#   FAB_TENANT_ID, FAB_CLIENT_SECRET (as a secret), FABRIC_WORKSPACE,
+#   STATE_WORKSPACE and STATE_LAKEHOUSE. The last two name the lakehouse
+#   that keeps the deployment state, in a workspace the service principal
+#   can write to, such as one kept for operations.
 # - Run one deployment at a time per workspace: for example, deploy to an
-#   environment with an Exclusive Lock check.
+#   environment with an Exclusive Lock check. A second run would find the
+#   deployment state locked, and fail.
 # - Until the next pyfabricops release, install it from the repository, as
 #   below; then pin the release instead: pip install "pyfabricops==<version>".
 
@@ -23,8 +27,6 @@ pool:
 
 variables:
   - group: fabric-prd
-  - name: STATE_DIR
-    value: $(Pipeline.Workspace)/deploy-state
 
 steps:
   - checkout: self
@@ -35,23 +37,17 @@ steps:
     inputs:
       versionSpec: "3.13"
 
-  # The state of the last successful run. A job that fails saves no cache,
-  # so the next run compares from the same commits.
-  - task: Cache@2
-    displayName: Restore the deployment state
-    inputs:
-      key: 'deploy-state | "$(Build.BuildId)"'
-      restoreKeys: deploy-state
-      path: $(STATE_DIR)
-
   - script: pip install "pyfabricops @ git+https://github.com/alisonpezzott/pyfabricops"
     displayName: Install pyfabricops
 
+  # The state of the last successful run is read from the lakehouse, and
+  # recorded there only when every item succeeds.
   - script: >
       python examples/04-deploy-selective/deploy.py
       --workspace "$(FABRIC_WORKSPACE)"
       --environment PRD
-      --state-dir "$(STATE_DIR)"
+      --state-workspace "$(STATE_WORKSPACE)"
+      --state-lakehouse "$(STATE_LAKEHOUSE)"
     displayName: Deploy
     env:
       # Secret variables reach a script only when mapped.

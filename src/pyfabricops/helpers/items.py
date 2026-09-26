@@ -302,7 +302,10 @@ def deploy_all_items(
     every item succeeds, HEAD and
     what was sent for each item are recorded; otherwise the state stays,
     and the next run compares from the same commits. A run without
-    ``state_backend`` compares nothing and deploys every candidate.
+    ``state_backend`` compares nothing and deploys every candidate. With a
+    backend that locks, as the backends of pyfabricops do, the run holds the
+    lock of the environment from before it reads the state until after it
+    records it, so two runs never deploy to one environment at a time.
 
     With ``resolve_dependencies`` (the default), the references between
     local items are read, such as a report's semantic model. Each item
@@ -357,6 +360,8 @@ def deploy_all_items(
             git cannot run, the folder is not in a Git repository or a commit
             is not in its history (a shallow clone may lack it); with
             ``state_backend``, also if the stored state is invalid.
+        DeploymentLockedError: If another run holds the lock of the
+            environment; nothing was deployed.
 
     Examples:
         ```python

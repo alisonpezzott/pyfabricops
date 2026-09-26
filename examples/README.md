@@ -29,6 +29,10 @@ them. Everything here is made up: no real tenant, workspace or data.
 
 - **A workspace on a Fabric capacity** to deploy to: a sandbox, the first
   time.
+- **A lakehouse for the deployment state**, for `04-deploy-selective`, the
+  CI examples and `07-reconcile`: in a workspace of its own, such as one
+  for operations, where the service principal is a Contributor too. On
+  your machine, `--state-dir` keeps the state in a local folder instead.
 
 ## The sample workspace
 
@@ -80,7 +84,7 @@ data source. A real model would read the lakehouse, with its connection in
 | `01-authentication/` | Authenticating with a service principal from `.env`, and the other ways to sign in. |
 | `02-export/` | Exporting a workspace to a folder, to start a repository from it. |
 | `03-deploy-full/` | Deploying a folder of items: staging, placeholders, plan, then deploy, pipelines last. |
-| `04-deploy-selective/` | Deploying only what changed in Git since the last successful deployment, with a deployment state. |
+| `04-deploy-selective/` | Deploying only what changed in Git since the last successful deployment, with a deployment state in a lakehouse or a local folder. |
 | `05-ci-azure-devops/` | An Azure Pipelines definition that runs the selective deployment. |
 | `06-ci-github-actions/` | A GitHub Actions workflow that runs it. |
 | `07-reconcile/` | Reporting drift: how the workspace stands against the source, with scheduled Azure DevOps and GitHub Actions definitions that fail when anything differs. |

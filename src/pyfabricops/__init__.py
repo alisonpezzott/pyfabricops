@@ -174,9 +174,11 @@ from .helpers.deployment_plan import (
     DeploymentReason,
 )
 from .helpers.deployment_state import (
+    DeploymentLock,
     DeploymentState,
     DeploymentStateBackend,
     LocalJsonStateBackend,
+    LockingStateBackend,
 )
 from .helpers.environments import (
     add_environment_external_library_from_pypi,
@@ -224,6 +226,7 @@ from .helpers.notebooks import (
     replace_notebook_parameters_with_placeholders,
     replace_notebook_placeholders_with_parameters,
 )
+from .helpers.onelake_state import OneLakeStateBackend
 from .helpers.reconciliation import Reconciliation, UnmanagedItem
 from .helpers.reports import (
     convert_report_definition_to_by_connection,
@@ -409,6 +412,7 @@ from .utils.decorators import df
 from .utils.exceptions import (
     AuthenticationError,
     ConfigurationError,
+    DeploymentLockedError,
     InvalidParameterError,
     OptionNotAvailableError,
     PyFabricOpsError,
@@ -457,6 +461,8 @@ __all__ = [
     "DEPLOY_ORDER",
     "DeploymentAction",
     "DeploymentActionType",
+    "DeploymentLock",
+    "DeploymentLockedError",
     "DeploymentPlan",
     "DeploymentReason",
     "DeploymentReport",
@@ -464,6 +470,8 @@ __all__ = [
     "DeploymentState",
     "DeploymentStateBackend",
     "LocalJsonStateBackend",
+    "LockingStateBackend",
+    "OneLakeStateBackend",
     "Reconciliation",
     "UnmanagedItem",
     "PyFabricOpsFileNotFoundError",

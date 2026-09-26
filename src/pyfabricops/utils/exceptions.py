@@ -44,3 +44,9 @@ class PyFabricOpsFileNotFoundError(PyFabricOpsError):
     """Exception raised when a file is not found."""
 
     pass
+
+
+class DeploymentLockedError(PyFabricOpsError):
+    """Exception raised when another run holds a deployment state's lock."""
+
+    pass

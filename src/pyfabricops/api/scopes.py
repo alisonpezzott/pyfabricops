@@ -8,4 +8,6 @@ FABRIC_API = "https://api.fabric.microsoft.com/v1"
 PLATFORM_SCHEMA = "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json"
 PLATFORM_VERSION = "2.0"
 GRAPH_SCOPE = "https://graph.microsoft.com/.default"
+# OneLake accepts only tokens for the Azure Storage audience.
+STORAGE_SCOPE = "https://storage.azure.com/.default"
 GRAPH_API = "https://graph.microsoft.com/v1.0"
