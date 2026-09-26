@@ -1,0 +1,131 @@
+table Sales
+	lineageTag: 00000000-0000-4000-8000-000000001032
+	sourceLineageTag: [SalesLT].[Sales]
+
+	measure 'Sales Amount' = ```
+			
+			SUMX(
+			    'Sales',
+			    'Sales'[OrderQty] * ( 'Sales'[UnitPrice] - 'Sales'[UnitPriceDiscount] ) 
+			)
+			
+			```
+		lineageTag: 00000000-0000-4000-8000-000000001029
+
+		changedProperty = Name
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure Orders = ```
+			DISTINCTCOUNT('Sales'[SalesOrderID]) 
+			```
+		formatString: #,0
+		lineageTag: 00000000-0000-4000-8000-000000001030
+
+		changedProperty = Name
+
+		changedProperty = FormatString
+
+	column SalesOrderID
+		dataType: int64
+		formatString: #,0
+		lineageTag: 00000000-0000-4000-8000-000000001038
+		sourceLineageTag: SalesOrderID
+		summarizeBy: count
+		sourceColumn: SalesOrderID
+
+		changedProperty = FormatString
+
+		annotation SummarizationSetBy = Automatic
+
+	column CustomerID
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: 00000000-0000-4000-8000-000000001031
+		sourceLineageTag: CustomerID
+		summarizeBy: none
+		sourceColumn: CustomerID
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+	column OrderDate
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: 00000000-0000-4000-8000-000000001033
+		sourceLineageTag: OrderDate
+		summarizeBy: none
+		sourceColumn: OrderDate
+
+		annotation SummarizationSetBy = Automatic
+
+	column DueDate
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: 00000000-0000-4000-8000-000000001035
+		sourceLineageTag: DueDate
+		summarizeBy: none
+		sourceColumn: DueDate
+
+		annotation SummarizationSetBy = Automatic
+
+	column ProductID
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: 00000000-0000-4000-8000-000000001028
+		sourceLineageTag: ProductID
+		summarizeBy: none
+		sourceColumn: ProductID
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+	column OrderQty
+		dataType: int64
+		formatString: #,0
+		lineageTag: 00000000-0000-4000-8000-000000001037
+		sourceLineageTag: OrderQty
+		summarizeBy: sum
+		sourceColumn: OrderQty
+
+		changedProperty = FormatString
+
+		annotation SummarizationSetBy = Automatic
+
+	column UnitPrice
+		dataType: double
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: 00000000-0000-4000-8000-000000001036
+		sourceLineageTag: UnitPrice
+		summarizeBy: sum
+		sourceColumn: UnitPrice
+
+		changedProperty = FormatString
+
+		annotation SummarizationSetBy = Automatic
+
+	column UnitPriceDiscount
+		dataType: double
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: 00000000-0000-4000-8000-000000001034
+		sourceLineageTag: UnitPriceDiscount
+		summarizeBy: sum
+		sourceColumn: UnitPriceDiscount
+
+		changedProperty = FormatString
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"currencyCulture":"en-US"}
+
+	partition Sales = entity
+		mode: directLake
+		source
+			entityName: Sales
+			schemaName: SalesLT
+			expressionSource: 'DirectLake - gold'
+

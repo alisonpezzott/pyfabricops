@@ -1,0 +1,78 @@
+# Deploys fabric-workspace/ to the PRD workspace when main changes, with the
+# IDs of PRD in place of those of DEV (see deploy.py).
+#
+# Before the first run:
+# - This folder is the root of the repository, and DEV is connected to its
+#   fabric-workspace folder with Fabric Git integration.
+# - A variable group "fabric-prd" (Pipelines > Library) with FAB_TENANT_ID,
+#   FAB_CLIENT_ID and FAB_CLIENT_SECRET, this one as a secret, of a service
+#   principal that is a Viewer of DEV and a Contributor of PRD and OPS.
+# - An environment "PRD" (Pipelines > Environments) with an approval and an
+#   Exclusive Lock check, so that one deployment runs at a time.
+# - The lakehouse that keeps the deployment state: STATE_LAKEHOUSE, in the
+#   STATE_WORKSPACE workspace.
+# - The pipeline itself: Pipelines > New pipeline > Existing Azure Pipelines
+#   YAML file, this one.
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - fabric-workspace
+      - deploy.py
+
+pr: none
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  - group: fabric-prd
+  - name: SOURCE_WORKSPACE
+    value: Adventure-Works-LT-DEV
+  - name: TARGET_WORKSPACE
+    value: Adventure-Works-LT-PRD
+  - name: STATE_WORKSPACE
+    value: Adventure-Works-LT-OPS
+  - name: STATE_LAKEHOUSE
+    value: deploy_state
+
+stages:
+  - stage: Deploy
+    displayName: Deploy to PRD
+    jobs:
+      - deployment: Deploy
+        displayName: Deploy to PRD
+        environment: PRD
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                # A deployment job checks out nothing unless asked.
+                - checkout: self
+                  # The whole history: the run compares commits.
+                  fetchDepth: 0
+
+                - task: UsePythonVersion@0
+                  inputs:
+                    versionSpec: "3.13"
+
+                - script: pip install "pyfabricops>=0.7.0,<0.8.0"
+                  displayName: Install pyfabricops
+
+                - script: >
+                    python deploy.py
+                    --source-workspace "$(SOURCE_WORKSPACE)"
+                    --workspace "$(TARGET_WORKSPACE)"
+                    --environment PRD
+                    --value-set Production
+                    --state-workspace "$(STATE_WORKSPACE)"
+                    --state-lakehouse "$(STATE_LAKEHOUSE)"
+                  displayName: Deploy
+                  env:
+                    # Secret variables reach a script only when mapped.
+                    FAB_TENANT_ID: $(FAB_TENANT_ID)
+                    FAB_CLIENT_ID: $(FAB_CLIENT_ID)
+                    FAB_CLIENT_SECRET: $(FAB_CLIENT_SECRET)

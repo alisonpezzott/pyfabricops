@@ -1,0 +1,17 @@
+relationship 00000000-0000-4000-8000-000000001004
+	fromColumn: Sales.ProductID
+	toColumn: Product.ProductID
+
+relationship 00000000-0000-4000-8000-000000001003
+	fromColumn: Sales.CustomerID
+	toColumn: Customer.CustomerID
+
+relationship 00000000-0000-4000-8000-000000001002
+	fromColumn: Sales.OrderDate
+	toColumn: Date.Date
+
+relationship 00000000-0000-4000-8000-000000001005
+	isActive: false
+	fromColumn: Sales.DueDate
+	toColumn: Date.Date
+

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/variableLibrary/definition/valueSet/1.0.0/schema.json",
+  "name": "Production",
+  "variableOverrides": [
+    {
+      "name": "datasource_server",
+      "value": "your-prd-server.database.windows.net"
+    },
+    {
+      "name": "datasource_connection_id",
+      "value": "00000000-0000-4000-8000-000000000302"
+    }
+  ]
+}

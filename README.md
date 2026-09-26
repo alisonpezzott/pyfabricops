@@ -123,11 +123,11 @@ This file maps your local branches to Fabric branches, allowing the library to a
 
 The [`examples/`](https://github.com/alisonpezzott/pyfabricops/tree/main/examples) folder has runnable examples:
 
-- a sample workspace with a lakehouse, notebooks, a pipeline, a semantic
-  model and a report;
-- scripts that authenticate, export a workspace and deploy the sample,
-  fully or only what changed;
-- a reconciliation that reports drift, and can restore it;
+- scripts that authenticate and export a workspace;
+- Adventure Works LT, a medallion project as Fabric Git integration writes
+  it, deployed from a DEV workspace connected to Git to PRD, with the IDs
+  of PRD in place of those of DEV;
+- a drift report that can restore what changed by hand;
 - CI definitions for Azure DevOps and GitHub Actions.
 
 More examples: [https://github.com/alisonpezzott/pyfabricops-examples](https://github.com/alisonpezzott/pyfabricops-examples)

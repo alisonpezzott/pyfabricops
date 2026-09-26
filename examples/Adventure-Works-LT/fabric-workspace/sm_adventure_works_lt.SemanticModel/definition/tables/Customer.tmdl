@@ -1,0 +1,69 @@
+table Customer
+	lineageTag: 00000000-0000-4000-8000-000000001011
+	sourceLineageTag: [SalesLT].[Customer]
+
+	column CustomerID
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: 00000000-0000-4000-8000-000000001007
+		sourceLineageTag: CustomerID
+		summarizeBy: none
+		sourceColumn: CustomerID
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+	column Customer
+		dataType: string
+		lineageTag: 00000000-0000-4000-8000-000000001008
+		sourceLineageTag: Customer
+		summarizeBy: none
+		sourceColumn: Customer
+
+		annotation SummarizationSetBy = Automatic
+
+	column City
+		dataType: string
+		lineageTag: 00000000-0000-4000-8000-000000001009
+		sourceLineageTag: City
+		dataCategory: City
+		summarizeBy: none
+		sourceColumn: City
+
+		changedProperty = DataCategory
+
+		annotation SummarizationSetBy = Automatic
+
+	column StateProvince
+		dataType: string
+		lineageTag: 00000000-0000-4000-8000-000000001010
+		sourceLineageTag: StateProvince
+		dataCategory: StateOrProvince
+		summarizeBy: none
+		sourceColumn: StateProvince
+
+		changedProperty = DataCategory
+
+		annotation SummarizationSetBy = Automatic
+
+	column CountryRegion
+		dataType: string
+		lineageTag: 00000000-0000-4000-8000-000000001006
+		sourceLineageTag: CountryRegion
+		dataCategory: Country
+		summarizeBy: none
+		sourceColumn: CountryRegion
+
+		changedProperty = DataCategory
+
+		annotation SummarizationSetBy = Automatic
+
+	partition Customer = entity
+		mode: directLake
+		source
+			entityName: Customer
+			schemaName: SalesLT
+			expressionSource: 'DirectLake - gold'
+
