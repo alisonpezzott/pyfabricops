@@ -226,6 +226,7 @@ from .helpers.notebooks import (
     replace_notebook_parameters_with_placeholders,
     replace_notebook_placeholders_with_parameters,
 )
+from .helpers.onelake_state import OneLakeStateBackend
 from .helpers.reconciliation import Reconciliation, UnmanagedItem
 from .helpers.reports import (
     convert_report_definition_to_by_connection,
@@ -470,6 +471,7 @@ __all__ = [
     "DeploymentStateBackend",
     "LocalJsonStateBackend",
     "LockingStateBackend",
+    "OneLakeStateBackend",
     "Reconciliation",
     "UnmanagedItem",
     "PyFabricOpsFileNotFoundError",
