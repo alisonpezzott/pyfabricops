@@ -1297,6 +1297,8 @@ class _StateTracker:
     workspace: str
     head: str
     previous: DeploymentState | None
+    # The journal of the interrupted run this one resumes, if any.
+    resumed: DeploymentJournal | None = None
     # The journal of this run, while the backend can keep it.
     journal: DeploymentJournal | None = None
 
@@ -1332,7 +1334,14 @@ class _StateTracker:
                 f"'{previous.workspace}', not '{workspace}'; ignoring it."
             )
             previous = None
-        return cls(backend, environment, workspace, head, previous)
+        return cls(
+            backend,
+            environment,
+            workspace,
+            head,
+            previous,
+            resumed=_interrupted_run(backend, environment, workspace),
+        )
 
     def baselines(
         self, item_types: Sequence[str], baseline_commit: str | None
@@ -1359,14 +1368,30 @@ class _StateTracker:
 
     @property
     def deployed_items(self) -> Mapping[tuple[str, str], DeployedItem]:
-        """What the last successful deployment sent for each item."""
-        return self.previous.items if self.previous is not None else {}
+        """
+        What was last sent for each item.
+
+        What the last successful deployment sent, and over it what the
+        interrupted run this one resumes sent successfully.
+        """
+        items = dict(self.previous.items) if self.previous is not None else {}
+        if self.resumed is not None:
+            items.update(self.resumed.sent())
+        return items
 
     def start_journal(self) -> None:
-        """Begin the journal of the run, when the backend keeps journals."""
+        """
+        Begin the journal of the run, when the backend keeps journals.
+
+        It carries the entries of the interrupted run this one resumes, so
+        that what that run sent is not lost if this one is interrupted too.
+        """
         if isinstance(self.backend, JournalingStateBackend):
             self.journal = DeploymentJournal.start(
-                self.environment, self.workspace, self.head
+                self.environment,
+                self.workspace,
+                self.head,
+                resumed=self.resumed,
             )
             self._save_journal()
 
@@ -1541,6 +1566,36 @@ def _deploy_all(
             )
             tracker.finish_journal(report.ok)
     return report
+
+
+def _interrupted_run(
+    backend: DeploymentStateBackend, environment: str, workspace: str
+) -> DeploymentJournal | None:
+    """
+    Return the journal of the environment's last run, if it was interrupted.
+
+    A run that failed, or died, before recording the state left what it
+    sent in its journal: items unchanged since then need not go again.
+    """
+    if not isinstance(backend, JournalingStateBackend):
+        return None
+    journal = backend.load_journal(environment)
+    if journal is None or not journal.interrupted:
+        return None
+    if journal.workspace != workspace:
+        logger.warning(
+            f"The last run of deployment state '{environment}' deployed to "
+            f"workspace '{journal.workspace}', not '{workspace}'; it is not "
+            "resumed."
+        )
+        return None
+    sent = journal.sent()
+    if sent:
+        logger.info(
+            f"Resuming the interrupted run of {journal.started_at_utc}: "
+            f"{len(sent)} item(s) it sent are not sent again while unchanged."
+        )
+    return journal
 
 
 def _journal_writer(

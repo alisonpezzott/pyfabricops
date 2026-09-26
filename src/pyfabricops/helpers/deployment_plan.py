@@ -457,19 +457,18 @@ class DeploymentPlanner:
         sent = self._sent_before(identity, item)
         if sent is None:
             return _action(item, DeploymentActionType.UPDATE)
+        since = sent.sent_by or "the last successful deployment"
         if sent.folder_path == item.folder_path:
             return _action(
                 item,
                 DeploymentActionType.NOOP,
-                "Definition and folder unchanged since the last successful "
-                "deployment.",
+                f"Definition and folder unchanged since {since}.",
             )
         return _action(
             item,
             DeploymentActionType.MOVE,
-            "Definition unchanged since the last successful deployment; "
-            f"folder changed from {_folder(sent.folder_path)} to "
-            f"{_folder(item.folder_path)}.",
+            f"Definition unchanged since {since}; folder changed from "
+            f"{_folder(sent.folder_path)} to {_folder(item.folder_path)}.",
         )
 
     def _sent_before(

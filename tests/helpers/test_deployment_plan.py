@@ -700,3 +700,31 @@ def test_the_planner_cannot_reach_the_fabric_api() -> None:
             imported.add(node.module or "")
 
     assert {name.split(".")[0] for name in imported} <= sys.stdlib_module_names
+
+
+def test_an_item_an_interrupted_run_sent_says_so() -> None:
+    """The detail tells which run sent the definition last."""
+    by = "an interrupted run sent it at 2026-09-26T10:00:00Z"
+    item = dataclasses.replace(_item("Orders"), content_hash="h")
+    moved = dataclasses.replace(
+        _item("Sales", folder="New"), content_hash="h2"
+    )
+    planner = DeploymentPlanner(
+        existing_items={("Notebook", "Orders"), ("Notebook", "Sales")},
+        deployed_items={
+            ("Notebook", "Orders"): DeployedItem("h", sent_by=by),
+            ("Notebook", "Sales"): DeployedItem("h2", "Old", sent_by=by),
+        },
+    )
+
+    noop, move = planner.plan([item, moved]).actions
+
+    assert (noop.action, noop.detail) == (
+        NOOP,
+        f"Definition and folder unchanged since {by}.",
+    )
+    assert (move.action, move.detail) == (
+        MOVE,
+        f"Definition unchanged since {by}; folder changed from 'Old' to "
+        "'New'.",
+    )

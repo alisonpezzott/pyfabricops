@@ -23,6 +23,7 @@ from pyfabricops.helpers.deployment import (
     DeploymentExecutor,
     DeploymentReport,
     DeploymentResult,
+    _interrupted_run,
     _request_delete_item,
     _WorkspaceIndex,
 )
@@ -36,6 +37,7 @@ from pyfabricops.helpers.deployment_state import (
     DeploymentJournal,
     DeploymentLock,
     DeploymentState,
+    JournalEntry,
     LocalJsonStateBackend,
 )
 from pyfabricops.helpers.items import deploy_all_items, plan_all_items
@@ -2945,3 +2947,198 @@ def test_planning_writes_no_journal(
     _plan(root, state_backend=state, environment="dev")
 
     assert state.load_journal("dev") is None
+
+
+# ---------------------------------------------------------------------------
+# Resume: the next run skips what an interrupted run sent
+# ---------------------------------------------------------------------------
+
+
+def _fail_on(item_id: str) -> Any:
+    """An update that fails for one workspace item, and works for others."""
+
+    def update(
+        workspace_id: str, target: str, item_definition: dict[str, Any]
+    ) -> ApiResult:
+        if target == item_id:
+            return _failure("InvalidDefinition")
+        return ApiResult(True, 200)
+
+    return update
+
+
+def _in_workspace(fabric: SimpleNamespace, *names: str) -> None:
+    """List notebooks in the workspace, each with the ID nb-<name>."""
+    fabric.list_items.return_value = [
+        {"id": f"nb-{name}", "type": "Notebook", "displayName": name}
+        for name in names
+    ]
+
+
+def test_the_next_run_skips_what_the_failed_run_sent(
+    git_repo: GitRepo,
+    root: Path,
+    fabric: SimpleNamespace,
+    state: LocalJsonStateBackend,
+) -> None:
+    """A went, B failed: the next run sends only B, and records both."""
+    _in_workspace(fabric, "A", "B")
+    a = _write_item(root, "A.Notebook")
+    b = _write_item(root, "B.Notebook")
+    git_repo.commit("first")
+    _deploy(root, state_backend=state, environment="dev")
+    _change(a, "a2")
+    _change(b, "b2")
+    head = git_repo.commit("change A and B")
+    fabric.update.side_effect = _fail_on("nb-B")
+    failed = _deploy(root, state_backend=state, environment="dev")
+    assert [(r.display_name, r.action) for r in failed.results] == [
+        ("A", "updated"),
+        ("B", "failed"),
+    ]
+
+    fabric.update.side_effect = None
+    fabric.update.reset_mock()
+    report = _deploy(root, state_backend=state, environment="dev")
+
+    assert [(r.display_name, r.action) for r in report.results] == [
+        ("B", "updated")
+    ]
+    assert [c.args[1] for c in fabric.update.call_args_list] == ["nb-B"]
+    recorded = _recorded(state, "dev")
+    assert recorded.source_commit == head
+    assert recorded.items[("Notebook", "A")].content_hash == definition_hash(
+        pack_item_definition(str(a))
+    )
+    journal = state.load_journal("dev")
+    assert journal is not None and not journal.interrupted
+
+
+def test_the_plan_says_what_the_interrupted_run_sent(
+    git_repo: GitRepo,
+    root: Path,
+    fabric: SimpleNamespace,
+    state: LocalJsonStateBackend,
+) -> None:
+    """plan_all_items shows the resume, with when the item was sent."""
+    _in_workspace(fabric, "A", "B")
+    _write_item(root, "A.Notebook")
+    _write_item(root, "B.Notebook")
+    git_repo.commit("first")
+    fabric.update.side_effect = _fail_on("nb-B")
+    _deploy(root, state_backend=state, environment="dev")
+    journal = state.load_journal("dev")
+    assert journal is not None
+    sent_at = journal.entries[0].at_utc
+
+    plan = _plan(root, state_backend=state, environment="dev")
+
+    assert [(a.action, a.display_name, a.detail) for a in plan.actions] == [
+        (
+            DeploymentActionType.NOOP,
+            "A",
+            "Definition and folder unchanged since an interrupted run sent "
+            f"it at {sent_at}.",
+        ),
+        (DeploymentActionType.UPDATE, "B", None),
+    ]
+
+
+def test_an_item_changed_since_the_interrupted_run_goes_again(
+    git_repo: GitRepo,
+    root: Path,
+    fabric: SimpleNamespace,
+    state: LocalJsonStateBackend,
+) -> None:
+    """Only an item unchanged since it was sent is skipped."""
+    _in_workspace(fabric, "A", "B")
+    a = _write_item(root, "A.Notebook")
+    _write_item(root, "B.Notebook")
+    git_repo.commit("first")
+    fabric.update.side_effect = _fail_on("nb-B")
+    _deploy(root, state_backend=state, environment="dev")
+    _change(a, "a3")
+    git_repo.commit("change A again")
+
+    fabric.update.side_effect = None
+    report = _deploy(root, state_backend=state, environment="dev")
+
+    assert [(r.display_name, r.action) for r in report.results] == [
+        ("A", "updated"),
+        ("B", "updated"),
+    ]
+
+
+def test_a_run_that_died_is_resumed(
+    git_repo: GitRepo,
+    root: Path,
+    fabric: SimpleNamespace,
+    state: LocalJsonStateBackend,
+) -> None:
+    """It never finished: its journal still tells what it sent."""
+    _in_workspace(fabric, "A", "B")
+    _write_item(root, "A.Notebook")
+    _write_item(root, "B.Notebook")
+    git_repo.commit("first")
+    fabric.update.side_effect = [ApiResult(True, 200), SystemExit("killed")]
+    with pytest.raises(SystemExit):
+        _deploy(root, state_backend=state, environment="dev")
+    journal = state.load_journal("dev")
+    assert journal is not None and journal.finished_at_utc is None
+
+    fabric.update.side_effect = None
+    fabric.update.reset_mock()
+    report = _deploy(root, state_backend=state, environment="dev")
+
+    assert [(r.display_name, r.action) for r in report.results] == [
+        ("B", "updated")
+    ]
+
+
+def test_what_was_sent_survives_a_second_interruption(
+    git_repo: GitRepo,
+    root: Path,
+    fabric: SimpleNamespace,
+    state: LocalJsonStateBackend,
+) -> None:
+    """The run that resumes carries what the first one sent."""
+    _in_workspace(fabric, "A", "B")
+    _write_item(root, "A.Notebook")
+    _write_item(root, "B.Notebook")
+    git_repo.commit("first")
+    fabric.update.side_effect = _fail_on("nb-B")
+    _deploy(root, state_backend=state, environment="dev")
+    again = _deploy(root, state_backend=state, environment="dev")
+    assert [(r.display_name, r.action) for r in again.results] == [
+        ("B", "failed")
+    ]
+
+    fabric.update.side_effect = None
+    report = _deploy(root, state_backend=state, environment="dev")
+
+    assert [(r.display_name, r.action) for r in report.results] == [
+        ("B", "updated")
+    ]
+
+
+def test_a_finished_run_is_not_resumed(
+    root: Path, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    """Only a run that failed, or died, is; and only on its workspace."""
+    backend = LocalJsonStateBackend(tmp_path_factory.mktemp("state"))
+    journal = DeploymentJournal.start("dev", "Sales-DEV", "a" * 40).with_entry(
+        JournalEntry(
+            item_type="Notebook",
+            display_name="A",
+            outcome="updated",
+            at_utc="2026-09-26T10:00:00Z",
+            content_hash="h",
+        )
+    )
+
+    backend.save_journal("dev", journal.finish(True))
+    assert _interrupted_run(backend, "dev", "Sales-DEV") is None
+
+    backend.save_journal("dev", journal.finish(False))
+    assert _interrupted_run(backend, "dev", "Sales-DEV") is not None
+    assert _interrupted_run(backend, "dev", "Sales-PRD") is None
