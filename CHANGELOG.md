@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.8.0] - 2026-09-28
+
 ### Added
 - `GitStateBackend(repository, branch)` keeps the deployment state on a
   branch of the repository, `pyfabricops/state` by default, so a project
@@ -867,7 +871,8 @@ Internal build.
 ### Added
 - Initial release.
 
-[Unreleased]: https://github.com/alisonpezzott/pyfabricops/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/alisonpezzott/pyfabricops/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/alisonpezzott/pyfabricops/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/alisonpezzott/pyfabricops/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/alisonpezzott/pyfabricops/compare/v0.5.4...v0.6.0
 [0.5.4]: https://github.com/alisonpezzott/pyfabricops/compare/v0.5.3...v0.5.4
