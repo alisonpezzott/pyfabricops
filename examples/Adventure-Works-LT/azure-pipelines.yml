@@ -6,11 +6,13 @@
 #   fabric-workspace folder with Fabric Git integration.
 # - A variable group "fabric-prd" (Pipelines > Library) with FAB_TENANT_ID,
 #   FAB_CLIENT_ID and FAB_CLIENT_SECRET, this one as a secret, of a service
-#   principal that is a Viewer of DEV and a Contributor of PRD and OPS.
+#   principal that is a Viewer of DEV and a Contributor of PRD.
 # - An environment "PRD" (Pipelines > Environments) with an approval and an
 #   Exclusive Lock check, so that one deployment runs at a time.
-# - The lakehouse that keeps the deployment state: STATE_LAKEHOUSE, in the
-#   STATE_WORKSPACE workspace.
+# - Contribute and Create branch for the build service of the project on
+#   this repository (Project settings > Repositories > Security): the job
+#   pushes the deployment state to the pyfabricops/state branch, which the
+#   first run creates. Its commits say [skip ci]. Never merge that branch.
 # - The pipeline itself: Pipelines > New pipeline > Existing Azure Pipelines
 #   YAML file, this one.
 
@@ -34,10 +36,6 @@ variables:
     value: Adventure-Works-LT-DEV
   - name: TARGET_WORKSPACE
     value: Adventure-Works-LT-PRD
-  - name: STATE_WORKSPACE
-    value: Adventure-Works-LT-OPS
-  - name: STATE_LAKEHOUSE
-    value: deploy_state
 
 stages:
   - stage: Deploy
@@ -54,12 +52,15 @@ stages:
                 - checkout: self
                   # The whole history: the run compares commits.
                   fetchDepth: 0
+                  # git pushes the deployment state with the token of the
+                  # job.
+                  persistCredentials: true
 
                 - task: UsePythonVersion@0
                   inputs:
                     versionSpec: "3.13"
 
-                - script: pip install "pyfabricops>=0.7.0,<0.8.0"
+                - script: pip install "pyfabricops>=0.8.0,<0.9.0"
                   displayName: Install pyfabricops
 
                 - script: >
@@ -68,8 +69,7 @@ stages:
                     --workspace "$(TARGET_WORKSPACE)"
                     --environment PRD
                     --value-set Production
-                    --state-workspace "$(STATE_WORKSPACE)"
-                    --state-lakehouse "$(STATE_LAKEHOUSE)"
+                    --state-branch pyfabricops/state
                   displayName: Deploy
                   env:
                     # Secret variables reach a script only when mapped.

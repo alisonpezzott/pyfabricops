@@ -30,10 +30,10 @@ already in the target workspace. Within a type, the items the others refer
 to are created first, such as a lakehouse a shortcut points to. A run stops
 before it sends an item that would still refer to the source workspace.
 
-With a deployment state, in a lakehouse (--state-workspace and
---state-lakehouse) or in a folder (--state-dir), a run deploys only what
-changed in Git since the last successful one, and holds a lock, so that two
-runs never deploy at a time.
+With a deployment state, on a branch of this repository (--state-branch),
+in a lakehouse (--state-workspace and --state-lakehouse) or in a folder
+(--state-dir), a run deploys only what changed in Git since the last
+successful one, and holds a lock, so that two runs never deploy at a time.
 
 Instead of deploying, --plan prints the plan; --reconcile reports how the
 target stands against the repository, its active value sets included, and
@@ -45,8 +45,7 @@ Usage::
     python deploy.py --source-workspace <source> --workspace <target> \\
         --value-set <value set> [--plan | --reconcile | --restore]
     python deploy.py --source-workspace <source> --workspace <target> \\
-        --value-set <value set> \\
-        --state-workspace <workspace> --state-lakehouse <lakehouse>
+        --value-set <value set> --state-branch pyfabricops/state
 """
 
 from __future__ import annotations
@@ -64,7 +63,7 @@ from typing import Any
 
 from dotenv import load_dotenv
 
-# pyfabricops 0.7 ships no py.typed marker, so mypy cannot read its types.
+# pyfabricops ships no py.typed marker, so mypy cannot read its types.
 import pyfabricops as pf  # type: ignore[import-untyped]
 
 ItemKey = tuple[str, str]
@@ -419,7 +418,10 @@ def value_set_in_place(
 
 
 def state_backend(args: argparse.Namespace) -> Any:
-    """The state in a lakehouse or a folder, when either is given."""
+    """The state on a branch, in a lakehouse or in a folder, if one is given."""
+    if args.state_branch:
+        # The repository of the items, whose remote keeps the branch.
+        return pf.GitStateBackend(str(args.source), args.state_branch)
     if args.state_lakehouse:
         return pf.OneLakeStateBackend(
             args.state_workspace, args.state_lakehouse
@@ -464,6 +466,12 @@ def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         "fabric-workspace folder next to this script",
     )
     parser.add_argument(
+        "--state-branch",
+        help="The branch of this repository that keeps the state, such as "
+        "pyfabricops/state. The first deployment creates it; each run "
+        "pushes to it.",
+    )
+    parser.add_argument(
         "--state-workspace",
         help="The workspace, by name or ID, of the lakehouse of the state.",
     )
@@ -501,8 +509,11 @@ def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     args = parser.parse_args(argv)
     if bool(args.state_workspace) != bool(args.state_lakehouse):
         parser.error("--state-workspace and --state-lakehouse go together")
-    if args.state_lakehouse and args.state_dir:
-        parser.error("--state-dir goes without --state-lakehouse")
+    stores = (args.state_branch, args.state_lakehouse, args.state_dir)
+    if sum(bool(store) for store in stores) > 1:
+        parser.error(
+            "give one of --state-branch, --state-lakehouse or --state-dir"
+        )
     return args
 
 

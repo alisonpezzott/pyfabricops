@@ -481,6 +481,60 @@ def test_the_repository_is_never_changed(
     }
 
 
+def test_the_state_branch_lives_in_the_repository_of_the_items(
+    script: ModuleType,
+) -> None:
+    """--state-branch keeps the state on a branch of that repository."""
+    args = script.parse_args([*_ARGS, "--state-branch", "pyfabricops/state"])
+
+    backend = script.state_backend(args)
+
+    assert isinstance(backend, pf.GitStateBackend)
+    assert backend._repository == Path(str(_SAMPLE))
+    assert backend._branch == "pyfabricops/state"
+
+
+@pytest.mark.parametrize(
+    "other",
+    [
+        ["--state-dir", "state"],
+        ["--state-workspace", "Ops", "--state-lakehouse", "State"],
+    ],
+)
+def test_the_state_is_kept_in_one_place(
+    script: ModuleType, other: list[str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A branch goes with neither a folder nor a lakehouse."""
+    with pytest.raises(SystemExit):
+        script.parse_args(
+            [*_ARGS, "--state-branch", "pyfabricops/state", *other]
+        )
+
+    assert "give one of --state-branch" in capsys.readouterr().err
+
+
+def test_every_pipeline_keeps_the_state_on_the_branch() -> None:
+    """With the rights each CI needs to push it, or to read it."""
+    pipelines = {
+        name: (_EXAMPLE / name).read_text(encoding="utf-8")
+        for name in (
+            "azure-pipelines.yml",
+            "azure-pipelines-reconcile.yml",
+            ".github/workflows/deploy.yml",
+            ".github/workflows/reconcile.yml",
+        )
+    }
+
+    for text in pipelines.values():
+        assert "--state-branch pyfabricops/state" in text
+        assert "--state-lakehouse" not in text
+        assert '"pyfabricops>=0.8.0,<0.9.0"' in text
+    assert "contents: write" in pipelines[".github/workflows/deploy.yml"]
+    assert "contents: read" in pipelines[".github/workflows/reconcile.yml"]
+    for name in ("azure-pipelines.yml", "azure-pipelines-reconcile.yml"):
+        assert "persistCredentials: true" in pipelines[name]
+
+
 def test_the_examples_hold_no_real_id() -> None:
     """Only the IDs made up for the sample, never one from a workspace."""
     found = {
