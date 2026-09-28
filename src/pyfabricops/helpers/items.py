@@ -343,9 +343,10 @@ def deploy_all_items(
             from ``path``. Only used with ``baseline_commit`` or
             ``state_backend``. Defaults to ``path``.
         state_backend (DeploymentStateBackend, optional): Where the
-            deployment state is kept, such as a ``LocalJsonStateBackend``.
-            An explicit ``baseline_commit`` still wins over the state.
-            Defaults to None: no state.
+            deployment state is kept, such as a ``LocalJsonStateBackend``,
+            a ``OneLakeStateBackend`` or a ``GitStateBackend``. An explicit
+            ``baseline_commit`` still wins over the state. Defaults to
+            None: no state.
         environment (str, optional): The name the state is kept under, such
             as ``'prod'``. Defaults to ``workspace``.
         resolve_dependencies (bool, optional): Order, meet and check the
