@@ -1,12 +1,19 @@
 """
-End-to-end check of OneLakeStateBackend against a real Fabric workspace.
+End-to-end check of the remote state backends against real services.
 
 Creates a lakehouse in a sandbox workspace and keeps deployment states in
-it, as a deployment pipeline would. Steps: a state saved and read back; a
-save refused because another run saved first; a lock another run holds;
-an expired lock taken over; a lock removed with ``force_unlock``; and a
-deployment whose state and journal live in the lakehouse, which a second
-run then reads. At the end the script deletes what it created.
+it with OneLakeStateBackend, as a deployment pipeline would. Steps: a state
+saved and read back; a save refused because another run saved first; a
+lock another run holds; an expired lock taken over; a lock removed with
+``force_unlock``; and a deployment whose state and journal live in the
+lakehouse, which a second run then reads. At the end the script deletes
+what it created.
+
+With ``--git-remote``, the same steps run with GitStateBackend on a
+temporary branch of that remote instead, which the script deletes at the
+end; the deployment step still deploys to the sandbox workspace. Use a
+private repository: the lock records the user and host that took it, and
+the state the ID of the sandbox workspace.
 
 Prerequisites, as for ``scripts/e2e_deployment.py``:
 
@@ -21,6 +28,9 @@ Usage::
 
     uv run --frozen python scripts/e2e_state.py \\
         --workspace pyfabricops-e2e --env-file project/.env
+    uv run --frozen python scripts/e2e_state.py \\
+        --workspace pyfabricops-e2e --env-file project/.env \\
+        --git-remote https://dev.azure.com/<org>/<project>/_git/<repo>
 
 It runs only with an explicit workspace (``--workspace`` or
 ``PYFABRICOPS_E2E_WORKSPACE``).
@@ -87,17 +97,31 @@ class E2EFailure(Exception):
 
 @dataclass
 class Run:
-    """The sandbox workspace and the local repository the steps work on."""
+    """The sandbox workspace and the local repositories the steps work on."""
 
     workspace: str
     workspace_id: str
     prefix: str
     root: Path
+    # The remote whose temporary branch keeps the states, or None for a
+    # lakehouse.
+    git_remote: str | None = None
+    branch: str = ""
 
     @property
     def lakehouse(self) -> str:
         """The lakehouse that keeps the states."""
         return f"{self.prefix}_L"
+
+    @property
+    def store(self) -> str:
+        """Where the states live, for the messages."""
+        return "the branch" if self.git_remote else "the lakehouse"
+
+    @property
+    def state_repository(self) -> Path:
+        """The local repository of GitStateBackend, whose origin is the remote."""
+        return self.root / "state"
 
     @property
     def notebook(self) -> str:
@@ -109,8 +133,14 @@ class Run:
         """The local Git repository of the deployment step."""
         return self.root / "repo"
 
-    def backend(self, **kwargs: Any) -> pf.OneLakeStateBackend:
-        """A backend over the run's lakehouse, as a new run would make."""
+    def backend(
+        self, **kwargs: Any
+    ) -> pf.OneLakeStateBackend | pf.GitStateBackend:
+        """A backend over the run's store, as a new run would make."""
+        if self.git_remote:
+            return pf.GitStateBackend(
+                self.state_repository, self.branch, **kwargs
+            )
         return pf.OneLakeStateBackend(
             self.workspace, self.lakehouse, _FOLDER, **kwargs
         )
@@ -130,8 +160,61 @@ def _step_lakehouse(run: Run) -> None:
     )
 
 
+def _step_branch(run: Run) -> None:
+    print("\n== A branch of the remote for the states")
+    run.state_repository.mkdir(parents=True)
+    _git(run.state_repository, "init", "--quiet")
+    _git(run.state_repository, "remote", "add", "origin", str(run.git_remote))
+    probe = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(run.state_repository),
+            "ls-remote",
+            "--exit-code",
+            "origin",
+            f"refs/heads/{run.branch}",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if probe.returncode not in (0, 2):
+        raise E2EFailure(f"The remote cannot be read: {probe.stderr.strip()}")
+    _check(probe.returncode == 2, f"the branch {run.branch} is not there yet")
+
+
+def _step_history(run: Run) -> None:
+    print("\n== What the branch holds")
+    fetched = f"refs/pyfabricops/origin/{run.branch}"
+    _git(
+        run.state_repository,
+        "fetch",
+        "--quiet",
+        "origin",
+        f"+refs/heads/{run.branch}:{fetched}",
+    )
+    subjects = _git(
+        run.state_repository, "log", "--format=%s", fetched
+    ).splitlines()
+    _check(
+        bool(subjects) and all("[skip ci]" in s for s in subjects),
+        f"its {len(subjects)} commits all say [skip ci]",
+    )
+    roots = _git(
+        run.state_repository, "rev-list", "--max-parents=0", fetched
+    ).splitlines()
+    _check(len(roots) == 1, "it grew from one commit of its own")
+    files = _git(
+        run.state_repository, "ls-tree", "--name-only", fetched
+    ).split()
+    _check(
+        ".pyfabricops-state" in files and "e2e.json" in files,
+        "it holds the marker and the states",
+    )
+
+
 def _step_round_trip(run: Run) -> None:
-    print("\n== A state saved in OneLake and read back")
+    print(f"\n== A state saved in {run.store} and read back")
     backend = run.backend()
     _check(backend.load(_ENVIRONMENT) is None, "there is no state yet")
     backend.save(_ENVIRONMENT, _state(run, "a"))
@@ -200,7 +283,7 @@ def _step_force_unlock(run: Run) -> None:
 
 
 def _step_deployment(run: Run) -> None:
-    print("\n== A deployment whose state lives in the lakehouse")
+    print(f"\n== A deployment whose state lives in {run.store}")
     _init_repository(run)
     _write_notebook(run, version=1)
     head = _commit(run, "Add the notebook")
@@ -224,7 +307,7 @@ def _step_deployment(run: Run) -> None:
         state is not None
         and state.source_commit == head
         and ("Notebook", run.notebook) in state.items,
-        "the state in the lakehouse records the deployment",
+        f"the state in {run.store} records the deployment",
     )
     journal = run.backend().load_journal("deploy")
     _check(
@@ -232,7 +315,7 @@ def _step_deployment(run: Run) -> None:
         and not journal.interrupted
         and [(e.display_name, e.outcome) for e in journal.entries]
         == [(run.notebook, "created")],
-        "the lakehouse keeps the journal of the run",
+        f"{run.store} keeps the journal of the run",
     )
     _check(
         run.backend().force_unlock("deploy") is None,
@@ -249,7 +332,6 @@ def _step_deployment(run: Run) -> None:
 
 
 _STEPS: tuple[Callable[[Run], None], ...] = (
-    _step_lakehouse,
     _step_round_trip,
     _step_conflict,
     _step_lock_held,
@@ -257,6 +339,13 @@ _STEPS: tuple[Callable[[Run], None], ...] = (
     _step_force_unlock,
     _step_deployment,
 )
+
+
+def _steps(run: Run) -> tuple[Callable[[Run], None], ...]:
+    """The steps of a run: the same ones over a lakehouse or a branch."""
+    if run.git_remote:
+        return (_step_branch, *_STEPS, _step_history)
+    return (_step_lakehouse, *_STEPS)
 
 
 # ---------------------------------------------------------------------------
@@ -299,26 +388,26 @@ def _indent(text: str) -> str:
 
 def _init_repository(run: Run) -> None:
     run.items.mkdir(parents=True)
-    _git(run, "init", "--quiet")
+    _git(run.items, "init", "--quiet")
     for key, value in (
         ("user.name", "pyfabricops e2e"),
         ("user.email", "e2e@example.com"),
         ("commit.gpgsign", "false"),
         ("core.autocrlf", "false"),
     ):
-        _git(run, "config", key, value)
+        _git(run.items, "config", key, value)
 
 
 def _commit(run: Run, message: str) -> str:
     """Commit every change and return the commit ID."""
-    _git(run, "add", "--all")
-    _git(run, "commit", "--quiet", "--message", message)
-    return _git(run, "rev-parse", "HEAD")
+    _git(run.items, "add", "--all")
+    _git(run.items, "commit", "--quiet", "--message", message)
+    return _git(run.items, "rev-parse", "HEAD")
 
 
-def _git(run: Run, *args: str) -> str:
+def _git(repository: Path, *args: str) -> str:
     result = subprocess.run(
-        ["git", "-C", str(run.items), *args],
+        ["git", "-C", str(repository), *args],
         capture_output=True,
         text=True,
         check=True,
@@ -369,6 +458,32 @@ def _remove_what_the_run_created(run: Run) -> None:
     for item in sorted(created, key=lambda i: i["type"] == "Lakehouse"):
         pf.delete_item(run.workspace_id, item["id"])
         print(f"Deleted {item['displayName']}.{item['type']}.")
+
+
+def _remove_the_branch(run: Run) -> None:
+    """Delete the run's temporary branch from the remote, if it made one."""
+    if not run.git_remote or not (run.state_repository / ".git").is_dir():
+        return
+    ref = f"refs/heads/{run.branch}"
+    git = ["git", "-C", str(run.state_repository)]
+    found = subprocess.run(
+        [*git, "ls-remote", "--exit-code", "origin", ref], capture_output=True
+    )
+    if found.returncode != 0:
+        return
+    deleted = subprocess.run(
+        [*git, "push", "--quiet", "--no-verify", "origin", "--delete", ref],
+        capture_output=True,
+        text=True,
+    )
+    if deleted.returncode == 0:
+        print(f"Deleted the branch {run.branch}.")
+    else:
+        print(
+            f"Could not delete the branch {run.branch}; delete it by hand: "
+            f"{deleted.stderr.strip()}",
+            file=sys.stderr,
+        )
 
 
 def _remove_tree(path: Path) -> None:
@@ -436,7 +551,8 @@ def _prefix(value: str) -> str:
 
 def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Check OneLakeStateBackend against a sandbox workspace."
+        description="Check the remote state backends against a sandbox "
+        "workspace."
     )
     parser.add_argument(
         "--workspace",
@@ -453,6 +569,12 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         type=_prefix,
         default="pfo_state",
         help="Prefix of the items the run creates. Default: pfo_state",
+    )
+    parser.add_argument(
+        "--git-remote",
+        help="Keep the states on a temporary branch of this remote, with "
+        "GitStateBackend, instead of a lakehouse. Use a private repository: "
+        "the lock records who took it.",
     )
     parser.add_argument(
         "--verbose", action="store_true", help="Show the library log."
@@ -498,17 +620,23 @@ def main(argv: Sequence[str] | None = None) -> int:
         workspace_id=workspace_id,
         prefix=args.prefix,
         root=Path(tempfile.mkdtemp(prefix="pyfabricops-e2e-state-")),
+        git_remote=args.git_remote,
+        branch=f"pyfabricops-e2e/{args.prefix}-{uuid.uuid4().hex[:8]}",
     )
     try:
         _remove_what_the_run_created(run)
-        for step in _STEPS:
+        for step in _steps(run):
             step(run)
     except (E2EFailure, pf.PyFabricOpsError) as e:
         print(f"\n[FAIL] {e}", file=sys.stderr)
         return 1
+    except subprocess.CalledProcessError as e:
+        print(f"\n[FAIL] {e}: {e.stderr}", file=sys.stderr)
+        return 1
     finally:
         print()
         _remove_what_the_run_created(run)
+        _remove_the_branch(run)
         _remove_tree(run.root)
 
     print("\nAll steps passed.")

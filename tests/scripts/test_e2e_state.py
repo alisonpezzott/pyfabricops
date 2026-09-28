@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import shutil
+import subprocess
 import sys
 from collections.abc import Callable, Iterator
 from contextlib import ExitStack
@@ -124,6 +125,37 @@ def test_every_step_passes_and_the_run_cleans_up(
         "deploy.json",
         "e2e.json",
     ]
+
+
+def test_every_step_passes_on_a_branch_and_the_run_deletes_it(
+    sandbox: tuple[FakeSandbox, FakeOneLake],
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """With --git-remote, the states live on a branch of their own."""
+    workspace, onelake = sandbox
+    remote = tmp_path / "origin.git"
+    subprocess.run(
+        ["git", "init", "--quiet", "--bare", str(remote)], check=True
+    )
+
+    code = _run_script(
+        tmp_path, "--workspace", "Sandbox", "--git-remote", str(remote)
+    )
+
+    captured = capsys.readouterr()
+    assert code == 0, captured.out + captured.err
+    assert "commits all say [skip ci]" in captured.out
+    assert "Deleted the branch pyfabricops-e2e/pfo_state-" in captured.out
+    assert workspace.items == {}
+    assert onelake.blobs == {}
+    refs = subprocess.run(
+        ["git", "--git-dir", str(remote), "for-each-ref"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert refs.stdout == ""
 
 
 def test_a_workspace_with_other_items_is_refused(
