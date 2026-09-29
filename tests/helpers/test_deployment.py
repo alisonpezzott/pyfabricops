@@ -2961,29 +2961,44 @@ def test_a_git_branch_keeps_the_state_and_the_journal_of_a_run(
     fabric: SimpleNamespace,
     tmp_path_factory: pytest.TempPathFactory,
 ) -> None:
-    """The next run reads them there, and the checkout stays clean."""
+    """
+    The next run reads them there, and the checkout stays clean.
+
+    The backend is given the folder of the items, below the root of the
+    repository, and deploys a type at a time, as a pipeline would.
+    """
     remote = tmp_path_factory.mktemp("remote") / "origin.git"
     git_repo.run("init", "--quiet", "--bare", str(remote))
     git_repo.run("remote", "add", "origin", str(remote))
     _write_item(root, "A.Notebook")
+    _write_item(root, "Sales.Report")
     head = git_repo.commit("first")
+    backend = GitStateBackend(root)
 
-    report = _deploy(
-        root, state_backend=GitStateBackend(git_repo.root), environment="dev"
-    )
+    reports = [
+        _deploy(
+            root,
+            state_backend=backend,
+            environment="dev",
+            item_types=[item_type],
+        )
+        for item_type in ("Notebook", "Report")
+    ]
 
-    assert [r.action for r in report.results] == ["created"]
+    assert [[r.action for r in report.results] for report in reports] == [
+        ["created"],
+        ["created"],
+    ]
     state = GitStateBackend(git_repo.root)
     recorded = state.load("dev")
     assert recorded is not None and recorded.source_commit == head
+    assert set(recorded.commits) >= {"Notebook", "Report"}
     journal = state.load_journal("dev")
     assert journal is not None and journal.ok
     assert state.force_unlock("dev") is None
     assert git_repo.run("status", "--porcelain") == ""
 
-    again = _deploy(
-        root, state_backend=GitStateBackend(git_repo.root), environment="dev"
-    )
+    again = _deploy(root, state_backend=backend, environment="dev")
 
     assert again.results == []
 

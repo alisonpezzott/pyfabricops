@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- `GitStateBackend` given a folder below the root of the repository, such
+  as the folder of the items the Adventure Works LT example gives it, left
+  each lock in place when releasing it: the commit that should remove it
+  changed nothing, so the next deployment of the run found the environment
+  locked by the run itself. `force_unlock()` removed nothing either, and a
+  lock that could not be read was dated from the moment it was read. git
+  now runs at the root of the repository, whatever folder the backend is
+  given, and a commit that does not hold its change is never pushed.
+
 ---
 
 ## [0.8.0] - 2026-09-28

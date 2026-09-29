@@ -124,6 +124,11 @@ class Run:
         return self.root / "state"
 
     @property
+    def state_folder(self) -> Path:
+        """The folder the backend is given, below the root, as in a pipeline."""
+        return self.state_repository / "workspace"
+
+    @property
     def notebook(self) -> str:
         """The notebook the deployment step deploys."""
         return f"{self.prefix}_N"
@@ -138,9 +143,7 @@ class Run:
     ) -> pf.OneLakeStateBackend | pf.GitStateBackend:
         """A backend over the run's store, as a new run would make."""
         if self.git_remote:
-            return pf.GitStateBackend(
-                self.state_repository, self.branch, **kwargs
-            )
+            return pf.GitStateBackend(self.state_folder, self.branch, **kwargs)
         return pf.OneLakeStateBackend(
             self.workspace, self.lakehouse, _FOLDER, **kwargs
         )
@@ -165,6 +168,7 @@ def _step_branch(run: Run) -> None:
     run.state_repository.mkdir(parents=True)
     _git(run.state_repository, "init", "--quiet")
     _git(run.state_repository, "remote", "add", "origin", str(run.git_remote))
+    run.state_folder.mkdir()
     probe = subprocess.run(
         [
             "git",

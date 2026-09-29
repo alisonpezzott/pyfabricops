@@ -430,6 +430,76 @@ def test_the_checkout_is_left_as_it_was(checkout: Checkout) -> None:
     assert look() == before
 
 
+def _items_folder(repo: GitRepo) -> Path:
+    """The folder of the items, below the root, as a pipeline gives it."""
+    folder = repo.root / "fabric-workspace"
+    folder.mkdir()
+    return folder
+
+
+def test_a_folder_below_the_root_releases_the_lock_it_takes(
+    checkout: Checkout, remote: Path
+) -> None:
+    """Each deployment of a run takes the lock after the one before."""
+    items = _items_folder(checkout())
+    backend = GitStateBackend(items)
+
+    for _ in range(2):
+        with backend.lock("prod"):
+            backend.save("prod", _state())
+            backend.save_journal("prod", _journal())
+        assert "prod.lock" not in _files(remote)
+
+    assert _files(remote) == [
+        ".pyfabricops-state",
+        "README.md",
+        "prod.journal.json",
+        "prod.json",
+    ]
+
+
+def test_a_folder_below_the_root_removes_a_lock_by_force(
+    checkout: Checkout, remote: Path
+) -> None:
+    """force_unlock removes the lock from there too."""
+    abandoned = _backend(checkout()).lock("prod")
+    gone = abandoned.__enter__()
+
+    removed = GitStateBackend(_items_folder(checkout())).force_unlock("prod")
+
+    assert removed is not None and removed.lock_id == gone.lock_id
+    assert "prod.lock" not in _files(remote)
+    abandoned.__exit__(None, None, None)
+
+
+def test_a_folder_below_the_root_dates_an_unreadable_lock(
+    checkout: Checkout,
+) -> None:
+    """From its last change on the branch, so that it can expire."""
+    _backend(checkout()).save("prod", _state())
+    hours_ago = datetime.now(timezone.utc) - timedelta(hours=3)
+    _commit_to_branch(checkout(), "prod.lock", "{", date=hours_ago)
+
+    with GitStateBackend(_items_folder(checkout())).lock("prod") as held:
+        assert held.holder != "an unknown run"
+
+
+def test_a_change_git_did_not_make_is_never_pushed(
+    checkout: Checkout, remote: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A commit that changes nothing would pass for the change."""
+    _backend(checkout()).save("prod", _state())
+    tip = _remote_git(remote, "rev-parse", _REF)
+    monkeypatch.setattr(
+        GitStateBackend, "_put", lambda self, path, blob, index: None
+    )
+
+    with pytest.raises(ConfigurationError, match="git did not write prod"):
+        _backend(checkout()).save("prod", _state(commit="b" * 40))
+
+    assert _remote_git(remote, "rev-parse", _REF) == tip
+
+
 def test_each_commit_says_what_it_does_and_skips_ci(
     checkout: Checkout, remote: Path
 ) -> None:
