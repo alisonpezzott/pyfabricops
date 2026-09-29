@@ -72,7 +72,7 @@ The items are numbered in the order of their folders, from `bronze` (01) to
 
 ## Before you start
 
-- **pyfabricops 0.8.0 or later.**
+- **pyfabricops 0.8.1 or later.**
 - **A service principal**, allowed to call the Fabric APIs by the tenant
   settings. It is a Viewer of DEV, to read its IDs, and a Contributor of
   PRD. When it publishes the pipeline, the pipeline may run as it: it then

@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.8.1] - 2026-09-29
+
+### Fixed
+- `GitStateBackend` given a folder below the root of the repository, such
+  as the folder of the items the Adventure Works LT example gives it, left
+  each lock in place when releasing it: the commit that should remove it
+  changed nothing, so the next deployment of the run found the environment
+  locked by the run itself. `force_unlock()` removed nothing either, and a
+  lock that could not be read was dated from the moment it was read. git
+  now runs at the root of the repository, whatever folder the backend is
+  given, and a commit that does not hold its change is never pushed.
+
+### Changed
+- The examples install `pyfabricops>=0.8.1,<0.9.0`, since their
+  `deploy.py` gives the backend the folder of the items.
+
+---
+
 ## [0.8.0] - 2026-09-28
 
 ### Added
@@ -871,7 +889,8 @@ Internal build.
 ### Added
 - Initial release.
 
-[Unreleased]: https://github.com/alisonpezzott/pyfabricops/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/alisonpezzott/pyfabricops/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/alisonpezzott/pyfabricops/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/alisonpezzott/pyfabricops/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/alisonpezzott/pyfabricops/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/alisonpezzott/pyfabricops/compare/v0.5.4...v0.6.0

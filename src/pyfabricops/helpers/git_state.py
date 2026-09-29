@@ -173,6 +173,8 @@ class GitStateBackend:
                 "digits, '.', '_' and '-', with no name starting with '.'."
             )
         self._repository = Path(repository)
+        # The root of the working tree, where git runs once it is known.
+        self._root: Path | None = None
         self._branch = branch
         self._remote = remote
         self._folder = folder
@@ -572,7 +574,7 @@ class GitStateBackend:
             tree = self._git("write-tree", env=index).decode("ascii").strip()
 
         parents = ["-p", base] if base is not None else []
-        commit = self._git(
+        output = self._git(
             "commit-tree",
             tree,
             *parents,
@@ -580,7 +582,16 @@ class GitStateBackend:
             f"chore(pyfabricops): {message} [skip ci]",
             env=self._author(),
         )
-        return commit.decode("ascii").strip()
+        commit = output.decode("ascii").strip()
+        # A commit that does not hold the change would be pushed as if it
+        # did, and a lock would stay in place: none goes out.
+        if self._blob(commit, path) != blob:
+            action = "remove" if blob is None else "write"
+            raise ConfigurationError(
+                f"git did not {action} {path} in the commit for "
+                f"{self._where()}; nothing was pushed."
+            )
+        return commit
 
     def _put(self, path: str, blob: str, index: dict[str, str]) -> None:
         """Put a blob at a path of a temporary index."""
@@ -594,6 +605,7 @@ class GitStateBackend:
 
     def _store(self, text: str) -> str:
         """Write text to the object database and return its blob."""
+        self._check_setup()
         blob = self._git(
             "hash-object", "-w", "--stdin", input=text.encode("utf-8")
         )
@@ -630,10 +642,16 @@ class GitStateBackend:
         """
         if self._ready:
             return
-        if self._run("rev-parse", "--git-dir").returncode != 0:
+        top = self._run("rev-parse", "--show-toplevel")
+        if top.returncode != 0:
             raise ConfigurationError(
-                f"{self._repository} is not inside a Git repository."
+                f"{self._repository} is not inside a Git repository, or "
+                "has no working tree."
             )
+        # git reads the paths some commands take, such as those of
+        # update-index or a pathspec, from the folder it runs in: from the
+        # root, they are the paths of the branch.
+        self._root = Path(top.stdout.decode("utf-8").rstrip("\r\n"))
         # The ref the tip is fetched to holds the names of both the remote
         # and the branch: git takes it only if it takes them.
         if self._run("check-ref-format", self._fetched_ref).returncode != 0:
@@ -702,17 +720,19 @@ class GitStateBackend:
         network: bool = False,
     ) -> subprocess.CompletedProcess[bytes]:
         """
-        Run git in the repository, capturing its output.
+        Run git at the root of the repository, capturing its output.
 
-        A call to the remote has a timeout.
+        Until the root is known, git runs in the folder given. A call to the
+        remote has a timeout.
 
         Raises:
             ConfigurationError: If git cannot run.
             RequestError: If a call to the remote takes too long.
         """
+        folder = self._root or self._repository
         try:
             return subprocess.run(
-                ["git", "-C", str(self._repository), *args],
+                ["git", "-C", str(folder), *args],
                 input=input,
                 capture_output=True,
                 check=False,
