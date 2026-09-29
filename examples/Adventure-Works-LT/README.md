@@ -96,9 +96,10 @@ python deploy.py --source-workspace Adventure-Works-LT-DEV --workspace Adventure
 ```
 
 - Without `--plan`, it deploys: each item type in turn, in the dependency
-  order of pyfabricops, pipelines last. Within a type, the items the others
-  refer to go first, such as bronze before silver. The run stops before it
-  sends an item that would still refer to DEV.
+  order of pyfabricops, pipelines last, skipping a type that neither the
+  repository nor PRD has. Within a type, the items the others refer to go
+  first, such as bronze before silver. The run stops before it sends an
+  item that would still refer to DEV.
 - `--reconcile` tells how PRD stands against the repository, the active
   value sets included, and changes nothing. It exits with 1 when anything
   differs.
