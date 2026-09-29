@@ -26,9 +26,11 @@ they are deployed, the value set of the target is made active in them.
 
 The item types are deployed one at a time, in the dependency order of
 pyfabricops and pipelines last, so that an item refers by ID only to items
-already in the target workspace. Within a type, the items the others refer
-to are created first, such as a lakehouse a shortcut points to. A run stops
-before it sends an item that would still refer to the source workspace.
+already in the target workspace. A type that neither the repository nor the
+target has is skipped: its run would do nothing, but still take the lock
+and record the state. Within a type, the items the others refer to are
+created first, such as a lakehouse a shortcut points to. A run stops before
+it sends an item that would still refer to the source workspace.
 
 With a deployment state, on a branch of this repository (--state-branch),
 in a lakehouse (--state-workspace and --state-lakehouse) or in a folder
@@ -584,7 +586,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             if args.plan:
                 return 0
 
-        for item_type in ITEM_TYPES:
+        # A type the target has, but no longer the repository, still runs:
+        # its run tells about the items deleted in Git.
+        present = {item.item_type for item in items}
+        present |= {item_type for item_type, _ in ids.target_items}
+        for item_type in [t for t in ITEM_TYPES if t in present]:
             if not run_type(
                 item_type,
                 operation,

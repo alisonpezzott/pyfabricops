@@ -481,6 +481,44 @@ def test_the_repository_is_never_changed(
     }
 
 
+def _types_run(fabric: _Fabric) -> set[str]:
+    """The item types the deployments were given."""
+    return {
+        item_type
+        for call in fabric.calls
+        if call.operation == "deploy"
+        for item_type in call.item_types
+    }
+
+
+def test_a_type_neither_side_has_gets_no_run(
+    script: ModuleType, fabric: _Fabric, tmp_path: Path
+) -> None:
+    """Its run would take the lock and record the state, for nothing."""
+    assert _deploy(script, tmp_path) == 0
+
+    assert _types_run(fabric) == {
+        "VariableLibrary",
+        "Lakehouse",
+        "Notebook",
+        "SemanticModel",
+        "Report",
+        "DataPipeline",
+    }
+
+
+def test_a_type_only_the_target_has_still_runs(
+    script: ModuleType, fabric: _Fabric, tmp_path: Path
+) -> None:
+    """Its run tells about the items deleted in Git."""
+    key = ("Warehouse", "legacy")
+    fabric.prd[key] = fabric._item(key, _made_up(999), None)
+
+    assert _deploy(script, tmp_path) == 0
+
+    assert "Warehouse" in _types_run(fabric)
+
+
 def test_the_state_branch_lives_in_the_repository_of_the_items(
     script: ModuleType,
 ) -> None:

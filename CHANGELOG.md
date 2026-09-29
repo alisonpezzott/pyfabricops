@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- The Adventure Works LT example skips an item type that neither the
+  repository nor the target workspace has. Its run would do nothing, but
+  still take the lock and record the state, which on a branch costs a few
+  pushes. A type that only the target has still runs, so the items deleted
+  in Git are still found.
+
 ---
 
 ## [0.8.1] - 2026-09-29
