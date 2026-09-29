@@ -201,6 +201,7 @@ from .helpers.folders import (
     get_folders_paths,
     resolve_folder_from_id_to_path,
 )
+from .helpers.git_state import GitStateBackend
 from .helpers.items import (
     deploy_all_items,
     deploy_item,
@@ -474,6 +475,7 @@ __all__ = [
     "DeploymentResult",
     "DeploymentState",
     "DeploymentStateBackend",
+    "GitStateBackend",
     "JournalEntry",
     "JournalingStateBackend",
     "LocalJsonStateBackend",

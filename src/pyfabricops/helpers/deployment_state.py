@@ -10,8 +10,10 @@ succeeded, and it never holds secrets.
 
 ``DeploymentStateBackend`` is where states are kept; the engine knows
 nothing more. ``LocalJsonStateBackend`` keeps them as JSON files in a local
-folder, and ``OneLakeStateBackend``, in ``pyfabricops.helpers.onelake_state``,
-in the Files of a lakehouse, where they outlive any CI run.
+folder. Two backends keep them where they outlive any CI run:
+``OneLakeStateBackend``, in ``pyfabricops.helpers.onelake_state``, in the
+Files of a lakehouse, and ``GitStateBackend``, in
+``pyfabricops.helpers.git_state``, on a branch of the repository.
 
 A backend that also locks (``LockingStateBackend``) keeps two runs from
 deploying to one environment at a time: a run holds a ``DeploymentLock``

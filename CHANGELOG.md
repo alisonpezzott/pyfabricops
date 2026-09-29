@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.8.0] - 2026-09-28
+
+### Added
+- `GitStateBackend(repository, branch)` keeps the deployment state on a
+  branch of the repository, `pyfabricops/state` by default, so a project
+  with no Fabric capacity for a lakehouse still keeps its state between
+  runs. It locks and keeps journals, as the other backends do:
+  - the first write creates the branch as an orphan, with a README and a
+    marker, and the backend writes to no branch without the marker;
+  - each change is a commit pushed without force, so a state is saved only
+    over the one the run read, and a lock is created only where there is
+    none; when another environment wrote meanwhile, the change is made
+    again over the new tip;
+  - the commits say `[skip ci]`, skip the local pre-push hooks, and leave
+    the working tree, index and branches of the checkout as they are; git
+    pushes them with its own credentials.
+- `scripts/e2e_state.py --git-remote <url>` runs its checks against a
+  temporary branch of a real remote, which it deletes at the end.
+
 ### Changed
 - The examples deploy from a workspace connected to Git.
   `examples/Adventure-Works-LT` holds a medallion project on Adventure
@@ -21,7 +42,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - the variable libraries are sent as they are, and the value set of the
     target is made active in them;
   - `--plan`, `--reconcile` and `--restore`, with CI definitions for Azure
-    DevOps and GitHub Actions.
+    DevOps and GitHub Actions;
+  - the deployment state on the `pyfabricops/state` branch of the
+    repository (`--state-branch`), so no workspace has to keep it.
 
 ### Removed
 - The sample workspace with placeholders, and the examples built on it
@@ -848,7 +871,8 @@ Internal build.
 ### Added
 - Initial release.
 
-[Unreleased]: https://github.com/alisonpezzott/pyfabricops/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/alisonpezzott/pyfabricops/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/alisonpezzott/pyfabricops/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/alisonpezzott/pyfabricops/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/alisonpezzott/pyfabricops/compare/v0.5.4...v0.6.0
 [0.5.4]: https://github.com/alisonpezzott/pyfabricops/compare/v0.5.3...v0.5.4

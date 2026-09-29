@@ -15,7 +15,7 @@ Access to the repositoy on [GitHub](https://github.com/alisonpezzott/pyfabricops
 - Authenticate using environment variables (GitHub Secrets, ADO Secrets, .env ...)
 - Manage workspaces, capacities, semantic models, lakehouses, reports and connections
 - Execute Git operations and automate Fabric deployment flows (Power BI inclusive)
-- Deploy from Git with a plan: `plan_all_items()` shows what would change, and `deploy_all_items()` deploys only what changed since the last deployment, in dependency order, with the state and a lock per environment kept in OneLake ([Deployment](https://pyfabricops.readthedocs.io/en/latest/functions/helpers/deployment/))
+- Deploy from Git with a plan: `plan_all_items()` shows what would change, and `deploy_all_items()` deploys only what changed since the last deployment, in dependency order, with the state and a lock per environment kept in OneLake or on a branch of the repository ([Deployment](https://pyfabricops.readthedocs.io/en/latest/functions/helpers/deployment/))
 - Tell how a workspace stands against the source with `reconcile_items()`, and restore what drifted with `restore_items()` ([Reconciliation](https://pyfabricops.readthedocs.io/en/latest/functions/helpers/reconciliation/))
 - Capture and Manage Git branches automatically for CI/CD scenarios
 - Many use cases and scenarios including yaml for test and deploy using GitHub Actions

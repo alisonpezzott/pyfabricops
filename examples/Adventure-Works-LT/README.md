@@ -72,16 +72,18 @@ The items are numbered in the order of their folders, from `bronze` (01) to
 
 ## Before you start
 
-- **pyfabricops 0.7.0 or later.**
+- **pyfabricops 0.8.0 or later.**
 - **A service principal**, allowed to call the Fabric APIs by the tenant
   settings. It is a Viewer of DEV, to read its IDs, and a Contributor of
-  PRD and of the workspace that keeps the deployment state. When it
-  publishes the pipeline, the pipeline may run as it: it then needs to be
-  a user of the connection of the `Production` value set.
-- **A lakehouse for the deployment state**, in a workspace of its own, such
-  as `Adventure-Works-LT-OPS`, not in DEV, which would commit it, nor in
-  PRD, where it would be an item the source lacks. On your machine,
-  `--state-dir` keeps the state in a folder instead.
+  PRD. When it publishes the pipeline, the pipeline may run as it: it then
+  needs to be a user of the connection of the `Production` value set.
+- **The right for the pipeline to push to this repository.** The
+  deployment state lives on `pyfabricops/state`, a branch of this
+  repository that the first deployment creates, with no history in common
+  with the others (see [Deploy from CI](#deploy-from-ci)). On your machine,
+  `--state-dir` keeps the state in a folder instead; with
+  `--state-workspace` and `--state-lakehouse`, it goes in a lakehouse, in a
+  workspace of its own.
 - **A `.env` file**, copied from `.env.example`, with the credentials of the
   service principal. Keep it out of Git.
 
@@ -102,10 +104,11 @@ python deploy.py --source-workspace Adventure-Works-LT-DEV --workspace Adventure
   differs.
 - `--restore` brings back what drifted in PRD: an item deleted, edited or
   moved there by hand, and the active value sets. Nothing is deleted.
-- With `--state-workspace` and `--state-lakehouse`, or `--state-dir`, a
-  deployment sends only what changed in Git since the last successful one,
-  and holds a lock, so that two runs never deploy at a time. `--reconcile`
-  and `--restore` read the state, to leave a deployment still to run alone.
+- With `--state-branch`, `--state-workspace` and `--state-lakehouse`, or
+  `--state-dir`, a deployment sends only what changed in Git since the last
+  successful one, and holds a lock, so that two runs never deploy at a
+  time. `--reconcile` and `--restore` read the state, to leave a deployment
+  still to run alone.
 - An item deleted in Git fails the deployment until it is deleted by hand,
   or the run is given `--allow-deletions`.
 
@@ -116,8 +119,9 @@ silver may show under Unidentified.
 
 ## Deploy from CI
 
-The pipelines run the same script. They need only the history of the
-repository, Python and the credentials:
+The pipelines run the same script. They need the history of the
+repository, Python, the credentials, and the right to push the deployment
+state to its branch:
 
 | | Azure DevOps | GitHub Actions |
 | :--- | :--- | :--- |
@@ -126,6 +130,7 @@ repository, Python and the credentials:
 | Approval | an Approval check on the environment `PRD` | required reviewers on the environment `prd` |
 | One run at a time | an Exclusive Lock check | `concurrency` |
 | History | `fetchDepth: 0` | `fetch-depth: 0` |
+| Deployment state | Contribute and Create branch for the build service of the project, and `persistCredentials: true` on the checkout | `permissions: contents: write`, or `contents: read` to reconcile |
 
 ## Good to know
 
@@ -139,3 +144,9 @@ repository, Python and the credentials:
   silver fails with `MissingShortcutDependency`.
 - **The target tables are not deployed.** A deployment sends definitions,
   never data: the pipeline fills PRD.
+- **The branch of the state is no branch of code.** Each deployment pushes
+  commits to `pyfabricops/state`, marked `[skip ci]`: its lock, the journal
+  of each item and the state. Never merge it, connect no workspace to it,
+  and block force pushes and its deletion; leave it out of the rules that
+  ask for a pull request or signed commits. Its history keeps who took
+  each lock: in a public repository, that is public.

@@ -4,8 +4,9 @@
 #
 # Before using it:
 # - It uses the "fabric-prd" variable group of azure-pipelines.yml, and
-#   reads the deployment state from the same lakehouse, to tell drift from a
-#   deployment still to run. It never saves the state.
+#   reads the deployment state from the pyfabricops/state branch, to tell
+#   drift from a deployment still to run. It never saves the state, so the
+#   build service needs only to read the repository.
 # - To bring back what drifted instead of failing, replace --reconcile with
 #   --restore. Nothing is deleted either way.
 
@@ -29,19 +30,18 @@ variables:
     value: Adventure-Works-LT-DEV
   - name: TARGET_WORKSPACE
     value: Adventure-Works-LT-PRD
-  - name: STATE_WORKSPACE
-    value: Adventure-Works-LT-OPS
-  - name: STATE_LAKEHOUSE
-    value: deploy_state
 
 steps:
   - checkout: self
+    # git fetches the branch of the deployment state with the token of the
+    # job.
+    persistCredentials: true
 
   - task: UsePythonVersion@0
     inputs:
       versionSpec: "3.13"
 
-  - script: pip install "pyfabricops>=0.7.0,<0.8.0"
+  - script: pip install "pyfabricops>=0.8.0,<0.9.0"
     displayName: Install pyfabricops
 
   - script: >
@@ -51,8 +51,7 @@ steps:
       --workspace "$(TARGET_WORKSPACE)"
       --environment PRD
       --value-set Production
-      --state-workspace "$(STATE_WORKSPACE)"
-      --state-lakehouse "$(STATE_LAKEHOUSE)"
+      --state-branch pyfabricops/state
     displayName: Reconcile
     env:
       # Secret variables reach a script only when mapped.

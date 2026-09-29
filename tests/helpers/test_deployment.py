@@ -40,6 +40,7 @@ from pyfabricops.helpers.deployment_state import (
     JournalEntry,
     LocalJsonStateBackend,
 )
+from pyfabricops.helpers.git_state import GitStateBackend
 from pyfabricops.helpers.items import deploy_all_items, plan_all_items
 from pyfabricops.utils.exceptions import (
     ConfigurationError,
@@ -2947,6 +2948,44 @@ def test_planning_writes_no_journal(
     _plan(root, state_backend=state, environment="dev")
 
     assert state.load_journal("dev") is None
+
+
+# ---------------------------------------------------------------------------
+# State on a branch of the repository
+# ---------------------------------------------------------------------------
+
+
+def test_a_git_branch_keeps_the_state_and_the_journal_of_a_run(
+    git_repo: GitRepo,
+    root: Path,
+    fabric: SimpleNamespace,
+    tmp_path_factory: pytest.TempPathFactory,
+) -> None:
+    """The next run reads them there, and the checkout stays clean."""
+    remote = tmp_path_factory.mktemp("remote") / "origin.git"
+    git_repo.run("init", "--quiet", "--bare", str(remote))
+    git_repo.run("remote", "add", "origin", str(remote))
+    _write_item(root, "A.Notebook")
+    head = git_repo.commit("first")
+
+    report = _deploy(
+        root, state_backend=GitStateBackend(git_repo.root), environment="dev"
+    )
+
+    assert [r.action for r in report.results] == ["created"]
+    state = GitStateBackend(git_repo.root)
+    recorded = state.load("dev")
+    assert recorded is not None and recorded.source_commit == head
+    journal = state.load_journal("dev")
+    assert journal is not None and journal.ok
+    assert state.force_unlock("dev") is None
+    assert git_repo.run("status", "--porcelain") == ""
+
+    again = _deploy(
+        root, state_backend=GitStateBackend(git_repo.root), environment="dev"
+    )
+
+    assert again.results == []
 
 
 # ---------------------------------------------------------------------------
