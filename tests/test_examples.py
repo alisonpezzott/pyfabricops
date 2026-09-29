@@ -528,7 +528,7 @@ def test_every_pipeline_keeps_the_state_on_the_branch() -> None:
     for text in pipelines.values():
         assert "--state-branch pyfabricops/state" in text
         assert "--state-lakehouse" not in text
-        assert '"pyfabricops>=0.8.0,<0.9.0"' in text
+        assert '"pyfabricops>=0.8.1,<0.9.0"' in text
     assert "contents: write" in pipelines[".github/workflows/deploy.yml"]
     assert "contents: read" in pipelines[".github/workflows/reconcile.yml"]
     for name in ("azure-pipelines.yml", "azure-pipelines-reconcile.yml"):

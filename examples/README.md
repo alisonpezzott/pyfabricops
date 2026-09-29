@@ -8,14 +8,15 @@ tenant, workspace or data.
 
 ## Before you start
 
-- **pyfabricops 0.8.0 or later**, the first release that keeps the
-  deployment state on a branch of the repository, as these examples do:
+- **pyfabricops 0.8.1 or later**, which keeps the deployment state on a
+  branch of the repository from the folder of the items, as these examples
+  do:
 
   ```bash
-  pip install -U "pyfabricops>=0.8.0"
+  pip install -U "pyfabricops>=0.8.1"
   ```
 
-  The CI definitions install `pyfabricops>=0.8.0,<0.9.0`: before 1.0, a
+  The CI definitions install `pyfabricops>=0.8.1,<0.9.0`: before 1.0, a
   new minor version may change behavior, so move to one on purpose.
 
 - **A service principal** that can use the Fabric APIs, which is a tenant

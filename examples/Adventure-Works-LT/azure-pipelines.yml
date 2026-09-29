@@ -60,7 +60,7 @@ stages:
                   inputs:
                     versionSpec: "3.13"
 
-                - script: pip install "pyfabricops>=0.8.0,<0.9.0"
+                - script: pip install "pyfabricops>=0.8.1,<0.9.0"
                   displayName: Install pyfabricops
 
                 - script: >
