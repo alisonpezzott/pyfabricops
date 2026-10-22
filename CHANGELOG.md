@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `examples/Deploy-PowerBI-Pro`: a Power BI Project deployed to two
+  workspaces without a Fabric capacity, so without Git integration or
+  variable libraries. The repository is the source of DEV and PRD; a file
+  per environment gives its workspace and the parameters of the models,
+  set in a staging copy; each model deployed is taken over, bound to the
+  shareable cloud connection of its data source and refreshed without the
+  options of an enhanced refresh, which a Pro workspace refuses. With CI
+  for Azure DevOps and GitHub Actions, and tests in
+  `tests/test_example_powerbi_pro.py`.
+
 ### Changed
 - The Adventure Works LT example skips an item type that neither the
   repository nor the target workspace has. Its run would do nothing, but

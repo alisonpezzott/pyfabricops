@@ -1,0 +1,9 @@
+{
+  "workspace": "Power-BI-Pro-PRD",
+  "parameters": {
+    "Main": {
+      "Server": "your-prd-server.database.windows.net",
+      "Database": "adventureworkslt"
+    }
+  }
+}

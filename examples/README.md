@@ -36,6 +36,7 @@ tenant, workspace or data.
 | `01-authentication/` | Authenticating with a service principal from `.env`, and the other ways to sign in. |
 | `02-export/` | Exporting a workspace to a folder, to start a repository from it. |
 | `Adventure-Works-LT/` | A medallion project as Fabric Git integration writes it, deployed from a DEV workspace connected to Git to PRD: the IDs of DEV become those of PRD, the value set of PRD is made active, and a drift report can restore what changed by hand. With CI for Azure DevOps and GitHub Actions. |
+| `Deploy-PowerBI-Pro/` | A Power BI Project deployed to two workspaces without a Fabric capacity, so without Git integration: the repository is the source of DEV and PRD, a file per environment gives its workspace and the parameters of the models, and each model deployed is bound to its cloud connection and refreshed. With CI for Azure DevOps and GitHub Actions. |
 
 Run the first two from the repository root, for example:
 
@@ -43,8 +44,11 @@ Run the first two from the repository root, for example:
 python examples/02-export/export_workspace.py --workspace <workspace-name> --path exported
 ```
 
-`Adventure-Works-LT/` is the root of a repository of its own: its README
-tells how to set it up and run it. `tests/test_examples.py` checks it: what
-the deployment engine plans for it, how its script translates each
-reference, and that no ID other than its made-up ones gets into this
-folder.
+`Adventure-Works-LT/` and `Deploy-PowerBI-Pro/` are each the root of a
+repository of their own: their READMEs tell how to set them up and run
+them. `tests/test_examples.py` checks the first: what the deployment engine
+plans for it, how its script translates each reference, and that no ID
+other than the made-up ones gets into this folder.
+`tests/test_example_powerbi_pro.py` checks the second: what the engine plans
+for it, how its script reads an environment and sets the parameters, and
+what its pipelines run.

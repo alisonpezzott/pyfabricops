@@ -1,0 +1,9 @@
+# What Power BI Desktop keeps for itself: the local settings and the data
+# cache of a project, which deploy.py never sends.
+**/.pbi/localSettings.json
+**/.pbi/cache.abf
+# Credentials of the service principal, for local runs.
+.env
+# The deployment state of a local run (--state-dir).
+.deploy-state/
+__pycache__/
