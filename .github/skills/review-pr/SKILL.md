@@ -1,11 +1,20 @@
 ---
 name: review-pr
 description: "Review a Python pull request or set of changes for correctness, style, security and test coverage."
-argument-hint: "File(s) or diff to review (leave blank to use open editor tabs)"
+argument-hint: "PR number, branch or files to review (blank: current branch against main)"
 disable-model-invocation: true
 ---
 
 Review the provided Python code changes as a senior engineer. Be constructive and specific.
+
+### Changes to review
+
+- **PR number** — `gh pr diff <number>`.
+- **Branch** — `git diff main...<branch>`.
+- **Files** — review those files as they are now.
+- **Nothing given** — `git diff main...HEAD`, plus uncommitted changes from `git diff HEAD`.
+
+Read the surrounding code of each changed file before judging a change in isolation.
 
 ### Review checklist
 

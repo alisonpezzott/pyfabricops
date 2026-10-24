@@ -20,7 +20,8 @@ Generates idiomatic **pytest** test files for Python source code.
 2. **Check** `tests/` for existing `conftest.py`, fixtures, and naming patterns.
 3. **Consult** [pytest patterns reference](./references/pytest-patterns.md) for idiomatic examples.
 4. **Determine** test file path: mirror source under `tests/`
-   - `src/pkg/module.py` → `tests/pkg/test_module.py`
+   - `src/pyfabricops/<subpackage>/<module>.py` → `tests/<subpackage>/test_<module>.py`
+   - e.g. `src/pyfabricops/helpers/drift.py` → `tests/helpers/test_drift.py`
 5. **Write** tests covering:
    - Happy path (expected inputs/outputs)
    - Edge cases (empty, boundary, large values)
