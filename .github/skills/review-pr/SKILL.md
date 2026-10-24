@@ -1,7 +1,8 @@
 ---
+name: review-pr
 description: "Review a Python pull request or set of changes for correctness, style, security and test coverage."
-agent: agent
 argument-hint: "File(s) or diff to review (leave blank to use open editor tabs)"
+disable-model-invocation: true
 ---
 
 Review the provided Python code changes as a senior engineer. Be constructive and specific.

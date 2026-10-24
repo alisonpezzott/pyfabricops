@@ -1,7 +1,8 @@
 ---
+name: write-changelog
 description: "Write a CHANGELOG.md entry for the current changes. Use after staging commits or when preparing a release."
-agent: agent
 argument-hint: "Version number (e.g. 1.2.0) — leave blank to add to [Unreleased]"
+disable-model-invocation: true
 ---
 
 Analyse the recent changes in this repository (staged files, recent commits, or the diff provided) and write a **CHANGELOG.md** entry following the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
