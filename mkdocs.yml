@@ -46,6 +46,7 @@ nav:
       - Reports: functions/helpers/reports.md
       - Semantic Models: functions/helpers/semantic_models.md
       - Warehouses: functions/helpers/warehouses.md
+      - Workspace IDs: functions/helpers/workspace_ids.md
       - Workspaces: functions/helpers/workspaces.md
     - Items:
       - Data Pipelines: functions/items/data_pipelines.md

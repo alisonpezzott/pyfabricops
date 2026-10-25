@@ -1,12 +1,14 @@
 import os
 import re
+import time
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import pandas as pd
 from pandas import DataFrame
 
-from ..api.api import _base_api, api_request
+from ..api.api import ApiResult, _base_api, api_request
 from ..core.gateways import resolve_gateway
 from ..core.workspaces import resolve_workspace
 from ..helpers.deployment import DeploymentReport
@@ -27,6 +29,7 @@ from ..items.semantic_models import (
     update_semantic_model_definition,
 )
 from ..utils.decorators import df
+from ..utils.exceptions import RequestError, ResourceNotFoundError
 from ..utils.logging import get_logger
 from ..utils.utils import (
     extract_display_name_from_platform,
@@ -466,6 +469,140 @@ def refresh_semantic_model(
         logger.success("Refresh accepted successfully.")
     else:
         logger.error(f"Refresh failed: {response.error}")
+
+
+# The status of a refresh still running, in the refresh history.
+_REFRESH_RUNNING = "Unknown"
+
+
+def refresh_semantic_model_and_wait(
+    workspace: str,
+    semantic_model: str,
+    *,
+    options: Mapping[str, Any] | None = None,
+    timeout: float = 3600,
+    poll_interval: float = 15,
+) -> dict[str, Any]:
+    """
+    Refreshes a semantic model and waits for the refresh to end.
+
+    Without ``options`` the refresh is a plain one, which any workspace
+    takes: a workspace without a capacity, such as a Pro workspace, refuses
+    every option of an enhanced refresh, such as ``commitMode``, ``type``
+    or ``objects``. ``options`` are sent as they are, as the body of an
+    enhanced refresh. A refresh already running is waited for first, since
+    the service refuses a second one.
+
+    Args:
+        workspace (str): The workspace name or ID.
+        semantic_model (str): The semantic model name or ID.
+        options (Mapping[str, Any], optional): The options of an enhanced
+            refresh, such as ``{"type": "Full", "commitMode":
+            "Transactional"}``. Defaults to a plain refresh.
+        timeout (float, optional): How long to wait in all, in seconds.
+            Defaults to an hour.
+        poll_interval (float, optional): How often the refresh history is
+            read, in seconds. Defaults to 15.
+
+    Returns:
+        (dict[str, Any]): The entry of the refresh in the refresh history.
+            Its ``status`` is ``Completed`` when it succeeded, or
+            ``Failed``, ``Cancelled`` or ``Disabled``, with the error in
+            ``serviceExceptionJson``.
+
+    Raises:
+        ResourceNotFoundError: If the workspace or the semantic model is not
+            found.
+        RequestError: If the refresh does not start, or the refresh history
+            cannot be read.
+        TimeoutError: If the refresh does not end within ``timeout``.
+
+    Examples:
+        ```python
+        refresh = refresh_semantic_model_and_wait("Sales-PRD", "Sales")
+        if refresh["status"] != "Completed":
+            print(refresh.get("serviceExceptionJson"))
+        ```
+    """
+    workspace_id = resolve_workspace(workspace)
+    if not workspace_id:
+        raise ResourceNotFoundError(f"Workspace '{workspace}' not found.")
+    semantic_model_id = resolve_semantic_model(workspace_id, semantic_model)
+    if not semantic_model_id:
+        raise ResourceNotFoundError(
+            f"Semantic model '{semantic_model}' not found in workspace "
+            f"'{workspace}'."
+        )
+    endpoint = f"/groups/{workspace_id}/datasets/{semantic_model_id}/refreshes"
+    deadline = time.monotonic() + timeout
+
+    latest = _latest_refresh(endpoint)
+    if latest is not None and latest.get("status") == _REFRESH_RUNNING:
+        logger.info(
+            f"A refresh of '{semantic_model}' is running; waiting for it."
+        )
+        latest = _wait_refresh(endpoint, None, deadline, poll_interval)
+    before = latest.get("requestId") if latest else None
+
+    started = cast(
+        ApiResult,
+        api_request(
+            endpoint,
+            method="post",
+            payload={"notifyOption": "NoNotification", **(options or {})},
+            audience="powerbi",
+            return_result=True,
+        ),
+    )
+    if not started.success:
+        raise RequestError(
+            f"The refresh of '{semantic_model}' did not start: {started.error}"
+        )
+    ended = _wait_refresh(endpoint, before, deadline, poll_interval)
+    status = ended.get("status")
+    if status == "Completed":
+        logger.success(f"Refresh of '{semantic_model}' completed.")
+    else:
+        logger.error(f"Refresh of '{semantic_model}' {status}.")
+    return ended
+
+
+def _latest_refresh(endpoint: str) -> dict[str, Any] | None:
+    """The last entry of a refresh history, or None when it is empty."""
+    result = cast(
+        ApiResult,
+        api_request(
+            endpoint,
+            audience="powerbi",
+            params={"$top": 1},
+            return_result=True,
+        ),
+    )
+    if not result.success:
+        raise RequestError(
+            f"Could not read the refresh history at {endpoint}: {result.error}"
+        )
+    history = (result.data or {}).get("value") or []
+    return dict(history[0]) if history else None
+
+
+def _wait_refresh(
+    endpoint: str,
+    before: str | None,
+    deadline: float,
+    poll_interval: float,
+) -> dict[str, Any]:
+    """The first refresh other than ``before`` to end, by the deadline."""
+    while time.monotonic() < deadline:
+        time.sleep(poll_interval)
+        latest = _latest_refresh(endpoint)
+        if (
+            latest is not None
+            and latest.get("requestId") != before
+            and latest.get("status") != _REFRESH_RUNNING
+        ):
+            return latest
+    raise TimeoutError(f"The refresh at {endpoint} did not end in time.")
 
 
 @df

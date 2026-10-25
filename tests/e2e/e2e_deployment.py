@@ -43,7 +43,7 @@ Prerequisites:
 
 Usage::
 
-    uv run --frozen python scripts/e2e_deployment.py \\
+    uv run --frozen python tests/e2e/e2e_deployment.py \\
         --workspace pyfabricops-e2e --env-file project/.env
 
 It runs only with an explicit workspace (``--workspace`` or
