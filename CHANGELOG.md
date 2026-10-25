@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   options of an enhanced refresh, which a Pro workspace refuses. With CI
   for Azure DevOps and GitHub Actions, and tests in
   `tests/test_example_powerbi_pro.py`.
+- `examples/deploy-workspace`: the flow of `Deploy-PowerBI-Pro` for any
+  workspace, on a Fabric capacity or not, and for environments that mix
+  them: nothing in the files of the environments or in the pipelines
+  depends on it. It deploys semantic models and reports, and stops before
+  it deploys anything when the repository has another item, a Direct Lake
+  model, whose source is a Fabric item by ID that it does not translate, or
+  a model saved as `model.bim`, whose parameters it does not read. Tests in
+  `tests/test_example_deploy_workspace.py`.
 
 ### Changed
 - The Adventure Works LT example skips an item type that neither the

@@ -1,0 +1,23 @@
+relationship 00000000-0000-4000-8000-000000001011
+	joinOnDateBehavior: datePartOnly
+	fromColumn: Sales.OrderDate
+	toColumn: LocalDateTable_00000000-0000-4000-8000-000000001008.Date
+
+relationship 00000000-0000-4000-8000-000000001012
+	joinOnDateBehavior: datePartOnly
+	fromColumn: Sales.DueDate
+	toColumn: LocalDateTable_00000000-0000-4000-8000-000000001009.Date
+
+relationship 00000000-0000-4000-8000-000000001013
+	joinOnDateBehavior: datePartOnly
+	fromColumn: Sales.ShipDate
+	toColumn: LocalDateTable_00000000-0000-4000-8000-000000001010.Date
+
+relationship AutoDetected_00000000-0000-4000-8000-000000001014
+	fromColumn: Sales.ProductID
+	toColumn: Product.ProductID
+
+relationship 00000000-0000-4000-8000-000000001015
+	fromColumn: Sales.CustomerID
+	toColumn: Customer.CustomerID
+

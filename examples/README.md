@@ -37,6 +37,7 @@ tenant, workspace or data.
 | `02-export/` | Exporting a workspace to a folder, to start a repository from it. |
 | `Adventure-Works-LT/` | A medallion project as Fabric Git integration writes it, deployed from a DEV workspace connected to Git to PRD: the IDs of DEV become those of PRD, the value set of PRD is made active, and a drift report can restore what changed by hand. With CI for Azure DevOps and GitHub Actions. |
 | `Deploy-PowerBI-Pro/` | A Power BI Project deployed to two workspaces without a Fabric capacity, so without Git integration: the repository is the source of DEV and PRD, a file per environment gives its workspace and the parameters of the models, and each model deployed is bound to its cloud connection and refreshed. With CI for Azure DevOps and GitHub Actions. |
+| `deploy-workspace/` | The same Power BI Project and flow, to workspaces on a Fabric capacity or not, which the environments may mix, such as DEV on Pro and PRD on a capacity: nothing in the files or the pipelines depends on it. The run stops before it deploys an item it would send wrong: anything but a semantic model or a report, a Direct Lake model, or a model saved as `model.bim`. With CI for Azure DevOps and GitHub Actions. |
 
 Run the first two from the repository root, for example:
 
@@ -44,11 +45,12 @@ Run the first two from the repository root, for example:
 python examples/02-export/export_workspace.py --workspace <workspace-name> --path exported
 ```
 
-`Adventure-Works-LT/` and `Deploy-PowerBI-Pro/` are each the root of a
-repository of their own: their READMEs tell how to set them up and run
-them. `tests/test_examples.py` checks the first: what the deployment engine
-plans for it, how its script translates each reference, and that no ID
-other than the made-up ones gets into this folder.
+`Adventure-Works-LT/`, `Deploy-PowerBI-Pro/` and `deploy-workspace/` are
+each the root of a repository of their own: their READMEs tell how to set
+them up and run them. `tests/test_examples.py` checks the first: what the
+deployment engine plans for it, how its script translates each reference,
+and that no ID other than the made-up ones gets into this folder.
 `tests/test_example_powerbi_pro.py` checks the second: what the engine plans
 for it, how its script reads an environment and sets the parameters, and
-what its pipelines run.
+what its pipelines run. `tests/test_example_deploy_workspace.py` checks the
+same of the third, and what its script refuses to deploy.
