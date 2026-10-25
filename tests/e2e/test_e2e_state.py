@@ -1,4 +1,4 @@
-"""Offline run of scripts/e2e_state.py against an in-memory workspace."""
+"""Offline run of tests/e2e/e2e_state.py against an in-memory workspace."""
 
 from __future__ import annotations
 
@@ -15,10 +15,10 @@ from unittest.mock import patch
 
 import pytest
 
+from tests.e2e.test_e2e_deployment import FakeWorkspace
 from tests.helpers.test_onelake_state import FakeOneLake
-from tests.scripts.test_e2e_deployment import FakeWorkspace
 
-_SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "e2e_state.py"
+_SCRIPT = Path(__file__).resolve().parent / "e2e_state.py"
 _ENGINE = "pyfabricops.helpers.deployment"
 _ONELAKE = "pyfabricops.helpers.onelake_state"
 
