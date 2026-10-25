@@ -1,0 +1,86 @@
+# Reports drift on weekday mornings: compares develop with DEV and main with
+# PRD, the parameters of the semantic models included, and fails when
+# anything differs, so that someone looks. It never changes a workspace. A
+# report published to DEV from Power BI Desktop shows here as drift.
+#
+# The schedule runs once per branch, and the branch picks the environment
+# when the pipeline is compiled, as in azure-pipelines.yml: each run
+# reconciles its own environment only. A run of any other branch fails.
+#
+# Before using it:
+# - It uses the "fabric" variable group of azure-pipelines.yml, and needs
+#   the same Pipeline permission on it. It reads the deployment state from
+#   the pyfabricops/state branch, to tell drift from a deployment still to
+#   run. It never saves the state, so the build service needs only to read
+#   the repository.
+# - To bring back what drifted instead of failing, replace --reconcile with
+#   --restore, which also binds and refreshes what it restores. Nothing is
+#   deleted either way.
+
+trigger: none
+
+schedules:
+  - cron: "0 6 * * 1-5"
+    displayName: Weekdays at 06:00 UTC
+    branches:
+      include:
+        - develop
+        - main
+    # Run even when the branch did not change: drift happens in the
+    # workspace.
+    always: true
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  - group: fabric
+  # The environment of the branch: environments/<ENVIRONMENT>.json gives
+  # its workspace and parameters.
+  - ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/main') }}:
+      - name: ENVIRONMENT
+        value: PRD
+  - ${{ elseif eq(variables['Build.SourceBranch'], 'refs/heads/develop') }}:
+      - name: ENVIRONMENT
+        value: DEV
+  - ${{ else }}:
+      - name: ENVIRONMENT
+        value: none
+
+jobs:
+  - ${{ if eq(variables.ENVIRONMENT, 'none') }}:
+      - job: Fail
+        displayName: No environment for this branch
+        steps:
+          - checkout: none
+          - script: |
+              echo "##vso[task.logissue type=error]Only develop and main are reconciled: develop with DEV, main with PRD."
+              exit 1
+            displayName: Fail
+  - ${{ else }}:
+      - job: Reconcile
+        displayName: Reconcile ${{ variables.ENVIRONMENT }}
+        steps:
+          - checkout: self
+            # git fetches the branch of the deployment state with the token
+            # of the job.
+            persistCredentials: true
+
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: "3.13"
+
+          - script: pip install "pyfabricops>=0.8.1,<0.9.0"
+            displayName: Install pyfabricops
+
+          - script: >
+              python scripts/deploy.py
+              --reconcile
+              --environment $(ENVIRONMENT)
+              --state-branch pyfabricops/state
+            displayName: Reconcile
+            env:
+              # Secret variables reach a script only when mapped.
+              FAB_TENANT_ID: $(FAB_TENANT_ID)
+              FAB_CLIENT_ID: $(FAB_CLIENT_ID)
+              FAB_CLIENT_SECRET: $(FAB_CLIENT_SECRET)

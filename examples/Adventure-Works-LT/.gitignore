@@ -1,5 +1,0 @@
-# Credentials of the service principal, for local runs.
-.env
-# The deployment state of a local run (--state-dir).
-.deploy-state/
-__pycache__/

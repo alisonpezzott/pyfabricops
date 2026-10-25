@@ -1,0 +1,59 @@
+# Reports drift on weekday mornings: compares main with PRD and develop with
+# DEV, the parameters of the semantic models included, and fails when
+# anything differs, so that someone looks. It never changes a workspace. A
+# report published to DEV from Power BI Desktop shows here as drift.
+#
+# It uses the "dev" and "prd" environments of deploy.yml, and reads the
+# deployment state from the pyfabricops/state branch, to tell drift from a
+# deployment still to run. It never saves the state, so reading is enough. To
+# bring back what drifted instead of failing, replace --reconcile with
+# --restore, which also binds and refreshes what it restores, and give the
+# job contents: write. Nothing is deleted either way.
+
+name: Reconcile workspace
+
+on:
+  schedule:
+    - cron: "0 6 * * 1-5"
+  workflow_dispatch:
+
+jobs:
+  reconcile:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - environment: dev
+            name: DEV
+            branch: develop
+          - environment: prd
+            name: PRD
+            branch: main
+    runs-on: ubuntu-latest
+    environment: ${{ matrix.environment }}
+    permissions:
+      # The deployment state is read from the pyfabricops/state branch.
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # The branch the workspace is deployed from.
+          ref: ${{ matrix.branch }}
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install pyfabricops
+        run: pip install "pyfabricops>=0.8.1,<0.9.0"
+
+      - name: Reconcile
+        run: >
+          python scripts/deploy.py
+          --reconcile
+          --environment ${{ matrix.name }}
+          --state-branch pyfabricops/state
+        env:
+          FAB_TENANT_ID: ${{ secrets.FAB_TENANT_ID }}
+          FAB_CLIENT_ID: ${{ secrets.FAB_CLIENT_ID }}
+          FAB_CLIENT_SECRET: ${{ secrets.FAB_CLIENT_SECRET }}

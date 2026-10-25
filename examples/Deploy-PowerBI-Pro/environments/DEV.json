@@ -1,9 +1,0 @@
-{
-  "workspace": "Power-BI-Pro-DEV",
-  "parameters": {
-    "Main": {
-      "Server": "your-dev-server.database.windows.net",
-      "Database": "adventureworkslt"
-    }
-  }
-}
