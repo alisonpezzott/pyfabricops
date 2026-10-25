@@ -1,4 +1,4 @@
-"""Offline run of scripts/e2e_deployment.py against an in-memory workspace."""
+"""Offline run of tests/e2e/e2e_deployment.py against an in-memory workspace."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ import pytest
 import pyfabricops
 from pyfabricops.api.api import ApiResult
 
-_SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "e2e_deployment.py"
+_SCRIPT = Path(__file__).resolve().parent / "e2e_deployment.py"
 _PACKAGE = Path(pyfabricops.__file__).resolve().parent
 _ENGINE = "pyfabricops.helpers.deployment"
 _WORKSPACE_ID = "00000000-0000-0000-0000-0000000000e2"

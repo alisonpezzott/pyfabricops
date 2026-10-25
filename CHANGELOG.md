@@ -8,7 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- `examples/03-template-repo`: a template repository that deploys the
+- `WorkspaceIdMap`: maps each ID of a source workspace, such as the one
+  connected to Git, to the ID of the item of the same type and display
+  name in a target workspace, by ID and by logical ID. `translate()` puts
+  the IDs of the target in a staging copy of the items, OneLake shortcuts
+  and the empty workspace GUID of pipelines and notebooks included, and
+  `references()` tells what an item still refers to in the source, as an
+  `IdReferences`, so that a run deploys first what the others refer to.
+- `get_active_value_set()` and `set_active_value_set()`: the active value
+  set of a variable library, which is no part of its definition, so no
+  deployment sets it. `set_active_value_set()` sends nothing when the
+  value set is active already, and returns the active value set read back.
+- `refresh_semantic_model_and_wait()`: refreshes a semantic model and
+  waits for the refresh to end, returning its entry of the refresh
+  history. A refresh already running is waited for first. Without
+  `options` the refresh is a plain one, which a workspace without a
+  capacity also takes; `refresh_semantic_model()`, which always sends the
+  options of an enhanced refresh, is unchanged.
+- [pyfabricops-template](https://github.com/alisonpezzott/pyfabricops-template),
+  a template repository of its own, made into a new repository with **Use
+  this template** on GitHub or imported in Azure DevOps. It deploys the
   items of a Fabric workspace to one workspace per environment, DEV from
   `develop` and PRD from `main`, with CI for Azure DevOps and GitHub
   Actions. A file per environment, in Git, gives its workspace and,
@@ -17,7 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   repository, and the run says which.
   - With DEV connected to Git, no run deploys to DEV, and every item type
     pyfabricops deploys goes to PRD, each ID of DEV mapped to the ID of the
-    same item there, one item type at a time and pipelines last.
+    same item there with `WorkspaceIdMap`, one item type at a time and
+    pipelines last.
   - With no workspace connected, the repository is the source of every
     environment, DEV included, for variable libraries, semantic models and
     reports.
@@ -25,15 +45,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     one, and the environments may mix them. An item a Pro workspace cannot
     hold stops the run before anything is deployed.
   - The value set of the environment is made active in each variable
-    library, and each import model deployed is bound to the shareable
-    cloud connection of its data source and refreshed.
+    library with `set_active_value_set()`, and each import model deployed
+    is bound to the shareable cloud connection of its data source and
+    refreshed with `refresh_semantic_model_and_wait()`.
   - `--plan`, `--reconcile` and `--restore`, with the deployment state on a
     branch of the repository, in a lakehouse or in a folder.
+  - It needs pyfabricops 0.9.0.
 
 ### Removed
-- `examples/Adventure-Works-LT`, the medallion project deployed from a
-  workspace connected to Git: `examples/03-template-repo` does what it
-  did.
+- `examples/Adventure-Works-LT` and `examples/Deploy-PowerBI-Pro`, the
+  deploy examples: the template repository does what they did.
 
 ---
 

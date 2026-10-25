@@ -15,7 +15,7 @@ end; the deployment step still deploys to the sandbox workspace. Use a
 private repository: the lock records the user and host that took it, and
 the state the ID of the sandbox workspace.
 
-Prerequisites, as for ``scripts/e2e_deployment.py``:
+Prerequisites, as for ``tests/e2e/e2e_deployment.py``:
 
 - A service principal in an ``.env`` file (``FAB_CLIENT_ID``,
   ``FAB_CLIENT_SECRET``, ``FAB_TENANT_ID``), in a tenant that lets service
@@ -26,9 +26,9 @@ Prerequisites, as for ``scripts/e2e_deployment.py``:
 
 Usage::
 
-    uv run --frozen python scripts/e2e_state.py \\
+    uv run --frozen python tests/e2e/e2e_state.py \\
         --workspace pyfabricops-e2e --env-file project/.env
-    uv run --frozen python scripts/e2e_state.py \\
+    uv run --frozen python tests/e2e/e2e_state.py \\
         --workspace pyfabricops-e2e --env-file project/.env \\
         --git-remote https://dev.azure.com/<org>/<project>/_git/<repo>
 

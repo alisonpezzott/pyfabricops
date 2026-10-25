@@ -36,15 +36,20 @@ tenant, workspace or data.
 | :--- | :--- |
 | `01-authentication/` | Authenticating with a service principal from `.env`, and the other ways to sign in. |
 | `02-export/` | Exporting a workspace to a folder, to start a repository from it. |
-| `03-template-repo/` | A template repository: the script and the CI definitions, for Azure DevOps and GitHub Actions, that deploy the items of a Fabric workspace to one workspace per environment. With DEV connected to Git, every item type pyfabricops deploys goes to PRD, with the IDs of DEV mapped to those of PRD; with no workspace connected, the repository is the source of every environment, for variable libraries, semantic models and reports. A file per environment gives its workspace, value set and model parameters, and each workspace may be on a Fabric capacity or Pro. |
 
-Run the first two from the repository root, for example:
+Run them from the repository root, for example:
 
 ```bash
 python examples/02-export/export_workspace.py --workspace <workspace-name> --path exported
 ```
 
-`03-template-repo/` is the root of a repository of its own: copy it into a
-new repository, and its README tells how to set it up and run it.
 `tests/test_examples.py` checks that no ID other than the made-up ones gets
 into this folder.
+
+## Template repository
+
+To deploy a workspace from CI, start from
+[pyfabricops-template](https://github.com/alisonpezzott/pyfabricops-template): a repository with the script and the
+pipelines, for GitHub Actions and Azure DevOps, that deploy the items of a
+Fabric workspace to one workspace per environment. It used to be
+`examples/03-template-repo`; its README tells how to set it up and run it.

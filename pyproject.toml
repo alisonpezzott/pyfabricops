@@ -82,9 +82,8 @@ packages = ["src/pyfabricops"]
 [tool.hatch.build.targets.sdist]
 exclude = ["examples/"]
 
-[tool.pytest.ini.options]
-python = "."
-addopts = "--doctest-modules"
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 79

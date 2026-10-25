@@ -121,14 +121,25 @@ This file maps your local branches to Fabric branches, allowing the library to a
 
 ## 🪄 Examples
 
-The [`examples/`](https://github.com/alisonpezzott/pyfabricops/tree/main/examples) folder has runnable examples:
+The [`examples/`](https://github.com/alisonpezzott/pyfabricops/tree/main/examples) folder has runnable scripts that authenticate and export a workspace.
 
-- scripts that authenticate and export a workspace;
-- Adventure Works LT, a medallion project as Fabric Git integration writes
-  it, deployed from a DEV workspace connected to Git to PRD, with the IDs
-  of PRD in place of those of DEV;
-- a drift report that can restore what changed by hand;
-- CI definitions for Azure DevOps and GitHub Actions.
+### Template repository
+
+[pyfabricops-template](https://github.com/alisonpezzott/pyfabricops-template) is a repository to start a project from, with
+**Use this template** on GitHub or an import in Azure DevOps. Its script and
+pipelines, for GitHub Actions and Azure DevOps, deploy the items of a Fabric
+workspace to one workspace per environment, DEV from `develop` and PRD from
+`main`:
+
+- with DEV connected to Git, every item type pyfabricops deploys goes to
+  PRD, the IDs of DEV mapped to those of PRD with `WorkspaceIdMap`;
+- with no workspace connected, the repository is the source of every
+  environment, for variable libraries, semantic models and reports;
+- each workspace may be on a Fabric capacity or Pro;
+- a file per environment gives its workspace, the value set of its variable
+  libraries and the parameters of its semantic models;
+- the deployment state is kept on a branch of the repository, and a weekday
+  drift report can restore what changed by hand.
 
 More examples: [https://github.com/alisonpezzott/pyfabricops-examples](https://github.com/alisonpezzott/pyfabricops-examples)
 
