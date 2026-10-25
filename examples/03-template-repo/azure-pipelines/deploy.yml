@@ -1,0 +1,110 @@
+# Deploys fabric-workspace/ to DEV when develop changes and to PRD when main
+# changes, to the workspace and with the parameters of environments/DEV.json
+# or PRD.json, then binds and refreshes the semantic models (see deploy.py).
+# The repository is the source of both workspaces, each on a Fabric capacity
+# or not: no workspace is connected to Git.
+#
+# The branch picks the environment when the pipeline is compiled, so a run
+# holds the stage of its own environment only: a run of develop needs no
+# authorization for PRD, and nothing can be edited at queue time. A run of
+# any other branch deploys nowhere, and fails.
+#
+# Before the first run:
+# - A variable group "fabric" (Pipelines > Library) with FAB_TENANT_ID,
+#   FAB_CLIENT_ID and FAB_CLIENT_SECRET, this one as a secret, of a service
+#   principal that is a Contributor of both workspaces.
+# - Two environments (Pipelines > Environments), "DEV" and "PRD", each with
+#   an Exclusive Lock check, so that one deployment runs at a time; "PRD"
+#   with an approval too.
+# - This pipeline allowed to use the variable group and both environments
+#   (Pipeline permissions of each), or a Permit on its first run of each
+#   branch.
+# - A shareable cloud connection to the server and database of each
+#   environment, of which the service principal is a user: each semantic
+#   model is bound to it.
+# - Contribute and Create branch for the build service of the project on
+#   this repository (Project settings > Repositories > Security): the job
+#   pushes the deployment state to the pyfabricops/state branch, which the
+#   first run creates, one state per environment. Its commits say [skip ci].
+#   Never merge that branch.
+# - The pipeline itself: Pipelines > New pipeline > Existing Azure Pipelines
+#   YAML file, this one.
+
+trigger:
+  branches:
+    include:
+      - develop
+      - main
+  paths:
+    include:
+      - fabric-workspace
+      - environments
+      - scripts/deploy.py
+
+pr: none
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  - group: fabric
+  # The environment of the branch: environments/<ENVIRONMENT>.json gives
+  # its workspace and parameters.
+  - ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/main') }}:
+      - name: ENVIRONMENT
+        value: PRD
+  - ${{ elseif eq(variables['Build.SourceBranch'], 'refs/heads/develop') }}:
+      - name: ENVIRONMENT
+        value: DEV
+  - ${{ else }}:
+      - name: ENVIRONMENT
+        value: none
+
+stages:
+  - ${{ if eq(variables.ENVIRONMENT, 'none') }}:
+      - stage: NoEnvironment
+        displayName: No environment for this branch
+        jobs:
+          - job: Fail
+            steps:
+              - checkout: none
+              - script: |
+                  echo "##vso[task.logissue type=error]Only develop and main deploy: develop to DEV, main to PRD."
+                  exit 1
+                displayName: Fail
+  - ${{ else }}:
+      - stage: Deploy
+        displayName: Deploy to ${{ variables.ENVIRONMENT }}
+        jobs:
+          - deployment: Deploy
+            displayName: Deploy to ${{ variables.ENVIRONMENT }}
+            environment: ${{ variables.ENVIRONMENT }}
+            strategy:
+              runOnce:
+                deploy:
+                  steps:
+                    # A deployment job checks out nothing unless asked.
+                    - checkout: self
+                      # The whole history: the run compares commits.
+                      fetchDepth: 0
+                      # git pushes the deployment state with the token of
+                      # the job.
+                      persistCredentials: true
+
+                    - task: UsePythonVersion@0
+                      inputs:
+                        versionSpec: "3.13"
+
+                    - script: pip install "pyfabricops>=0.8.1,<0.9.0"
+                      displayName: Install pyfabricops
+
+                    - script: >
+                        python scripts/deploy.py
+                        --environment $(ENVIRONMENT)
+                        --state-branch pyfabricops/state
+                      displayName: Deploy
+                      env:
+                        # Secret variables reach a script only when mapped.
+                        FAB_TENANT_ID: $(FAB_TENANT_ID)
+                        FAB_CLIENT_ID: $(FAB_CLIENT_ID)
+                        FAB_CLIENT_SECRET: $(FAB_CLIENT_SECRET)

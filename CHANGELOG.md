@@ -8,30 +8,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- `examples/Deploy-PowerBI-Pro`: a Power BI Project deployed to two
-  workspaces without a Fabric capacity, so without Git integration or
-  variable libraries. The repository is the source of DEV and PRD; a file
-  per environment gives its workspace and the parameters of the models,
-  set in a staging copy; each model deployed is taken over, bound to the
-  shareable cloud connection of its data source and refreshed without the
-  options of an enhanced refresh, which a Pro workspace refuses. With CI
-  for Azure DevOps and GitHub Actions, and tests in
-  `tests/test_example_powerbi_pro.py`.
-- `examples/deploy-workspace`: the flow of `Deploy-PowerBI-Pro` for any
-  workspace, on a Fabric capacity or not, and for environments that mix
-  them: nothing in the files of the environments or in the pipelines
-  depends on it. It deploys semantic models and reports, and stops before
-  it deploys anything when the repository has another item, a Direct Lake
-  model, whose source is a Fabric item by ID that it does not translate, or
-  a model saved as `model.bim`, whose parameters it does not read. Tests in
-  `tests/test_example_deploy_workspace.py`.
+- `examples/03-template-repo`: a template repository that deploys the
+  items of a Fabric workspace to one workspace per environment, DEV from
+  `develop` and PRD from `main`, with CI for Azure DevOps and GitHub
+  Actions. A file per environment, in Git, gives its workspace and,
+  optionally, the value set of its variable libraries and the parameters
+  of its semantic models; a parameter it leaves out keeps the value of the
+  repository, and the run says which.
+  - With DEV connected to Git, no run deploys to DEV, and every item type
+    pyfabricops deploys goes to PRD, each ID of DEV mapped to the ID of the
+    same item there, one item type at a time and pipelines last.
+  - With no workspace connected, the repository is the source of every
+    environment, DEV included, for variable libraries, semantic models and
+    reports.
+  - A workspace may be on a Fabric capacity or a Pro workspace, without
+    one, and the environments may mix them. An item a Pro workspace cannot
+    hold stops the run before anything is deployed.
+  - The value set of the environment is made active in each variable
+    library, and each import model deployed is bound to the shareable
+    cloud connection of its data source and refreshed.
+  - `--plan`, `--reconcile` and `--restore`, with the deployment state on a
+    branch of the repository, in a lakehouse or in a folder.
 
-### Changed
-- The Adventure Works LT example skips an item type that neither the
-  repository nor the target workspace has. Its run would do nothing, but
-  still take the lock and record the state, which on a branch costs a few
-  pushes. A type that only the target has still runs, so the items deleted
-  in Git are still found.
+### Removed
+- `examples/Adventure-Works-LT`, the medallion project deployed from a
+  workspace connected to Git: `examples/03-template-repo` does what it
+  did.
 
 ---
 

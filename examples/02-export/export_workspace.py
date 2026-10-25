@@ -10,8 +10,9 @@ reads.
 Before committing, look through the exported files, and keep client data
 out of the repository. They hold the IDs of that workspace, such as a
 pipeline's notebook or a notebook's default lakehouse. Leave them: the
-deployment of ``examples/Adventure-Works-LT``, given that workspace as its
-source, turns them into the IDs of the workspace it deploys to.
+deployment of ``examples/03-template-repo``, with that workspace as the
+environment connected to Git, turns them into the IDs of the workspace it
+deploys to.
 
 Usage::
 
