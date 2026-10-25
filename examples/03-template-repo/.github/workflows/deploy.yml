@@ -1,0 +1,75 @@
+# Deploys fabric-workspace/ to DEV when develop changes and to PRD when main
+# changes, to the workspace and with the parameters of environments/DEV.json
+# or PRD.json, then binds and refreshes the semantic models (see deploy.py).
+# The repository is the source of both workspaces, each on a Fabric capacity
+# or not: no workspace is connected to Git.
+#
+# Before the first run:
+# - This folder is the root of the repository. GitHub runs the workflows of
+#   .github/workflows at the root only.
+# - Two environments (Settings > Environments), "dev" and "prd", each with
+#   the secrets FAB_TENANT_ID, FAB_CLIENT_ID and FAB_CLIENT_SECRET, of a
+#   service principal that is a Contributor of the workspace. The workspace
+#   itself is in environments/DEV.json or PRD.json. Required reviewers on
+#   "prd" make a deployment to PRD wait for an approval; "dev" may limit its
+#   deployment branches to develop, and "prd" to main.
+# - A shareable cloud connection to the server and database of each
+#   environment, of which the service principal is a user: each semantic
+#   model is bound to it.
+# - Nothing for the deployment state: it lives on the pyfabricops/state
+#   branch of this repository, which the first run creates, one state per
+#   environment. The job pushes to it with its own token, so it needs
+#   contents: write, and its commits say [skip ci]. Never merge that branch.
+
+name: Deploy workspace
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+    paths:
+      - fabric-workspace/**
+      - environments/**
+      - scripts/deploy.py
+  workflow_dispatch:
+
+# One deployment at a time per environment: a second run would find the
+# deployment state locked, and fail.
+concurrency:
+  group: deploy-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # Any other branch run by hand deploys nowhere.
+    if: github.ref_name == 'develop' || github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name == 'main' && 'prd' || 'dev' }}
+    permissions:
+      # The deployment state is pushed to the pyfabricops/state branch.
+      contents: write
+    env:
+      ENVIRONMENT: ${{ github.ref_name == 'main' && 'PRD' || 'DEV' }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # The whole history: the run compares commits.
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install pyfabricops
+        run: pip install "pyfabricops>=0.8.1,<0.9.0"
+
+      - name: Deploy
+        run: >
+          python scripts/deploy.py
+          --environment "$ENVIRONMENT"
+          --state-branch pyfabricops/state
+        env:
+          FAB_TENANT_ID: ${{ secrets.FAB_TENANT_ID }}
+          FAB_CLIENT_ID: ${{ secrets.FAB_CLIENT_ID }}
+          FAB_CLIENT_SECRET: ${{ secrets.FAB_CLIENT_SECRET }}
