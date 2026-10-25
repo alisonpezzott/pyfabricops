@@ -44,7 +44,7 @@ A run can then deploy first the items the others refer to, call
 copy again. The shortcuts are translated from what they were the first
 time, so a shortcut waiting for its lakehouse gets it on the next pass. An
 item still referring to the source must not be sent: it would read and
-write the source workspace. The template repository in
-`examples/03-template-repo` does this, one item type at a time.
+write the source workspace. The
+[template repository](https://github.com/alisonpezzott/pyfabricops-template) does this, one item type at a time.
 
 ::: pyfabricops.helpers.workspace_ids
