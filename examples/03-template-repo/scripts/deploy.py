@@ -114,7 +114,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -151,9 +150,8 @@ ANY_WORKSPACE = ("SemanticModel", "Report")
 SENT = ("created", "updated")
 # The refresh statuses that need no new refresh: done, or still running.
 REFRESHED = ("Completed", "Unknown")
-# How long a refresh may take, and how often it is checked, in seconds.
+# How long a refresh may take, in seconds.
 REFRESH_TIMEOUT = 3600
-REFRESH_POLL = 15
 # What Power BI Desktop saves of a semantic model but the service does not
 # keep, so that no reconciliation would ever find it in sync.
 UNKEPT = ("diagramLayout.json",)
@@ -172,24 +170,6 @@ TEXT_VALUE = re.compile(
 # A partition in Direct Lake, in the file of its table.
 DIRECT_LAKE = re.compile(
     r"^\s*mode:\s*directLake\b", re.MULTILINE | re.IGNORECASE
-)
-# The empty GUID, which Fabric writes for "this workspace".
-THIS_WORKSPACE = "00000000-0000-0000-0000-000000000000"
-# The shortcuts of a lakehouse, which get the IDs of the target one by one.
-SHORTCUTS = "shortcuts.metadata.json"
-# The files that get the IDs of the target as text: all but the shortcuts, a
-# .platform, which holds the identity of its item, and the files of the
-# variable libraries.
-MAPPED = (
-    r"^(?!.*\.VariableLibrary[\\/])(?!.*shortcuts\.metadata\.json$)"
-    r".*(?<!\.platform)$"
-)
-# In pipelines and notebooks, the empty GUID of a workspace gets the target.
-REFERRERS = r"(pipeline-content\.json|notebook-content\.\w+)$"
-EMPTY_WORKSPACE = (
-    r'("(?:workspaceId|default_lakehouse_workspace_id)"\s*:\s*")'
-    + THIS_WORKSPACE
-    + r'(")'
 )
 
 
@@ -632,127 +612,6 @@ def drop_local_files(
             (model.folder / name).unlink(missing_ok=True)
 
 
-class IdMap:
-    """
-    The ID in the target workspace of each ID of the source workspace.
-
-    An item of the source workspace maps to the item of the same type and
-    name in the target, by its ID and by its logical ID, and so does the
-    logical ID of an item of the repository. The source workspace maps to
-    the target.
-
-    Args:
-        source (str): The ID of the workspace connected to the repository.
-        target (str): The ID of the workspace to deploy to.
-        items (Sequence[SourceItem]): The items of the repository.
-    """
-
-    def __init__(
-        self, source: str, target: str, items: Sequence[SourceItem]
-    ) -> None:
-        self.source = source.lower()
-        self.target = target
-        self.items = items
-        # Every ID in lowercase, as Fabric returns them, with its item.
-        self.known: dict[str, ItemKey] = {}
-        for key, item in list_workspace(source).items():
-            for value in (item.get("id"), item.get("logicalId")):
-                if value:
-                    self.known[str(value).lower()] = key
-        for source_item in items:
-            if source_item.logical_id:
-                self.known[source_item.logical_id.lower()] = source_item.key
-        self.target_items: dict[ItemKey, dict[str, Any]] = {}
-        # The IDs of the items the target lacks yet.
-        self.pending: dict[str, ItemKey] = {}
-        self.refresh()
-
-    def refresh(self) -> None:
-        """List the target again, for the items deployed since."""
-        self.target_items = list_workspace(self.target)
-        self.pending = {
-            old: key
-            for old, key in self.known.items()
-            if key not in self.target_items
-        }
-
-    def apply(self, staging: Path, shortcuts: Mapping[Path, str]) -> None:
-        """
-        Put the IDs of the target in the staged items.
-
-        Args:
-            staging (Path): The staging folder.
-            shortcuts (Mapping[Path, str]): The staged shortcuts files, with
-                their content in the repository.
-        """
-        replacements = {(MAPPED, "(?i)" + re.escape(self.source)): self.target}
-        for old, key in self.known.items():
-            if key in self.target_items:
-                new = str(self.target_items[key]["id"])
-                replacements[(MAPPED, "(?i)" + re.escape(old))] = new
-        replacements[(REFERRERS, EMPTY_WORKSPACE)] = (
-            rf"\g<1>{self.target}\g<2>"
-        )
-        pf.find_and_replace(str(staging), replacements)
-        for file, text in shortcuts.items():
-            pointed = [self.point(shortcut) for shortcut in json.loads(text)]
-            file.write_text(json.dumps(pointed, indent=2), encoding="utf-8")
-
-    def point(self, shortcut: dict[str, Any]) -> dict[str, Any]:
-        """
-        A OneLake shortcut to an item of the source workspace, pointed at the
-        same item in the target.
-
-        Fabric looks the logical ID of a shortcut to its own workspace up
-        among the items of the workspace, so the shortcut gets the logical ID
-        of the item in the target; the ID of the item, with the ID of the
-        target workspace, when the item has none. Any other shortcut stays as
-        it is, as does one to an item the target lacks yet: the lakehouse
-        waits for it.
-        """
-        one_lake = shortcut.get("target", {}).get("oneLake")
-        if not isinstance(one_lake, dict):
-            return shortcut
-        workspace = str(one_lake.get("workspaceId", "")).lower()
-        key = self.known.get(str(one_lake.get("itemId", "")).lower())
-        target = self.target_items.get(key) if key else None
-        if workspace not in (THIS_WORKSPACE, self.source) or target is None:
-            return shortcut
-        pointed: dict[str, Any] = json.loads(json.dumps(shortcut))
-        if target.get("logicalId"):
-            pointed["target"]["oneLake"].update(
-                workspaceId=THIS_WORKSPACE, itemId=str(target["logicalId"])
-            )
-        else:
-            pointed["target"]["oneLake"].update(
-                workspaceId=self.target, itemId=str(target["id"])
-            )
-        return pointed
-
-    def references(self, item: SourceItem) -> tuple[set[ItemKey], bool]:
-        """
-        What a staged item still refers to in the source workspace.
-
-        Returns:
-            tuple[set[ItemKey], bool]: The items the target lacks that it
-                refers to by ID, and whether it refers to the source
-                workspace itself.
-        """
-        found: set[ItemKey] = set()
-        workspace = False
-        # A variable library holds the values of each environment itself.
-        if item.item_type == "VariableLibrary":
-            return found, workspace
-        for file in sorted(p for p in item.folder.rglob("*") if p.is_file()):
-            if file.name == ".platform":
-                continue
-            text = file.read_text(encoding="utf-8", errors="replace").lower()
-            found |= {key for old, key in self.pending.items() if old in text}
-            workspace = workspace or self.source in text
-        found.discard(item.key)
-        return found, workspace
-
-
 def subset(staging: Path, items: Sequence[SourceItem], folder: Path) -> Path:
     """A copy of some staged items, in their folders, for a run of their own."""
     root = folder / staging.name
@@ -775,8 +634,8 @@ def run_type(
     workspace_id: str,
     staging: Path,
     arguments: Mapping[str, Any],
-    ids: IdMap | None,
-    shortcuts: Mapping[Path, str],
+    ids: Any,
+    sources: Sequence[SourceItem],
 ) -> list[Any] | None:
     """
     Deploy or restore the items of a type: what was done to each, or None
@@ -784,24 +643,27 @@ def run_type(
 
     With the IDs of DEV to translate, the items the others refer to by ID
     are created first, in runs of their own and without the state, which
-    the run of the whole type reads and, for a deployment, records.
+    the run of the whole type reads and, for a deployment, records. ids is
+    the pf.WorkspaceIdMap from DEV to the target, and sources the items of
+    the repository.
     """
     run = {**arguments, "item_types": [item_type]}
     if ids is None:
         result = operation(workspace_id, str(staging), **run)
         return list(result.results) if report(result, item_type) else None
-    items = [item for item in ids.items if item.item_type == item_type]
-    sources = {item.key for item in ids.items}
+    items = [item for item in sources if item.item_type == item_type]
+    repository = {item.key for item in sources}
     created: set[ItemKey] = set()
     done: list[Any] = []
     while True:
-        ids.refresh()
-        ids.apply(staging, shortcuts)
+        ids.reload_target()
+        ids.translate(staging)
         waiting: dict[SourceItem, set[ItemKey]] = {}
         problems: list[str] = []
         for item in items:
-            found, workspace = ids.references(item)
-            if workspace:
+            references = ids.references(item.key, item.folder)
+            found = set(references.missing)
+            if references.source_workspace:
                 problems.append(
                     f"{label(item.key)} refers to the source workspace."
                 )
@@ -809,7 +671,7 @@ def run_type(
                 f"{label(item.key)} refers by ID to {label(key)}, which the "
                 "target lacks and this run cannot create before it."
                 for key in sorted(found)
-                if key[0] != item_type or key not in sources
+                if key[0] != item_type or key not in repository
             )
             if found:
                 waiting[item] = found
@@ -875,41 +737,16 @@ def latest_refresh(endpoint: str) -> dict[str, Any] | None:
     return dict(history[0]) if history else None
 
 
-def wait_refresh(endpoint: str, before: str | None) -> dict[str, Any] | None:
-    """The first refresh other than ``before`` to end, or None on timeout."""
-    deadline = time.monotonic() + REFRESH_TIMEOUT
-    while time.monotonic() < deadline:
-        time.sleep(REFRESH_POLL)
-        latest = latest_refresh(endpoint)
-        if (
-            latest is not None
-            and latest.get("requestId") != before
-            and latest.get("status") != "Unknown"
-        ):
-            return latest
-    return None
-
-
-def refresh(endpoint: str, name: str) -> bool:
+def refresh(workspace_id: str, model_id: str, name: str) -> bool:
     """Refresh a semantic model and wait for it; True when it completed."""
-    latest = latest_refresh(endpoint)
-    if latest is not None and latest.get("status") == "Unknown":
-        print(f"{name}: a refresh is running; waiting for it first.")
-        latest = wait_refresh(endpoint, None)
-    before = latest.get("requestId") if latest else None
     # A workspace without a capacity takes no option of an enhanced refresh,
     # and the plain refresh serves any workspace.
-    started = power_bi(
-        f"{endpoint}/refreshes",
-        method="post",
-        payload={"notifyOption": "NoNotification"},
-    )
-    if not started.success:
-        print(f"{name}: the refresh did not start: {started.error}")
-        return False
-    ended = wait_refresh(endpoint, before)
-    if ended is None:
-        print(f"{name}: the refresh did not end in {REFRESH_TIMEOUT} s.")
+    try:
+        ended: dict[str, Any] = pf.refresh_semantic_model_and_wait(
+            workspace_id, model_id, timeout=REFRESH_TIMEOUT
+        )
+    except (pf.RequestError, TimeoutError) as error:
+        print(f"{name}: {error}")
         return False
     status = ended.get("status")
     print(f"{name}: refresh {status}.")
@@ -976,7 +813,7 @@ def prepare_model(
             print(f"{name}: could not bind {path}: {bound.error}")
             return False
         print(f"{name}: {path} bound to {connection['displayName']}.")
-    return not refreshed or refresh(endpoint, name)
+    return not refreshed or refresh(workspace_id, model_id, name)
 
 
 def prepare_models(
@@ -1026,16 +863,6 @@ def prepare_models(
     return ok
 
 
-def active_value_set(endpoint: str) -> str | None:
-    """The active value set of a variable library, or None."""
-    result = pf.api_request(endpoint, return_result=True)
-    if not result.success:
-        return None
-    properties = (result.data or {}).get("properties") or {}
-    value = properties.get("activeValueSetName")
-    return str(value) if value else None
-
-
 def value_set_in_place(
     workspace_id: str,
     items: Sequence[SourceItem],
@@ -1061,23 +888,19 @@ def value_set_in_place(
             print(f"{label(library.key)}: not in the workspace.")
             ok = False
             continue
-        endpoint = (
-            f"/workspaces/{workspace_id}/variableLibraries/{existing['id']}"
-        )
-        active = active_value_set(endpoint)
-        if active != value_set and change:
-            changed = pf.api_request(
-                endpoint,
-                method="patch",
-                payload={"properties": {"activeValueSetName": value_set}},
-                return_result=True,
-            )
-            if not changed.success:
-                print(
-                    f"{label(library.key)}: could not make {value_set} "
-                    f"active: {changed.error}"
+        try:
+            if change:
+                active = pf.set_active_value_set(
+                    workspace_id, str(existing["id"]), value_set
                 )
-            active = active_value_set(endpoint)
+            else:
+                active = pf.get_active_value_set(
+                    workspace_id, str(existing["id"])
+                )
+        except pf.RequestError as error:
+            print(f"{label(library.key)}: {error}")
+            ok = False
+            continue
         print(f"{label(library.key)}: the active value set is {active}.")
         ok = ok and active == value_set
     return ok
@@ -1217,13 +1040,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         value_set = read_value_set(environment, items)
         # Those of the file, and of the repository for the others.
         parameters = apply_parameters(items, given)
-        shortcuts = {
-            file: file.read_text(encoding="utf-8-sig")
-            for file in sorted(staging.glob(f"**/*.Lakehouse/{SHORTCUTS}"))
-        }
-        ids = None if source is None else IdMap(source, target, items)
-        if ids is not None:
-            ids.apply(staging, shortcuts)
+        ids = None
+        if source is not None:
+            ids = pf.WorkspaceIdMap.load(source, target, staging)
+            ids.translate(staging)
         # The types a run manages: those that hold no ID of a workspace,
         # unless the IDs of DEV are translated.
         managed = [
@@ -1268,7 +1088,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             print(plan.describe())
             for item in items:
-                found = ids.references(item)[0] if ids is not None else set()
+                found = (
+                    ids.references(item.key, item.folder).missing
+                    if ids is not None
+                    else set()
+                )
                 if found:
                     names = ", ".join(map(label, sorted(found)))
                     print(
@@ -1298,7 +1122,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 staging,
                 arguments,
                 ids,
-                shortcuts,
+                items,
             )
             if done is None:
                 return 1
