@@ -258,6 +258,7 @@ from .helpers.semantic_models import (
     get_semantic_model_refreshes,
     list_valid_semantic_models,
     refresh_semantic_model,
+    refresh_semantic_model_and_wait,
     replace_semantic_model_parameters_with_placeholders,
     replace_semantic_model_placeholders_with_parameters,
 )
@@ -268,6 +269,7 @@ from .helpers.warehouses import (
     get_warehouse_config,
     list_valid_warehouses,
 )
+from .helpers.workspace_ids import IdReferences, WorkspaceIdMap
 from .helpers.workspaces import get_workspace_config
 from .items.data_pipelines import (
     create_data_pipeline,
@@ -396,11 +398,13 @@ from .items.spark import (
 from .items.variable_libraries import (
     create_variable_library,
     delete_variable_library,
+    get_active_value_set,
     get_variable_library,
     get_variable_library_definition,
     get_variable_library_id,
     list_variable_libraries,
     resolve_variable_library,
+    set_active_value_set,
     update_variable_library,
     update_variable_library_definition,
 )
@@ -476,6 +480,7 @@ __all__ = [
     "DeploymentState",
     "DeploymentStateBackend",
     "GitStateBackend",
+    "IdReferences",
     "JournalEntry",
     "JournalingStateBackend",
     "LocalJsonStateBackend",
@@ -483,6 +488,7 @@ __all__ = [
     "OneLakeStateBackend",
     "Reconciliation",
     "UnmanagedItem",
+    "WorkspaceIdMap",
     "PyFabricOpsFileNotFoundError",
     "InvalidParameterError",
     "OptionNotAvailableError",
@@ -700,6 +706,7 @@ __all__ = [
     "get_tag_id",
     "get_user_email",
     "get_user_id",
+    "get_active_value_set",
     "get_variable_library",
     "get_variable_library_definition",
     "get_variable_library_id",
@@ -766,6 +773,7 @@ __all__ = [
     "restore_items",
     "refresh_dataflow_gen1",
     "refresh_semantic_model",
+    "refresh_semantic_model_and_wait",
     "replace_data_pipeline_placeholders_with_variables",
     "replace_data_pipeline_variables_with_placeholders",
     "replace_dataflow_gen2_placeholders_with_parameters",
@@ -794,6 +802,7 @@ __all__ = [
     "resolve_semantic_model",
     "resolve_tag",
     "resolve_variable_library",
+    "set_active_value_set",
     "resolve_warehouse",
     "resolve_workspace",
     "resolve_workspace_custom_pool",

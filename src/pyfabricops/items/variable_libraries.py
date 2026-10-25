@@ -1,11 +1,12 @@
-from typing import Any
+from typing import Any, cast
 
 from pandas import DataFrame
 
-from ..api.api import api_request
+from ..api.api import ApiResult, api_request
 from ..core.folders import resolve_folder
 from ..core.workspaces import resolve_workspace
 from ..utils.decorators import df
+from ..utils.exceptions import RequestError, ResourceNotFoundError
 from ..utils.logging import get_logger
 from ..utils.utils import is_valid_uuid
 
@@ -324,3 +325,126 @@ def update_variable_library_definition(
         params=params,
         support_lro=True,
     )
+
+
+def _variable_library_endpoint(workspace: str, variable_library: str) -> str:
+    """The endpoint of a variable library, given by name or ID."""
+    workspace_id = resolve_workspace(workspace)
+    if not workspace_id:
+        raise ResourceNotFoundError(f"Workspace '{workspace}' not found.")
+    variable_library_id = resolve_variable_library(
+        workspace_id, variable_library
+    )
+    if not variable_library_id:
+        raise ResourceNotFoundError(
+            f"Variable library '{variable_library}' not found in workspace "
+            f"'{workspace}'."
+        )
+    return (
+        f"/workspaces/{workspace_id}/VariableLibraries/{variable_library_id}"
+    )
+
+
+def _read_active_value_set(endpoint: str) -> str | None:
+    """The active value set at the endpoint of a variable library."""
+    result = cast(ApiResult, api_request(endpoint, return_result=True))
+    if not result.success:
+        raise RequestError(
+            f"Could not read the variable library at {endpoint}: "
+            f"{result.error}"
+        )
+    properties = (result.data or {}).get("properties") or {}
+    value = properties.get("activeValueSetName")
+    return str(value) if value else None
+
+
+def get_active_value_set(workspace: str, variable_library: str) -> str | None:
+    """
+    Returns the active value set of a variable library.
+
+    The active value set is no part of the definition of the library, so a
+    deployment of its definition neither sets nor changes it.
+
+    Args:
+        workspace (str): The workspace name or ID.
+        variable_library (str): The name or ID of the variable library.
+
+    Returns:
+        (str | None): The name of the active value set, or None when the
+            library is on its default values.
+
+    Raises:
+        ResourceNotFoundError: If the workspace or the variable library is
+            not found.
+        RequestError: If the variable library cannot be read.
+
+    Examples:
+        ```python
+        get_active_value_set('Sales-PRD', 'variables')
+        ```
+    """
+    return _read_active_value_set(
+        _variable_library_endpoint(workspace, variable_library)
+    )
+
+
+def set_active_value_set(
+    workspace: str, variable_library: str, value_set: str
+) -> str | None:
+    """
+    Makes a value set the active one of a variable library, and reads it back.
+
+    Nothing is sent when the value set is active already. The Fabric API
+    documents no way back to the default values, so a value set must be
+    named.
+
+    Args:
+        workspace (str): The workspace name or ID.
+        variable_library (str): The name or ID of the variable library.
+        value_set (str): The name of the value set, as the library defines
+            it.
+
+    Returns:
+        (str | None): The active value set read back after the change, which
+            the caller compares with ``value_set``; None when the library is
+            on its default values.
+
+    Raises:
+        ResourceNotFoundError: If the workspace or the variable library is
+            not found.
+        RequestError: If the variable library cannot be read, or the value
+            set cannot be made active, such as one the library lacks.
+
+    Examples:
+        ```python
+        set_active_value_set('Sales-PRD', 'variables', 'Production')
+        ```
+    """
+    endpoint = _variable_library_endpoint(workspace, variable_library)
+    if _read_active_value_set(endpoint) == value_set:
+        return value_set
+    changed = cast(
+        ApiResult,
+        api_request(
+            endpoint,
+            method="patch",
+            payload={"properties": {"activeValueSetName": value_set}},
+            return_result=True,
+        ),
+    )
+    if not changed.success:
+        raise RequestError(
+            f"Could not make '{value_set}' the active value set of "
+            f"'{variable_library}': {changed.error}"
+        )
+    active = _read_active_value_set(endpoint)
+    if active == value_set:
+        logger.success(
+            f"'{value_set}' is the active value set of '{variable_library}'."
+        )
+    else:
+        logger.warning(
+            f"The active value set of '{variable_library}' is '{active}', "
+            f"not '{value_set}'."
+        )
+    return active

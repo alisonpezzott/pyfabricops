@@ -8,6 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `WorkspaceIdMap`: maps each ID of a source workspace, such as the one
+  connected to Git, to the ID of the item of the same type and display
+  name in a target workspace, by ID and by logical ID. `translate()` puts
+  the IDs of the target in a staging copy of the items, OneLake shortcuts
+  and the empty workspace GUID of pipelines and notebooks included, and
+  `references()` tells what an item still refers to in the source, as an
+  `IdReferences`, so that a run deploys first what the others refer to.
+- `get_active_value_set()` and `set_active_value_set()`: the active value
+  set of a variable library, which is no part of its definition, so no
+  deployment sets it. `set_active_value_set()` sends nothing when the
+  value set is active already, and returns the active value set read back.
+- `refresh_semantic_model_and_wait()`: refreshes a semantic model and
+  waits for the refresh to end, returning its entry of the refresh
+  history. A refresh already running is waited for first. Without
+  `options` the refresh is a plain one, which a workspace without a
+  capacity also takes; `refresh_semantic_model()`, which always sends the
+  options of an enhanced refresh, is unchanged.
 - `examples/03-template-repo`: a template repository that deploys the
   items of a Fabric workspace to one workspace per environment, DEV from
   `develop` and PRD from `main`, with CI for Azure DevOps and GitHub
@@ -29,6 +46,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     cloud connection of its data source and refreshed.
   - `--plan`, `--reconcile` and `--restore`, with the deployment state on a
     branch of the repository, in a lakehouse or in a folder.
+  - It translates the IDs of DEV with `WorkspaceIdMap`, sets the value
+    sets with `set_active_value_set()` and refreshes the models with
+    `refresh_semantic_model_and_wait()`, and so needs pyfabricops 0.9.0.
 
 ### Removed
 - `examples/Adventure-Works-LT`, the medallion project deployed from a
