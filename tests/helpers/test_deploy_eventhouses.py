@@ -8,6 +8,7 @@ import shutil
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
+from unittest.mock import patch
 
 from pyfabricops.api.api import ApiResult
 from pyfabricops.helpers.deployment import DEPLOY_ORDER
@@ -267,3 +268,19 @@ def test_a_database_whose_eventhouse_failed_is_not_deployed(
         ("Eventhouse", "failed"),
         ("KQLDatabase", "skipped"),
     ]
+
+
+def test_each_action_logs_its_start_before_its_outcome(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """A create takes a while: the log tells what is going on meanwhile."""
+    _write_item(root, "Orders.Notebook")
+
+    with patch("pyfabricops.helpers.deployment.logger") as logger:
+        _deploy(root)
+
+    messages = [c.args[0] for c in logger.info.call_args_list]
+    start = messages.index("Creating Orders.Notebook...")
+    assert any(
+        m.startswith("Orders.Notebook created") for m in messages[start + 1 :]
+    )

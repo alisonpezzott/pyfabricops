@@ -1500,6 +1500,25 @@ def _log_report(report: DeploymentReport) -> None:
     )
 
 
+# How the start of an action that changes the workspace is logged.
+_STARTING: dict[DeploymentActionType, str] = {
+    DeploymentActionType.CREATE: "Creating",
+    DeploymentActionType.UPDATE: "Updating",
+    DeploymentActionType.MOVE: "Moving",
+    DeploymentActionType.DELETE: "Deleting",
+}
+
+
+def _log_start(action: DeploymentAction) -> None:
+    """
+    Log that an action starts, as creating an item may take a while and
+    its outcome is logged only once it ends.
+    """
+    starting = _STARTING.get(action.action)
+    if starting is not None and action.display_name:
+        logger.info(f"{starting} {action.display_name}.{action.item_type}...")
+
+
 def _log_noop(action: DeploymentAction) -> None:
     """Log an action that needs no change to the workspace."""
     logger.info(
@@ -1613,6 +1632,10 @@ class DeploymentExecutor:
                     "skipped.",
                 )
             else:
+                if action.action is not DeploymentActionType.DELETE or (
+                    self._allow_deletions
+                ):
+                    _log_start(action)
                 result = _apply_action(
                     self._index,
                     action,

@@ -51,6 +51,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   deployment of its definition does not publish for sure (preview API).
 
 ### Changed
+- A deployment logs the start of each action that changes the workspace,
+  such as `Creating Bronze.Lakehouse...`, at INFO: a create can take a
+  while, and its outcome is logged only once it ends.
 - `deploy_all_items()`, `plan_all_items()`, `reconcile_items()` and
   `restore_items()` without `item_types` now take eventhouses, KQL
   databases, eventstreams, ontologies and data agents, which they used to
