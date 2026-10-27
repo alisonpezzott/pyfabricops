@@ -14,11 +14,15 @@ out what Fabric changes by itself, as measured against a workspace:
 - how a report's ``definition.pbir`` points to its semantic model: by the
   path of its folder in Git, by a connection in the workspace. Given the
   name of the model it points to, the reference is compared by that name;
-- the ``ref`` lines Fabric adds to a semantic model's ``model.tmdl`` to
-  order its tables and other objects;
+- the ``ref`` lines Fabric adds to the ``model.tmdl`` of a semantic model,
+  or of an ontology, to order its tables and other objects;
 - a part that holds nothing, such as the empty ``shortcuts.metadata.json``
   Fabric adds to a lakehouse sent without one, when the other side lacks
-  it.
+  it;
+- the parts of a KQL database that tell what the database holds rather
+  than what was sent: ``DatabaseSchema.kql``, which Fabric returns as the
+  whole schema of the database, whatever created it, and
+  ``EmbeddedRealTimeQueryset.json``, the tabs of its query editor.
 
 Internal for now: nothing here is exported from ``pyfabricops``.
 """
@@ -37,7 +41,11 @@ __all__ = ["comparable_parts", "differing_parts"]
 
 _PLATFORM = ".platform"
 _PBIR = "definition.pbir"
-_MODEL_TMDL = "definition/model.tmdl"
+_MODEL_TMDL = "model.tmdl"
+# The parts never compared: what a KQL database holds, not what was sent.
+_NOT_COMPARED = frozenset(
+    {"DatabaseSchema.kql", "EmbeddedRealTimeQueryset.json"}
+)
 # A line that only orders the objects of a model, such as "ref table Sales".
 _TMDL_REF = re.compile(r"ref\s")
 _BLANK_LINES = re.compile(r"\n{3,}")
@@ -74,6 +82,8 @@ def comparable_parts(
     parts: dict[str, bytes] = {}
     for part in definition.get("parts", []):
         path = part["path"]
+        if path in _NOT_COMPARED:
+            continue
         content = canonical_part(path, base64.b64decode(part["payload"]))
         parts[path] = _comparable(path, content, semantic_model)
     return parts
@@ -131,7 +141,7 @@ def _comparable(
         text = _without_logical_id(text)
     elif path == _PBIR and semantic_model is not None:
         text = _pointing_to(text, semantic_model)
-    elif path == _MODEL_TMDL:
+    elif path.rpartition("/")[2] == _MODEL_TMDL:
         text = _without_refs(text)
     return text.rstrip().encode("utf-8")
 

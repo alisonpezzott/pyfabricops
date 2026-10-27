@@ -2254,7 +2254,13 @@ def _reconcile(
         )
         for (item_type, display_name), entry in index.items.items()
     ]
-    differences, unchecked = _compare_definitions(index, items)
+    differences, unchecked = _compare_definitions(
+        index,
+        items,
+        LocalCatalog.read(path, DEPLOY_ORDER)
+        if any(item.item_type in _BOUND_TO_LOCAL_ITEMS for item in items)
+        else None,
+    )
     reconciliation = reconcile(
         items,
         listed,
@@ -2295,10 +2301,16 @@ def _deployed_items(
 
 
 def _compare_definitions(
-    index: _WorkspaceIndex, items: Sequence[SourceItem]
+    index: _WorkspaceIndex,
+    items: Sequence[SourceItem],
+    catalog: LocalCatalog | None = None,
 ) -> tuple[dict[ItemKey, tuple[str, ...]], dict[ItemKey, str]]:
     """
     Compare the definition of each local item the workspace has.
+
+    An item bound to the local items it refers to, such as a KQL database
+    to its eventhouse, is compared as it would be sent: with the IDs of the
+    workspace in place of the logical IDs Git holds.
 
     Returns the parts that differ for each item compared, empty when it
     matches, and why each of the others could not be compared.
@@ -2332,7 +2344,11 @@ def _compare_definitions(
             )
             continue
         try:
-            desired = pack_item_definition(item.source_path)
+            desired = (
+                _definition_to_send(index, _as_update(item), catalog)
+                if item.item_type in _BOUND_TO_LOCAL_ITEMS
+                else pack_item_definition(item.source_path)
+            )
         except (PyFabricOpsError, OSError) as e:
             unchecked[key] = f"Its definition could not be read: {e}"
             continue
@@ -2355,6 +2371,18 @@ def _compare_definitions(
             ),
         )
     return differences, unchecked
+
+
+def _as_update(item: SourceItem) -> DeploymentAction:
+    """The update a deployment would send for an item of the source."""
+    return DeploymentAction(
+        action=DeploymentActionType.UPDATE,
+        item_type=item.item_type,
+        display_name=item.display_name,
+        source_path=item.source_path,
+        reason=DeploymentReason.WORKSPACE_DRIFT,
+        folder_path=item.folder_path,
+    )
 
 
 def _report_model(

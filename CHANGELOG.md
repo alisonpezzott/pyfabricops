@@ -56,12 +56,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   databases, eventstreams, ontologies and data agents, which they used to
   leave alone; a reconciliation no longer
   lists them as unmanaged. Pass `item_types` to keep a run as it was.
-
-### Known limitations
-- A reconciliation compares a KQL database as Fabric returns it:
-  `parentEventhouseItemId` holds an ID there, and `DatabaseSchema.kql`
-  the whole schema of the database, so it differs from the source until
-  the comparison learns both.
+- A reconciliation compares a KQL database, an eventstream, an ontology
+  or a data agent as a deployment would send it, with the IDs of the
+  workspace in place of the logical IDs Git holds. It leaves out what a
+  KQL database holds rather than what was sent: `DatabaseSchema.kql`,
+  which Fabric returns as the whole schema of the database, and
+  `EmbeddedRealTimeQueryset.json`, the tabs of its query editor. The `ref`
+  lines Fabric adds to the `model.tmdl` of an ontology are left out, as
+  those of a semantic model were.
+- `export_item()` and `export_all_items()` put a KQL database where Fabric
+  Git integration writes it, in the `.children` folder of its eventhouse.
 
 ---
 

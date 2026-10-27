@@ -1,3 +1,5 @@
+import base64
+import json
 import os
 from collections.abc import Sequence
 from pathlib import Path
@@ -32,6 +34,7 @@ from ..items.items import (
 from ..utils.decorators import df
 from ..utils.logging import get_logger
 from ..utils.utils import (
+    CHILDREN_FOLDER,
     extract_display_name_from_platform,
     extract_middle_path,
     pack_item_definition,
@@ -41,6 +44,51 @@ from ..utils.utils import (
 logger = get_logger(__name__)
 
 
+def _item_path(workspace_id: str, item: dict[str, Any], path: str) -> Path:
+    """The folder an item is exported to: its workspace folder, then it."""
+    name = f"{item['displayName']}.{item['type']}"
+    folder_path = None
+    if "folderId" in item:
+        try:
+            folder_path = resolve_folder_from_id_to_path(
+                workspace_id, item["folderId"]
+            )
+        except Exception:
+            logger.info(f"{name} is not inside a folder.")
+    if folder_path is None:
+        return Path(path) / name
+    return Path(path) / folder_path / name
+
+
+def _nested_path(parent_path: Path, item: dict[str, Any]) -> Path:
+    """The folder of an item nested in another, as Git integration writes it."""
+    return (
+        parent_path / CHILDREN_FOLDER / f"{item['displayName']}.{item['type']}"
+    )
+
+
+def _parent_eventhouse_id(
+    item_type: str, definition: dict[str, Any]
+) -> str | None:
+    """The ID of the eventhouse a KQL database's definition names, if any."""
+    if item_type != "KQLDatabase":
+        return None
+    for part in definition.get("definition", {}).get("parts", []):
+        if part.get("path") != "DatabaseProperties.json":
+            continue
+        try:
+            properties = json.loads(base64.b64decode(part["payload"]))
+        except (KeyError, TypeError, ValueError):
+            return None
+        value = (
+            properties.get("parentEventhouseItemId")
+            if isinstance(properties, dict)
+            else None
+        )
+        return value if isinstance(value, str) and value else None
+    return None
+
+
 def export_item(
     workspace: str,
     item: str,
@@ -48,6 +96,9 @@ def export_item(
 ):
     """
     Exports a item definition to a specified folder structure.
+
+    A KQL database goes where Fabric Git integration writes it, in the
+    ``.children`` folder of its eventhouse.
 
     Args:
         workspace (str): The workspace name or ID.
@@ -76,23 +127,12 @@ def export_item(
     item_type = item_["type"]
     item_name = item_["displayName"]
 
-    folder_id = None
-    folder_path = None
-
-    if "folderId" in item_:
-        folder_id = item_["folderId"]
-        try:
-            folder_path = resolve_folder_from_id_to_path(
-                workspace_id, folder_id
-            )
-        except Exception:
-            logger.info(f"{item_name}.{item_type} is not inside a folder.")
-            folder_path = None
-
-    if folder_path is None:
-        item_path = Path(path) / f"{item_name}.{item_type}"
+    parent_id = _parent_eventhouse_id(item_type, definition)
+    parent = get_item(workspace_id, parent_id, df=False) if parent_id else None
+    if parent:
+        item_path = _nested_path(_item_path(workspace_id, parent, path), item_)
     else:
-        item_path = Path(path) / folder_path / f"{item_name}.{item_type}"
+        item_path = _item_path(workspace_id, item_, path)
 
     os.makedirs(item_path, exist_ok=True)
 
@@ -112,7 +152,8 @@ def export_all_items(
     Exports all items to the specified folder structure.
 
     An item that cannot be read is logged and skipped; the export goes on
-    with the next one.
+    with the next one. A KQL database goes where Fabric Git integration
+    writes it, in the ``.children`` folder of its eventhouse.
 
     Args:
         workspace (str): The workspace name or ID.
@@ -127,7 +168,13 @@ def export_all_items(
     if items is None:
         return None
 
-    items = [item for item in items if item["type"] != "SQLEndpoint"]
+    # The eventhouses first, so that their databases go in their folders.
+    items = sorted(
+        (item for item in items if item["type"] != "SQLEndpoint"),
+        key=lambda item: item["type"] == "KQLDatabase",
+    )
+    # The folder each item went to, by its ID in lowercase.
+    exported: dict[str, Path] = {}
 
     failed = []
 
@@ -155,26 +202,13 @@ def export_all_items(
             failed.append(f"{item_name}.{item_type}")
             continue
 
-        folder_id = None
-        folder_path = None
-
-        if "folderId" in item_:
-            folder_id = item_["folderId"]
-
-            try:
-                folder_path = resolve_folder_from_id_to_path(
-                    workspace_id, folder_id
-                )
-            except Exception:
-                logger.info(
-                    f"{item['displayName']}.{item_type} is not inside a folder."
-                )
-                folder_path = None
-
-        if folder_path is None:
-            item_path = Path(path) / f"{item_name}.{item_type}"
+        parent_id = _parent_eventhouse_id(item_type, definition)
+        parent_path = exported.get(parent_id.lower()) if parent_id else None
+        if parent_path is not None:
+            item_path = _nested_path(parent_path, item_)
         else:
-            item_path = Path(path) / folder_path / f"{item_name}.{item_type}"
+            item_path = _item_path(workspace_id, item_, path)
+        exported[str(item_id).lower()] = item_path
         os.makedirs(item_path, exist_ok=True)
 
         unpack_item_definition(definition, item_path)
