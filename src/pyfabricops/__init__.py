@@ -271,6 +271,7 @@ from .helpers.warehouses import (
 )
 from .helpers.workspace_ids import IdReferences, WorkspaceIdMap
 from .helpers.workspaces import get_workspace_config
+from .items.data_agents import publish_data_agent
 from .items.data_pipelines import (
     create_data_pipeline,
     delete_data_pipeline,
@@ -767,6 +768,7 @@ __all__ = [
     "parse_definition_report",
     "parse_tmdl_parameters",
     "plan_all_items",
+    "publish_data_agent",
     "publish_environment",
     "read_json",
     "reconcile_items",

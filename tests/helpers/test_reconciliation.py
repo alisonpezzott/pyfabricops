@@ -304,7 +304,7 @@ def test_an_item_the_source_lacks_is_unmanaged() -> None:
             WorkspaceItem(*BRONZE),
             WorkspaceItem("SQLEndpoint", "Bronze"),
             WorkspaceItem("Notebook", "Draft", folder_path="Sandbox"),
-            WorkspaceItem("KQLDatabase", "Logs"),
+            WorkspaceItem("MLModel", "Logs"),
         ],
         differences={BRONZE: ()},
         deployable_types={"Lakehouse", "Notebook"},
@@ -312,7 +312,7 @@ def test_an_item_the_source_lacks_is_unmanaged() -> None:
 
     assert result.unmanaged == (
         UnmanagedItem("Notebook", "Draft", "Sandbox", deployable=True),
-        UnmanagedItem("KQLDatabase", "Logs", None, deployable=False),
+        UnmanagedItem("MLModel", "Logs", None, deployable=False),
     )
     assert not result.ok
 

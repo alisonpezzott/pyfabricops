@@ -20,6 +20,7 @@ from pathlib import PurePosixPath
 
 from ..helpers.deployment_plan import SourceChange
 from ..utils.exceptions import ConfigurationError
+from ..utils.utils import CHILDREN_FOLDER
 
 __all__ = [
     "GitChangeDetector",
@@ -54,7 +55,9 @@ class ItemResolver:
 
     An item folder is named ``<display name>.<item type>``, the layout
     ``deploy_all_items`` reads. A file belongs to the outermost such folder
-    on its path. Files outside any item folder, or in folders of other
+    on its path, except that a file of an item nested in the ``.children``
+    folder of another, such as a KQL database in its eventhouse, belongs to
+    the nested item. Files outside any item folder, or in folders of other
     types, are ignored, and several files of one item give it once.
 
     Args:
@@ -91,6 +94,9 @@ class ItemResolver:
         folders = PurePosixPath(path).parts[:-1]
         for depth, name in enumerate(folders, start=1):
             stem, _, item_type = name.rpartition(".")
+            if folders[depth : depth + 1] == (CHILDREN_FOLDER,):
+                # The file is one of an item nested in this one.
+                continue
             if stem and item_type in self._item_types:
                 return item_type, "/".join(folders[:depth])
         return None
