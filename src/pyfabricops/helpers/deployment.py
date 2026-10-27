@@ -34,6 +34,7 @@ from ..core.folders import create_folder, list_folders
 from ..core.workspaces import resolve_workspace
 from ..helpers.content_hash import definition_hash
 from ..helpers.dependencies import (
+    LOGICAL_ID_TYPES,
     CatalogItem,
     IdReference,
     LocalCatalog,
@@ -72,6 +73,7 @@ from ..helpers.source_changes import (
     has_uncommitted_changes,
     head_commit,
 )
+from ..helpers.workspace_ids import THIS_WORKSPACE
 from ..items.items import list_items
 from ..utils.exceptions import (
     ConfigurationError,
@@ -106,6 +108,9 @@ DEPLOY_ORDER: tuple[str, ...] = (
     "DataPipeline",
     "SemanticModel",
     "Report",
+    "Eventstream",
+    "Ontology",
+    "DataAgent",
 )
 
 DeploymentOutcome: TypeAlias = Literal[
@@ -150,6 +155,9 @@ _CREATED_WITH: dict[str, str] = {"Eventhouse": "KQLDatabase"}
 # The item types that move with the item they are nested in: Fabric
 # refuses to move one on its own (CannotMoveChildOnly).
 _MOVES_WITH_PARENT = frozenset({"KQLDatabase"})
+# The item types whose definition is bound to the local items it refers
+# to by logical ID before it is sent.
+_BOUND_TO_LOCAL_ITEMS = frozenset({"KQLDatabase", *LOGICAL_ID_TYPES})
 
 
 @dataclass(frozen=True)
@@ -482,6 +490,35 @@ def _parse_display_name(content: bytes, source: str) -> str:
     return display_name
 
 
+def _check_database_type(item_path: str) -> None:
+    """
+    Refuse a KQL database that no definition can create.
+
+    A definition creates only a ``ReadWrite`` database: a shortcut
+    (follower) database takes a creation payload instead. A database
+    without ``databaseType`` is left to Fabric.
+
+    Raises:
+        ConfigurationError: If ``databaseType`` is anything else.
+    """
+    path = Path(item_path) / _DATABASE_PROPERTIES
+    try:
+        properties = json.loads(path.read_bytes())
+    except (OSError, ValueError):
+        return
+    database_type = (
+        properties.get("databaseType")
+        if isinstance(properties, dict)
+        else None
+    )
+    if database_type not in (None, "ReadWrite"):
+        raise ConfigurationError(
+            f"{_DATABASE_PROPERTIES}: databaseType is {database_type}; a "
+            "definition creates only a ReadWrite database, as a shortcut "
+            "database is created from a creation payload."
+        )
+
+
 def _parse_logical_id(content: bytes) -> str | None:
     """Read ``config.logicalId`` from a ``.platform`` file, if it has one."""
     try:
@@ -514,6 +551,8 @@ def _read_source_item(
     folder_path = extract_middle_path(item_path, start_path=start_path)
     try:
         display_name = _read_display_name(item_path)
+        if item_type == "KQLDatabase":
+            _check_database_type(item_path)
     except (PyFabricOpsError, OSError) as e:
         return SourceItem(
             item_type=item_type,
@@ -856,7 +895,109 @@ def _definition_to_send(
         definition = _bind_report(index, action, definition)
     elif action.item_type == "KQLDatabase":
         definition = _bind_kql_database(index, action, definition, catalog)
+    elif action.item_type in LOGICAL_ID_TYPES:
+        definition = _bind_logical_ids(index, action, definition, catalog)
     return definition
+
+
+def _bind_logical_ids(
+    index: _WorkspaceIndex,
+    action: DeploymentAction,
+    definition: dict[str, Any],
+    catalog: LocalCatalog | None,
+) -> dict[str, Any]:
+    """
+    Point the references by logical ID of a definition to the workspace.
+
+    In Git, an eventstream, an ontology or a data agent refers to an item
+    of its workspace by that item's logical ID, with the empty GUID as
+    ``workspaceId``. In its JSON parts, each value that is the logical ID
+    of another local item is sent as the ID of that item in the workspace,
+    and each ``workspaceId`` that is the empty GUID as the ID of the
+    workspace. The files themselves are left alone.
+
+    Raises:
+        ConfigurationError: If the definition refers to a local item the
+            workspace does not have.
+    """
+    ids = {
+        logical_id: entry.key
+        for logical_id, entry in (
+            catalog.by_logical_id().items() if catalog is not None else ()
+        )
+        if entry.key != _identity(action)
+    }
+    missing: dict[ItemKey, None] = {}
+    bound_count = [0]
+
+    def bound(node: Any) -> Any:
+        if isinstance(node, dict):
+            return {
+                name: (
+                    _bound_workspace(index, value, bound_count)
+                    if name == "workspaceId"
+                    else bound(value)
+                )
+                for name, value in node.items()
+            }
+        if isinstance(node, list):
+            return [bound(value) for value in node]
+        if isinstance(node, str) and node.lower() in ids:
+            key = ids[node.lower()]
+            target = index.items.get(key)
+            if target is None:
+                missing[key] = None
+                return node
+            bound_count[0] += 1
+            return str(target["id"])
+        return node
+
+    parts: list[dict[str, Any]] = []
+    for part in definition.get("parts", []):
+        if not part["path"].endswith(".json"):
+            parts.append(part)
+            continue
+        try:
+            content = json.loads(base64.b64decode(part["payload"]))
+        except (KeyError, TypeError, ValueError):
+            # Fabric refuses it with a reason of its own.
+            parts.append(part)
+            continue
+        before = bound_count[0]
+        content = bound(content)
+        if bound_count[0] == before:
+            parts.append(part)
+            continue
+        parts.append(
+            {
+                **part,
+                "payload": base64.b64encode(
+                    json.dumps(content, indent=2).encode("utf-8")
+                ).decode("ascii"),
+            }
+        )
+    if missing:
+        names = ", ".join(f"{name}.{item_type}" for item_type, name in missing)
+        raise ConfigurationError(
+            f"It refers by logical ID to {names}, which the workspace lacks."
+        )
+    if bound_count[0]:
+        logger.info(
+            f"{action.display_name}.{action.item_type}: "
+            f"{bound_count[0]} reference(s) by logical ID or to this "
+            "workspace sent with the IDs of the workspace."
+        )
+    return {**definition, "parts": parts}
+
+
+def _bound_workspace(
+    index: _WorkspaceIndex, value: Any, count: list[int]
+) -> Any:
+    """The ID of the workspace for the empty GUID of ``workspaceId``."""
+    if value == THIS_WORKSPACE:
+        count[0] += 1
+        return index.workspace_id
+    return value
 
 
 _DATABASE_PROPERTIES = "DatabaseProperties.json"
@@ -2641,11 +2782,11 @@ def _catalog_for(
     plan: DeploymentPlan, root: str | None
 ) -> LocalCatalog | None:
     """
-    Read the local items when the plan sends a KQL database, which may
-    refer to its eventhouse by logical ID.
+    Read the local items when the plan sends an item that may refer to
+    another by logical ID, such as a KQL database to its eventhouse.
     """
     if root is None or not any(
-        action.item_type == "KQLDatabase" for action in plan.actions
+        action.item_type in _BOUND_TO_LOCAL_ITEMS for action in plan.actions
     ):
         return None
     return LocalCatalog.read(root, DEPLOY_ORDER)

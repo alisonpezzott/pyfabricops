@@ -25,11 +25,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     moves no child item on its own.
   - `WorkspaceIdMap.references()` leaves out what the databases nested in
     an eventhouse refer to.
+  - A KQL database whose `databaseType` is not `ReadWrite`, a shortcut
+    database that only a creation payload creates, is blocked in the plan.
+- Eventstreams, ontologies and data agents deploy: `DEPLOY_ORDER` ends
+  with `Eventstream`, `Ontology` and `DataAgent`, after what they read.
+  - Fabric Git integration writes them with a reference to an item of
+    their workspace as that item's logical ID, with the empty GUID as
+    `workspaceId`: an eventstream's destinations, an ontology's data
+    bindings, a data agent's data sources. Each such reference is a
+    dependency, and is sent as the ID of the item in the workspace; each
+    empty `workspaceId` of their JSON files as the ID of the workspace.
+    A reference to a local item the workspace lacks fails the item.
+  - An ontology name that breaks the rule Fabric documents (a letter
+    first, then letters, digits and underscores, under 100 characters) is
+    blocked in the plan.
 
 ### Changed
 - `deploy_all_items()`, `plan_all_items()`, `reconcile_items()` and
-  `restore_items()` without `item_types` now take eventhouses and KQL
-  databases, which they used to leave alone; a reconciliation no longer
+  `restore_items()` without `item_types` now take eventhouses, KQL
+  databases, eventstreams, ontologies and data agents, which they used to
+  leave alone; a reconciliation no longer
   lists them as unmanaged. Pass `item_types` to keep a run as it was.
 
 ### Known limitations

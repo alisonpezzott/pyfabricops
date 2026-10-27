@@ -24,6 +24,10 @@ References read:
 - KQLDatabase → Eventhouse: the eventhouse whose ``.children`` folder holds
   the database, as Fabric Git integration writes it, or else the eventhouse
   whose logical ID is ``parentEventhouseItemId``.
+- Eventstream, Ontology and DataAgent → any local item: a value of their
+  JSON files that is the logical ID of that item, such as the ``itemId`` of
+  an eventstream destination, the ``itemId`` of an ontology data binding,
+  or the ``artifactId`` of a data agent's data source.
 
 ``pipeline_references`` reads what a data pipeline refers to by ID
 (notebooks, pipelines, dataflows, lakehouses and other items): those IDs
@@ -49,7 +53,11 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, TypeAlias
 
-from ..utils.utils import list_paths_of_type, parent_item_folder
+from ..utils.utils import (
+    CHILDREN_FOLDER,
+    list_paths_of_type,
+    parent_item_folder,
+)
 from .dependency_graph import Dependency, ItemKey
 
 __all__ = [
@@ -167,6 +175,18 @@ class LocalCatalog:
             CatalogItem | None: The item, or None when there is none.
         """
         return self._by_logical_id.get(logical_id)
+
+    def by_logical_id(self) -> dict[str, CatalogItem]:
+        """
+        Return the items with a logical ID, by that ID in lowercase.
+
+        Returns:
+            dict[str, CatalogItem]: Each item with a logical ID.
+        """
+        return {
+            logical_id.lower(): item
+            for logical_id, item in self._by_logical_id.items()
+        }
 
 
 @dataclass(frozen=True)
@@ -347,10 +367,70 @@ def _kql_database_references(
     return [Dependency(item.key, target.key, "parentEventhouseItemId")], []
 
 
+# The item types whose JSON files refer to the items of their workspace by
+# logical ID, with the empty GUID as workspace, as Fabric Git integration
+# writes them: an eventstream's destinations, an ontology's data bindings,
+# a data agent's data sources.
+LOGICAL_ID_TYPES = frozenset({"Eventstream", "Ontology", "DataAgent"})
+
+
+def _logical_id_references(item: CatalogItem, catalog: LocalCatalog) -> _Found:
+    """Any value of the item's JSON files that is another local item's
+    logical ID, such as an eventstream destination's ``itemId``."""
+    by_logical_id = catalog.by_logical_id()
+    found: dict[ItemKey, Dependency] = {}
+    for file, key, value in json_strings(item.path):
+        target = by_logical_id.get(value.lower())
+        if target is not None and target.key != item.key:
+            found.setdefault(
+                target.key, Dependency(item.key, target.key, f"{file} {key}")
+            )
+    # A logical ID of no local item is of an item outside the source.
+    return list(found.values()), []
+
+
+def json_strings(folder: str) -> Iterator[tuple[str, str, str]]:
+    """
+    Yield each string value of the JSON files of an item folder.
+
+    The items nested in its ``.children`` folder are left out, as are its
+    ``.platform`` and the files that are not JSON.
+
+    Args:
+        folder (str): The item folder.
+
+    Yields:
+        tuple[str, str, str]: The file, relative to the folder, the key the
+            value is under (empty in a list of a list), and the value.
+    """
+    base = Path(folder)
+    for file in sorted(base.rglob("*.json")):
+        relative = file.relative_to(base)
+        if relative.parts[0] == CHILDREN_FOLDER:
+            continue
+        yield from (
+            (relative.as_posix(), key, value)
+            for key, value in _strings(_read_json(file), "")
+        )
+
+
+def _strings(node: object, key: str) -> Iterator[tuple[str, str]]:
+    """Yield the string values under a JSON node, with their key."""
+    if isinstance(node, dict):
+        for name, value in node.items():
+            yield from _strings(value, str(name))
+    elif isinstance(node, list):
+        for value in node:
+            yield from _strings(value, key)
+    elif isinstance(node, str):
+        yield key, node
+
+
 _READERS: dict[str, Callable[[CatalogItem, LocalCatalog], _Found]] = {
     "Report": _report_references,
     "Notebook": _notebook_references,
     "KQLDatabase": _kql_database_references,
+    **dict.fromkeys(LOGICAL_ID_TYPES, _logical_id_references),
 }
 
 # A metadata line of a notebook source file, whose comments start with #,

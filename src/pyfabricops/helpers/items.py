@@ -334,6 +334,12 @@ def deploy_all_items(
     again, and a database moves with its eventhouse, as Fabric moves no
     database on its own.
 
+    An eventstream, an ontology or a data agent refers in Git to an item
+    of its workspace by that item's logical ID, with the empty GUID as
+    ``workspaceId``. Each such reference is a dependency, and goes as the
+    ID of the item in the workspace, each empty ``workspaceId`` of its JSON
+    files as the ID of the workspace; the files are left as they are.
+
     Args:
         workspace (str): The name or ID of the workspace.
         path (str): The path to the items.
