@@ -324,6 +324,16 @@ def deploy_all_items(
     is sent with a connection to that model's ID in the workspace instead,
     as the Fabric API accepts no path; the file is left as it is.
 
+    A KQL database is read where Fabric Git integration writes it, in the
+    ``.children`` folder of its eventhouse, or beside it. It is in the
+    workspace folder of its eventhouse, deployed after it, and sent with
+    the ID of that eventhouse in ``parentEventhouseItemId`` instead of its
+    logical ID. The definition of an eventhouse leaves its databases out.
+    A database Fabric created with its eventhouse, as the portal creates
+    one of the same name, gets its definition updated rather than created
+    again, and a database moves with its eventhouse, as Fabric moves no
+    database on its own.
+
     Args:
         workspace (str): The name or ID of the workspace.
         path (str): The path to the items.

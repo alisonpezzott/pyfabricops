@@ -26,6 +26,10 @@ from .logging import get_logger
 
 logger = get_logger(__name__)
 
+# The folder in which Fabric Git integration keeps the items nested in an
+# item, such as the KQL databases of an eventhouse.
+CHILDREN_FOLDER = ".children"
+
 
 def copy_to_staging(path: str, *, staging_dir: str | None = None) -> str:
     """
@@ -258,6 +262,10 @@ def pack_item_definition(
     """
     Pack the definition files into a JSON structure.
 
+    The items nested in the folder, such as the KQL databases Fabric Git
+    integration keeps in an eventhouse's ``.children``, are no part of its
+    definition and are left out.
+
     Args:
         path (str): The path to the project directory.
         exclude_paths (list): List of exact paths to exclude from packing.
@@ -281,7 +289,9 @@ def pack_item_definition(
     exclude_patterns = exclude_patterns or []
 
     # Walk through path recursively
-    for dirpath, _dirnames, filenames in os.walk(path):
+    for dirpath, dirnames, filenames in os.walk(path):
+        if os.path.normpath(dirpath) == os.path.normpath(path):
+            dirnames[:] = [d for d in dirnames if d != CHILDREN_FOLDER]
         for filename in filenames:
             full_path = os.path.join(dirpath, filename)
             # Compute path relative to input_path
@@ -713,9 +723,34 @@ def dataframe_to_list(df: DataFrame) -> list[dict]:
 def list_paths_of_type(path: str | Path, type: str) -> list[str | Path]:
     """
     Returns a list of paths given a type of the items
+
+    The items nested in another item's ``.children`` folder, as Fabric Git
+    integration keeps the KQL databases of an eventhouse, are listed too.
     """
     paths = glob.glob(f"{path}/**/*.{type}", recursive=True)
-    return [str(Path(p).as_posix()) for p in paths]
+    # glob does not enter hidden folders, so .children is named.
+    paths += glob.glob(f"{path}/**/{CHILDREN_FOLDER}/*.{type}", recursive=True)
+    return [str(Path(p).as_posix()) for p in dict.fromkeys(paths)]
+
+
+def parent_item_folder(path: str | Path) -> Path | None:
+    """
+    Return the folder of the item another item is nested in, if it is.
+
+    Fabric Git integration keeps the KQL databases of an eventhouse in its
+    folder, as ``Telemetry.Eventhouse/.children/Telemetry.KQLDatabase``.
+
+    Args:
+        path (str | Path): The folder of an item.
+
+    Returns:
+        Path | None: The folder of the item it is nested in, such as
+            ``Telemetry.Eventhouse``, or None for an item of its own.
+    """
+    parent = Path(path).parent
+    if parent.name != CHILDREN_FOLDER or not parent.parent.suffix:
+        return None
+    return parent.parent
 
 
 def extract_middle_path(
@@ -723,7 +758,13 @@ def extract_middle_path(
 ) -> str | None:
     """
     Extract the middle of a full path given a start.
+
+    An item nested in another item, such as a KQL database in the
+    ``.children`` folder of its eventhouse, is in the folder of that item.
     """
+    parent = parent_item_folder(path)
+    if parent is not None:
+        path = str(parent)
     # Normalize to remove ./ prefix and unify separators
     path = str(Path(path).as_posix())
     path_list = path.split("/")[:-1]

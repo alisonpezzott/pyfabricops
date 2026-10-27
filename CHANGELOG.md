@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Eventhouses and KQL databases deploy: `DEPLOY_ORDER` has `Eventhouse`
+  and `KQLDatabase` after `Warehouse`.
+  - A KQL database is read where Fabric Git integration writes it, in
+    `<eventhouse>.Eventhouse/.children/`, or beside its eventhouse. It is
+    in the workspace folder of its eventhouse, and a change to its files
+    is a change to it, not to the eventhouse, whose definition leaves its
+    databases out.
+  - It needs its eventhouse, by nesting or by the logical ID of
+    `parentEventhouseItemId`, and is sent with the ID of that eventhouse
+    in the workspace, as a report is bound to its semantic model. An ID of
+    an eventhouse of the workspace, as a copy translated by
+    `WorkspaceIdMap` holds, goes as it is.
+  - A database Fabric created along with its eventhouse is updated rather
+    than created again, and a database moves with its eventhouse: Fabric
+    moves no child item on its own.
+  - `WorkspaceIdMap.references()` leaves out what the databases nested in
+    an eventhouse refer to.
+
+### Changed
+- `deploy_all_items()`, `plan_all_items()`, `reconcile_items()` and
+  `restore_items()` without `item_types` now take eventhouses and KQL
+  databases, which they used to leave alone; a reconciliation no longer
+  lists them as unmanaged. Pass `item_types` to keep a run as it was.
+
+### Known limitations
+- A reconciliation compares a KQL database as Fabric returns it:
+  `parentEventhouseItemId` holds an ID there, and `DatabaseSchema.kql`
+  the whole schema of the database, so it differs from the source until
+  the comparison learns both.
+
 ---
 
 ## [0.9.0] - 2026-10-25

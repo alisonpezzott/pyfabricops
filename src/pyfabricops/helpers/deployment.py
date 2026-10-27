@@ -80,9 +80,11 @@ from ..utils.exceptions import (
 )
 from ..utils.logging import SUCCESS_LEVEL, get_logger
 from ..utils.utils import (
+    CHILDREN_FOLDER,
     extract_middle_path,
     list_paths_of_type,
     pack_item_definition,
+    parent_item_folder,
 )
 
 __all__ = ["DEPLOY_ORDER", "DeploymentReport", "DeploymentResult"]
@@ -95,6 +97,8 @@ DEPLOY_ORDER: tuple[str, ...] = (
     "VariableLibrary",
     "Lakehouse",
     "Warehouse",
+    "Eventhouse",
+    "KQLDatabase",
     "Environment",
     "Notebook",
     "Dataflow",
@@ -135,6 +139,17 @@ _NOT_DEPLOYED: dict[str, str] = {"failed": "failed", "skipped": "was skipped"}
 _NAME_NOT_AVAILABLE = "ItemDisplayNameNotAvailableYet"
 _NAME_WAIT_SECONDS = 30.0
 _NAME_WAIT_ATTEMPTS = 10
+# The error code of a create under a name another item of the type holds.
+_NAME_IN_USE = "ItemDisplayNameAlreadyInUse"
+
+# The item types Fabric may create along with an item of another type, by
+# that type: the portal creates an eventhouse with a KQL database of the
+# same name. Such an item, found in the workspace when it is to be created,
+# gets its definition updated instead.
+_CREATED_WITH: dict[str, str] = {"Eventhouse": "KQLDatabase"}
+# The item types that move with the item they are nested in: Fabric
+# refuses to move one on its own (CannotMoveChildOnly).
+_MOVES_WITH_PARENT = frozenset({"KQLDatabase"})
 
 
 @dataclass(frozen=True)
@@ -316,6 +331,27 @@ class _WorkspaceIndex:
             },
             folders=_folder_ids_by_path(folders),
         )
+
+    def add_listed(self, item_type: str) -> None:
+        """
+        List the workspace again, and add its items of a type to the index.
+
+        For the items Fabric creates along with another one. A listing that
+        fails is only logged: the item is then created as planned.
+        """
+        items = list_items(self.workspace_id, df=False)
+        if items is None:
+            logger.warning(
+                f"Could not list the workspace again for its {item_type} "
+                "items."
+            )
+            return
+        for item in items:
+            if item["type"] == item_type:
+                self.items.setdefault(
+                    (item_type, item["displayName"]),
+                    {"id": item["id"], "folderId": item.get("folderId")},
+                )
 
     def ensure_folder(self, folder_path: str | None) -> str | None:
         """
@@ -807,13 +843,129 @@ _PLANNED_AS: dict[DeploymentActionType, str] = {
 
 
 def _definition_to_send(
-    index: _WorkspaceIndex, action: DeploymentAction
+    index: _WorkspaceIndex,
+    action: DeploymentAction,
+    catalog: LocalCatalog | None = None,
 ) -> dict[str, Any]:
-    """Pack an item's definition, with a report bound to its model."""
+    """
+    Pack an item's definition, with a report bound to its model and a KQL
+    database to its eventhouse.
+    """
     definition = pack_item_definition(action.source_path)
     if action.item_type == "Report":
         definition = _bind_report(index, action, definition)
+    elif action.item_type == "KQLDatabase":
+        definition = _bind_kql_database(index, action, definition, catalog)
     return definition
+
+
+_DATABASE_PROPERTIES = "DatabaseProperties.json"
+
+
+def _bind_kql_database(
+    index: _WorkspaceIndex,
+    action: DeploymentAction,
+    definition: dict[str, Any],
+    catalog: LocalCatalog | None,
+) -> dict[str, Any]:
+    """
+    Point a KQL database's definition to its eventhouse by ID.
+
+    In Git, ``parentEventhouseItemId`` in ``DatabaseProperties.json`` holds
+    the logical ID of the eventhouse, which the Fabric API does not accept.
+    The eventhouse is the one whose ``.children`` folder holds the database,
+    or else the eventhouse of the source with that logical ID, and the
+    database is sent with the ID of that eventhouse in the workspace. An ID
+    of an eventhouse of the workspace, as a translated copy holds, goes as
+    it is. The file itself is left alone.
+
+    Raises:
+        ConfigurationError: If the eventhouse is not in the workspace, or
+            the reference leads to no eventhouse of the source or of the
+            workspace.
+    """
+    parts: list[dict[str, Any]] = definition.get("parts", [])
+    position = next(
+        (
+            n
+            for n, part in enumerate(parts)
+            if part["path"] == _DATABASE_PROPERTIES
+        ),
+        None,
+    )
+    if position is None:
+        return definition
+    try:
+        properties = json.loads(base64.b64decode(parts[position]["payload"]))
+    except (KeyError, TypeError, ValueError):
+        # Fabric refuses it with a reason of its own.
+        return definition
+    value = (
+        properties.get("parentEventhouseItemId")
+        if isinstance(properties, dict)
+        else None
+    )
+    if not isinstance(value, str):
+        return definition
+
+    eventhouse = _parent_eventhouse(action.source_path, value, catalog)
+    if eventhouse is None:
+        eventhouse_ids = {
+            str(entry["id"]).lower()
+            for (item_type, _), entry in index.items.items()
+            if item_type == "Eventhouse"
+        }
+        if value.lower() in eventhouse_ids:
+            return definition
+        raise ConfigurationError(
+            f"{_DATABASE_PROPERTIES}: parentEventhouseItemId '{value}' is no "
+            "eventhouse of the source or of the workspace."
+        )
+    eventhouse_id = (index.items.get(("Eventhouse", eventhouse)) or {}).get(
+        "id"
+    )
+    if not eventhouse_id:
+        raise ConfigurationError(
+            f"Its eventhouse {eventhouse} is not in the workspace."
+        )
+
+    properties["parentEventhouseItemId"] = eventhouse_id
+    bound = {
+        **parts[position],
+        "payload": base64.b64encode(
+            json.dumps(properties, indent=2).encode("utf-8")
+        ).decode("ascii"),
+    }
+    logger.info(
+        f"{action.display_name}.KQLDatabase: sent with the ID of eventhouse "
+        f"{eventhouse} in the workspace."
+    )
+    return {
+        **definition,
+        "parts": [*parts[:position], bound, *parts[position + 1 :]],
+    }
+
+
+def _parent_eventhouse(
+    source_path: str, value: str, catalog: LocalCatalog | None
+) -> str | None:
+    """
+    Name the eventhouse of the source a KQL database belongs to.
+
+    The eventhouse it is nested in, or else the one whose logical ID is
+    ``value``; None when neither is found.
+
+    Raises:
+        ConfigurationError: If the database is nested in a folder whose
+            ``.platform`` cannot be read.
+    """
+    parent = parent_item_folder(source_path)
+    if parent is not None and parent.suffix == ".Eventhouse":
+        return _read_display_name(str(parent))
+    entry = catalog.with_logical_id(value) if catalog is not None else None
+    if entry is not None and entry.key[0] == "Eventhouse":
+        return entry.key[1]
+    return None
 
 
 def _bind_report(
@@ -994,11 +1146,98 @@ def _move_to(
     return True
 
 
+def _create_or_adopt(
+    index: _WorkspaceIndex,
+    action: DeploymentAction,
+    definition: dict[str, Any],
+) -> tuple[str | None, DeploymentOutcome]:
+    """
+    Create the item of a CREATE action, or update the one Fabric created.
+
+    An item of a type Fabric creates along with another, such as the KQL
+    database of an eventhouse, may be in the workspace by the time it is to
+    be created: its definition is then updated. After an item that comes
+    with others is created, the workspace is listed again to find them.
+    """
+    key = _identity(action)
+    adopted = _adopted(index, action, definition)
+    if adopted is not None:
+        return adopted, "updated"
+    folder_id = index.ensure_folder(action.folder_path)
+    try:
+        item_id = _create_planned_item(index, action, definition, folder_id)
+    except RequestError as e:
+        if action.item_type not in _CREATED_WITH.values() or (
+            _NAME_IN_USE not in str(e)
+        ):
+            raise
+        index.add_listed(action.item_type)
+        adopted = _adopted(index, action, definition)
+        if adopted is None:
+            raise
+        return adopted, "updated"
+    child_type = _CREATED_WITH.get(key[0])
+    if child_type is not None:
+        index.add_listed(child_type)
+    return item_id, "created"
+
+
+def _adopted(
+    index: _WorkspaceIndex,
+    action: DeploymentAction,
+    definition: dict[str, Any],
+) -> str | None:
+    """
+    Update an item Fabric created along with another, if it is there.
+
+    Returns:
+        str | None: Its ID, or None when the workspace does not have it.
+    """
+    if action.item_type not in _CREATED_WITH.values():
+        return None
+    existing = index.items.get(_identity(action))
+    if existing is None:
+        return None
+    item_id = cast(str, existing["id"])
+    _raise_for_failure(
+        _request_update_item_definition(
+            index.workspace_id, item_id, definition
+        ),
+        "Update definition",
+    )
+    logger.info(
+        f"{action.display_name}.{action.item_type} came with the item it "
+        "belongs to; its definition was updated."
+    )
+    return item_id
+
+
+def _move_with_parent(
+    index: _WorkspaceIndex, action: DeploymentAction, folder_id: str | None
+) -> bool:
+    """
+    Record that an item nested in another moved with it.
+
+    Fabric moves it with the item it belongs to, which is deployed before
+    it, and refuses to move it alone, so nothing is sent.
+    """
+    existing = _planned_target(index, action)
+    if existing.get("folderId") == folder_id:
+        return False
+    existing["folderId"] = folder_id
+    logger.info(
+        f"{action.display_name}.{action.item_type} moves with the item it "
+        "belongs to."
+    )
+    return True
+
+
 def _apply_action(
     index: _WorkspaceIndex,
     action: DeploymentAction,
     *,
     allow_deletions: bool = False,
+    catalog: LocalCatalog | None = None,
 ) -> DeploymentResult:
     """Execute one planned action and report the outcome."""
     if action.action is DeploymentActionType.BLOCKED:
@@ -1021,19 +1260,20 @@ def _apply_action(
 
     try:
         if action.action is DeploymentActionType.CREATE:
-            definition = _definition_to_send(index, action)
-            folder_id = index.ensure_folder(action.folder_path)
-            item_id = _create_planned_item(
-                index, action, definition, folder_id
-            )
-            outcome = "created"
+            definition = _definition_to_send(index, action, catalog)
+            item_id, outcome = _create_or_adopt(index, action, definition)
         elif action.action is DeploymentActionType.UPDATE:
             # Check the target before the first change to the workspace.
             existing = _planned_target(index, action)
-            definition = _definition_to_send(index, action)
+            definition = _definition_to_send(index, action, catalog)
             folder_id = index.ensure_folder(action.folder_path)
             item_id = cast(str, existing["id"])
-            moved = _move_if_needed(index, item_id, existing, folder_id)
+            if action.item_type in _MOVES_WITH_PARENT:
+                moved = bool(folder_id) and _move_with_parent(
+                    index, action, folder_id
+                )
+            else:
+                moved = _move_if_needed(index, item_id, existing, folder_id)
             _raise_for_failure(
                 _request_update_item_definition(
                     index.workspace_id, item_id, definition
@@ -1045,7 +1285,10 @@ def _apply_action(
             existing = _planned_target(index, action)
             folder_id = index.ensure_folder(action.folder_path)
             item_id = cast(str, existing["id"])
-            moved = _move_to(index, item_id, existing, folder_id)
+            if action.item_type in _MOVES_WITH_PARENT:
+                moved = _move_with_parent(index, action, folder_id)
+            else:
+                moved = _move_to(index, item_id, existing, folder_id)
             outcome = "moved"
         elif action.action is DeploymentActionType.DELETE:
             item_id = _delete_planned_item(index, action)
@@ -1173,6 +1416,9 @@ class DeploymentExecutor:
         on_result (Callable, optional): Called with each action and its
             result as soon as the result is known, such as to write a
             journal. Defaults to none.
+        catalog (LocalCatalog, optional): The local items, to find the
+            eventhouse a KQL database refers to by logical ID when it is not
+            nested in it. Defaults to none.
     """
 
     def __init__(
@@ -1183,11 +1429,13 @@ class DeploymentExecutor:
         allow_deletions: bool = False,
         on_result: Callable[[DeploymentAction, DeploymentResult], None]
         | None = None,
+        catalog: LocalCatalog | None = None,
     ) -> None:
         self._index = index
         self._fail_fast = fail_fast
         self._allow_deletions = allow_deletions
         self._on_result = on_result
+        self._catalog = catalog
 
     def apply(self, plan: DeploymentPlan) -> list[DeploymentResult]:
         """
@@ -1228,6 +1476,7 @@ class DeploymentExecutor:
                     self._index,
                     action,
                     allow_deletions=self._allow_deletions,
+                    catalog=self._catalog,
                 )
             results.append(result)
             _log_result(result)
@@ -1771,8 +2020,11 @@ def _restore_all(
         report = DeploymentReport(
             workspace=workspace, workspace_id=index.workspace_id
         )
+        plan = _drift_to_undo(reconciliation)
         report.results.extend(
-            DeploymentExecutor(index).apply(_drift_to_undo(reconciliation))
+            DeploymentExecutor(index, catalog=_catalog_for(plan, path)).apply(
+                plan
+            )
         )
     _log_report(report)
     return report
@@ -2319,10 +2571,18 @@ def _read_deletions(
 
 
 def _ids_in(folder: str, ids: Collection[str]) -> dict[str, str]:
-    """Find which IDs the files of an item folder hold, and the first file."""
+    """
+    Find which IDs the files of an item folder hold, and the first file.
+
+    The items nested in its ``.children`` folder are items of their own.
+    """
     base = Path(folder)
     found: dict[str, str] = {}
-    for file in sorted(p for p in base.rglob("*") if p.is_file()):
+    for file in sorted(
+        p
+        for p in base.rglob("*")
+        if p.is_file() and p.relative_to(base).parts[0] != CHILDREN_FOLDER
+    ):
         try:
             content = file.read_bytes().lower()
         except OSError:
@@ -2375,6 +2635,20 @@ def _planner(
         referenced_by=deletions.referenced_by if deletions else None,
         allow_deletions=allow_deletions,
     )
+
+
+def _catalog_for(
+    plan: DeploymentPlan, root: str | None
+) -> LocalCatalog | None:
+    """
+    Read the local items when the plan sends a KQL database, which may
+    refer to its eventhouse by logical ID.
+    """
+    if root is None or not any(
+        action.item_type == "KQLDatabase" for action in plan.actions
+    ):
+        return None
+    return LocalCatalog.read(root, DEPLOY_ORDER)
 
 
 def _deploy_items(
@@ -2442,6 +2716,7 @@ def _deploy_items(
         fail_fast=fail_fast,
         allow_deletions=allow_deletions,
         on_result=on_result,
+        catalog=_catalog_for(plan, root),
     )
     report.results.extend(executor.apply(plan))
 

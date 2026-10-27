@@ -30,7 +30,7 @@ from typing import Any
 from ..core.workspaces import resolve_workspace
 from ..items.items import list_items
 from ..utils.exceptions import RequestError, ResourceNotFoundError
-from ..utils.utils import find_and_replace
+from ..utils.utils import CHILDREN_FOLDER, find_and_replace
 from .dependencies import _read_platform
 from .dependency_graph import ItemKey
 
@@ -278,7 +278,9 @@ class WorkspaceIdMap:
 
         A variable library refers to nothing: its value sets hold the IDs
         of each environment, which ``translate()`` leaves as they are. Nor
-        does an item to itself.
+        does an item to itself. The items nested in its ``.children``
+        folder, such as the KQL databases of an eventhouse, are items of
+        their own: what they refer to is not the item's.
 
         Args:
             key (ItemKey): The type and display name of the item.
@@ -293,7 +295,12 @@ class WorkspaceIdMap:
         workspace = False
         if key[0] == "VariableLibrary":
             return IdReferences(frozenset(), False)
-        files = sorted(p for p in Path(path).rglob("*") if p.is_file())
+        root = Path(path)
+        files = sorted(
+            p
+            for p in root.rglob("*")
+            if p.is_file() and p.relative_to(root).parts[0] != CHILDREN_FOLDER
+        )
         for file in files:
             if file.name == ".platform":
                 continue

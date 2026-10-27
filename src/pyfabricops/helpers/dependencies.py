@@ -21,6 +21,9 @@ References read:
 - Notebook → Environment: the attached environment, by logical ID.
 - Notebook → Notebook: ``%run <notebook>``; ``%run -b`` runs a script of
   the notebook's resources, not a notebook.
+- KQLDatabase → Eventhouse: the eventhouse whose ``.children`` folder holds
+  the database, as Fabric Git integration writes it, or else the eventhouse
+  whose logical ID is ``parentEventhouseItemId``.
 
 ``pipeline_references`` reads what a data pipeline refers to by ID
 (notebooks, pipelines, dataflows, lakehouses and other items): those IDs
@@ -46,7 +49,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, TypeAlias
 
-from ..utils.utils import list_paths_of_type
+from ..utils.utils import list_paths_of_type, parent_item_folder
 from .dependency_graph import Dependency, ItemKey
 
 __all__ = [
@@ -314,9 +317,40 @@ def _notebook_references(item: CatalogItem, catalog: LocalCatalog) -> _Found:
     return list(dict.fromkeys(found)), []
 
 
+def _kql_database_references(
+    item: CatalogItem, catalog: LocalCatalog
+) -> _Found:
+    """KQLDatabase → Eventhouse: the eventhouse it is nested in, or else
+    ``parentEventhouseItemId`` in ``DatabaseProperties.json``."""
+    parent = parent_item_folder(item.path)
+    if parent is not None:
+        target = catalog.at(str(parent))
+        if target is None or target.key[0] != "Eventhouse":
+            return [], [
+                f"It is nested in {parent.name}, which is not an eventhouse "
+                "of the source."
+            ]
+        return [
+            Dependency(item.key, target.key, "nested in the eventhouse")
+        ], []
+
+    properties = _read_json(Path(item.path) / "DatabaseProperties.json")
+    value = (
+        properties.get("parentEventhouseItemId")
+        if isinstance(properties, dict)
+        else None
+    )
+    target = _with_logical_id(catalog, value, "Eventhouse")
+    if target is None:
+        # An eventhouse outside the source is neither deployed nor blocking.
+        return [], []
+    return [Dependency(item.key, target.key, "parentEventhouseItemId")], []
+
+
 _READERS: dict[str, Callable[[CatalogItem, LocalCatalog], _Found]] = {
     "Report": _report_references,
     "Notebook": _notebook_references,
+    "KQLDatabase": _kql_database_references,
 }
 
 # A metadata line of a notebook source file, whose comments start with #,

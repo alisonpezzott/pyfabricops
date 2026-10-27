@@ -172,7 +172,7 @@ def test_items_the_source_lacks_are_unmanaged(
         _listed("lh-1", "Lakehouse", "Bronze"),
         _listed("se-1", "SQLEndpoint", "Bronze"),
         _listed("nb-9", "Notebook", "Draft"),
-        _listed("kq-1", "KQLDatabase", "Logs"),
+        _listed("kq-1", "MLModel", "Logs"),
     ]
     fabric.definitions = {"lh-1": _served(bronze)}
 
@@ -180,7 +180,7 @@ def test_items_the_source_lacks_are_unmanaged(
 
     assert result.unmanaged == (
         UnmanagedItem("Notebook", "Draft", None, deployable=True),
-        UnmanagedItem("KQLDatabase", "Logs", None, deployable=False),
+        UnmanagedItem("MLModel", "Logs", None, deployable=False),
     )
 
 
