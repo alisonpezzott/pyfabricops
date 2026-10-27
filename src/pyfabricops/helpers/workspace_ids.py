@@ -9,7 +9,9 @@ would read and write the first one.
 
 ``WorkspaceIdMap`` maps each ID of the source workspace to the ID of the
 item of the same type and display name in the target, by its ID and by its
-logical ID, and the source workspace to the target. ``translate()`` puts the
+logical ID, and the source workspace to the target, as well as the query
+URI of each eventhouse and the SQL endpoint of the workspace, which items
+hold as text. ``translate()`` puts the
 IDs of the target in a copy of the items, such as the staging copy a
 deployment sends; ``references()`` tells what an item still refers to in the
 source, so that a run deploys first the items the others refer to, and
@@ -21,20 +23,24 @@ from __future__ import annotations
 import json
 import os
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any
+from typing import Any, cast
 
+from ..api.api import ApiResult, api_request
 from ..core.workspaces import resolve_workspace
 from ..items.items import list_items
 from ..utils.exceptions import RequestError, ResourceNotFoundError
-from ..utils.utils import find_and_replace
+from ..utils.logging import get_logger
+from ..utils.utils import CHILDREN_FOLDER, find_and_replace
 from .dependencies import _read_platform
 from .dependency_graph import ItemKey
 
 __all__ = ["IdReferences", "WorkspaceIdMap"]
+
+logger = get_logger(__name__)
 
 # The empty GUID, which Fabric writes for "this workspace".
 THIS_WORKSPACE = "00000000-0000-0000-0000-000000000000"
@@ -54,6 +60,28 @@ _EMPTY_WORKSPACE = (
     + THIS_WORKSPACE
     + r'(")'
 )
+# The item types whose endpoints other items hold as text, the collection
+# of the API that reads them, and where each endpoint is in its properties:
+# the query and ingestion URIs of an eventhouse, which a KQL database's
+# queryset or an ontology's binding holds, and the SQL endpoint of the
+# workspace, which an ontology's or a model's expressions hold.
+_ENDPOINTS: dict[str, tuple[str, tuple[tuple[str, ...], ...]]] = {
+    "Eventhouse": (
+        "eventhouses",
+        (("queryServiceUri",), ("ingestionServiceUri",)),
+    ),
+    "Lakehouse": (
+        "lakehouses",
+        (("sqlEndpointProperties", "connectionString"),),
+    ),
+    "Warehouse": ("warehouses", (("connectionString",),)),
+}
+# The endpoints every item of a workspace shares: one pair is enough.
+_WORKSPACE_ENDPOINTS = frozenset({"Lakehouse", "Warehouse"})
+
+# Reads the endpoints of an item of a workspace, in the order of _ENDPOINTS;
+# an endpoint not provisioned yet is empty.
+EndpointReader = Callable[[str, Mapping[str, Any]], Sequence[str]]
 
 
 @dataclass(frozen=True)
@@ -88,6 +116,12 @@ class WorkspaceIdMap:
     whose item the target lacks maps to nothing until the target is listed
     again with ``reload_target()``.
 
+    With ``endpoint_reader``, as ``load()`` gives it, the endpoints items
+    hold as text map too: the query and ingestion URIs of an eventhouse to
+    those of the eventhouse of the same name in the target, and the SQL
+    endpoint of the source workspace, which its lakehouses and warehouses
+    share, to that of the target.
+
     IDs are compared in lowercase, as Fabric returns them.
 
     Args:
@@ -100,6 +134,9 @@ class WorkspaceIdMap:
             workspace, likewise.
         logical_ids (Mapping[str, ItemKey], optional): More logical IDs of
             the source, with the type and display name of their item.
+        endpoint_reader (EndpointReader, optional): Reads the endpoints of
+            an eventhouse, a lakehouse or a warehouse of a workspace.
+            Defaults to none: no endpoint maps.
 
     Examples:
         ```python
@@ -119,12 +156,15 @@ class WorkspaceIdMap:
         source_items: Iterable[Mapping[str, Any]],
         target_items: Iterable[Mapping[str, Any]],
         logical_ids: Mapping[str, ItemKey] | None = None,
+        endpoint_reader: EndpointReader | None = None,
     ) -> None:
         self._source = source_workspace_id.lower()
         self._target = target_workspace_id
         known: dict[str, ItemKey] = {}
+        self._source_items: dict[ItemKey, Mapping[str, Any]] = {}
         for item in source_items:
             key = (str(item["type"]), str(item["displayName"]))
+            self._source_items[key] = item
             for value in (item.get("id"), item.get("logicalId")):
                 if value:
                     known[str(value).lower()] = key
@@ -135,6 +175,11 @@ class WorkspaceIdMap:
         self._missing: dict[str, ItemKey] = {}
         # Each shortcuts file translated, as it was before the first time.
         self._shortcuts: dict[Path, str] = {}
+        self._endpoint_reader = endpoint_reader
+        # The endpoints read, by workspace and item ID; never an empty one.
+        self._endpoint_cache: dict[tuple[str, str], tuple[str, ...]] = {}
+        self._endpoints: dict[str, str] = {}
+        self._missing_endpoints: dict[str, ItemKey] = {}
         self._set_target(target_items)
 
     @classmethod
@@ -146,6 +191,9 @@ class WorkspaceIdMap:
     ) -> WorkspaceIdMap:
         """
         List both workspaces, and read the logical IDs under a folder.
+
+        The endpoints of the eventhouses, lakehouses and warehouses of both
+        are read too, as the map needs them.
 
         Args:
             source_workspace (str): The source workspace, by name or ID.
@@ -170,6 +218,7 @@ class WorkspaceIdMap:
             source_items=_list_workspace(source),
             target_items=_list_workspace(target),
             logical_ids=_read_logical_ids(path) if path is not None else None,
+            endpoint_reader=_fetch_endpoints,
         )
 
     @property
@@ -191,6 +240,11 @@ class WorkspaceIdMap:
     def missing(self) -> Mapping[str, ItemKey]:
         """The IDs of the source whose item the target lacks yet."""
         return MappingProxyType(self._missing)
+
+    @property
+    def endpoints(self) -> Mapping[str, str]:
+        """The endpoint in the target of each endpoint of the source."""
+        return MappingProxyType(self._endpoints)
 
     def reload_target(self) -> None:
         """
@@ -216,9 +270,14 @@ class WorkspaceIdMap:
             path (str | PathLike): The folder of the items.
         """
         root = Path(path)
+        # Endpoints first, before an ID inside one could change it.
         replacements = {
-            (_MAPPED, "(?i)" + re.escape(self._source)): self._target
+            (_MAPPED, "(?i)" + re.escape(old)): new
+            for old, new in self._endpoints.items()
         }
+        replacements[(_MAPPED, "(?i)" + re.escape(self._source))] = (
+            self._target
+        )
         for old, key in self._known.items():
             if key in self._target_items:
                 new = str(self._target_items[key]["id"])
@@ -278,7 +337,9 @@ class WorkspaceIdMap:
 
         A variable library refers to nothing: its value sets hold the IDs
         of each environment, which ``translate()`` leaves as they are. Nor
-        does an item to itself.
+        does an item to itself. The items nested in its ``.children``
+        folder, such as the KQL databases of an eventhouse, are items of
+        their own: what they refer to is not the item's.
 
         Args:
             key (ItemKey): The type and display name of the item.
@@ -293,12 +354,20 @@ class WorkspaceIdMap:
         workspace = False
         if key[0] == "VariableLibrary":
             return IdReferences(frozenset(), False)
-        files = sorted(p for p in Path(path).rglob("*") if p.is_file())
+        root = Path(path)
+        files = sorted(
+            p
+            for p in root.rglob("*")
+            if p.is_file() and p.relative_to(root).parts[0] != CHILDREN_FOLDER
+        )
         for file in files:
             if file.name == ".platform":
                 continue
             text = file.read_text(encoding="utf-8", errors="replace").lower()
             found |= {k for old, k in self._missing.items() if old in text}
+            found |= {
+                k for old, k in self._missing_endpoints.items() if old in text
+            }
             workspace = workspace or self._source in text
         found.discard(key)
         return IdReferences(frozenset(found), workspace)
@@ -314,6 +383,64 @@ class WorkspaceIdMap:
             for old, key in self._known.items()
             if key not in self._target_items
         }
+        if self._endpoint_reader is not None:
+            self._map_endpoints()
+
+    def _map_endpoints(self) -> None:
+        """
+        Pair the endpoints of the source with those of the target.
+
+        An eventhouse the target lacks leaves its endpoints missing, as an
+        ID is, until the target has it. The SQL endpoint the lakehouses and
+        warehouses of a workspace share takes one pair.
+        """
+        endpoints: dict[str, str] = {}
+        missing: dict[str, ItemKey] = {}
+        shared = False
+        for key, item in self._source_items.items():
+            if key[0] not in _ENDPOINTS:
+                continue
+            target = self._target_items.get(key)
+            workspace_wide = key[0] in _WORKSPACE_ENDPOINTS
+            if workspace_wide and (shared or target is None):
+                continue
+            source = self._read_endpoints(self._source, item)
+            if target is None:
+                missing.update(dict.fromkeys((e.lower() for e in source), key))
+                continue
+            pairs = [
+                (old, new)
+                for old, new in zip(
+                    source,
+                    self._read_endpoints(self._target, target),
+                    strict=True,
+                )
+                if old and new
+            ]
+            endpoints.update(
+                (old, new) for old, new in pairs if old.lower() != new.lower()
+            )
+            shared = shared or (workspace_wide and bool(pairs))
+        self._endpoints = endpoints
+        self._missing_endpoints = {
+            old: key for old, key in missing.items() if old
+        }
+
+    def _read_endpoints(
+        self, workspace_id: str, item: Mapping[str, Any]
+    ) -> tuple[str, ...]:
+        """The endpoints of an item, read once each once provisioned."""
+        cache_key = (workspace_id.lower(), str(item["id"]).lower())
+        cached = self._endpoint_cache.get(cache_key)
+        if cached is not None:
+            return cached
+        assert self._endpoint_reader is not None
+        found = tuple(
+            str(e or "") for e in self._endpoint_reader(workspace_id, item)
+        )
+        if all(found):
+            self._endpoint_cache[cache_key] = found
+        return found
 
 
 def _require_workspace(workspace: str) -> str:
@@ -325,6 +452,37 @@ def _require_workspace(workspace: str) -> str:
             "access to it."
         )
     return str(workspace_id)
+
+
+def _fetch_endpoints(
+    workspace_id: str, item: Mapping[str, Any]
+) -> tuple[str, ...]:
+    """
+    Read the endpoints of an item from its properties, as ``_ENDPOINTS``
+    names them; all empty when it cannot be read.
+    """
+    collection, paths = _ENDPOINTS[str(item["type"])]
+    result = cast(
+        ApiResult,
+        api_request(
+            f"/workspaces/{workspace_id}/{collection}/{item['id']}",
+            return_result=True,
+        ),
+    )
+    if not result.success:
+        logger.warning(
+            f"Could not read the endpoints of {item['displayName']}."
+            f"{item['type']}: {result.error}"
+        )
+        return tuple("" for _ in paths)
+    properties = (result.data or {}).get("properties") or {}
+    found: list[str] = []
+    for path in paths:
+        value: Any = properties
+        for name in path:
+            value = value.get(name) if isinstance(value, dict) else None
+        found.append(value if isinstance(value, str) else "")
+    return tuple(found)
 
 
 def _list_workspace(workspace_id: str) -> list[dict[str, Any]]:

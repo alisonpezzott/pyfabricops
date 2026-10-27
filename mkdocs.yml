@@ -49,6 +49,7 @@ nav:
       - Workspace IDs: functions/helpers/workspace_ids.md
       - Workspaces: functions/helpers/workspaces.md
     - Items:
+      - Data Agents: functions/items/data_agents.md
       - Data Pipelines: functions/items/data_pipelines.md
       - Dataflows Gen1: functions/items/dataflows_gen1.md
       - Dataflows Gen2: functions/items/dataflows_gen2.md

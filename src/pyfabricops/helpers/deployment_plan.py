@@ -755,6 +755,11 @@ _NAME_RULES: dict[str, tuple[re.Pattern[str], str]] = {
         "a lakehouse name starts with a letter and holds only letters, "
         "digits and underscores, up to 123 characters",
     ),
+    "Ontology": (
+        re.compile(r"[A-Za-z][A-Za-z0-9_]{0,98}"),
+        "an ontology name starts with a letter and holds only letters, "
+        "digits and underscores, under 100 characters",
+    ),
 }
 
 
@@ -764,7 +769,8 @@ def name_problem(item_type: str, display_name: str) -> str | None:
 
     Only the rules Fabric documents are checked, so that an item is not
     held back by a guess: a lakehouse name starts with a letter and holds
-    only letters, digits and underscores, up to 123 characters.
+    only letters, digits and underscores, up to 123 characters, and an
+    ontology name likewise, under 100 characters.
 
     Args:
         item_type (str): The Fabric item type.
