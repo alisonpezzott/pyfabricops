@@ -39,6 +39,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - An ontology name that breaks the rule Fabric documents (a letter
     first, then letters, digits and underscores, under 100 characters) is
     blocked in the plan.
+- `WorkspaceIdMap` maps the endpoints items hold as text: the query and
+  ingestion URIs of each eventhouse, which a KQL database's queryset or an
+  ontology's binding holds, to those of the eventhouse of the same name in
+  the target, and the SQL endpoint of the source workspace to that of the
+  target. `load()` reads them; `endpoints` gives the pairs, and an
+  eventhouse the target lacks counts as missing in `references()` for the
+  items that hold its URI. A URI not provisioned yet is read again at the
+  next `reload_target()`.
+- `publish_data_agent()`: publishes the draft of a data agent, which a
+  deployment of its definition does not publish for sure (preview API).
 
 ### Changed
 - `deploy_all_items()`, `plan_all_items()`, `reconcile_items()` and
