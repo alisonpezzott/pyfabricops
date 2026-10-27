@@ -72,6 +72,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.10.0] - 2026-10-26
+
+### Added
+- Eventhouses and KQL databases deploy: `DEPLOY_ORDER` has `Eventhouse`
+  and `KQLDatabase` after `Warehouse`.
+  - A KQL database is read where Fabric Git integration writes it, in
+    `<eventhouse>.Eventhouse/.children/`, or beside its eventhouse. It is
+    in the workspace folder of its eventhouse, and a change to its files
+    is a change to it, not to the eventhouse, whose definition leaves its
+    databases out.
+  - It needs its eventhouse, by nesting or by the logical ID of
+    `parentEventhouseItemId`, and is sent with the ID of that eventhouse
+    in the workspace, as a report is bound to its semantic model. An ID of
+    an eventhouse of the workspace, as a copy translated by
+    `WorkspaceIdMap` holds, goes as it is.
+  - A database Fabric created along with its eventhouse is updated rather
+    than created again, and a database moves with its eventhouse: Fabric
+    moves no child item on its own.
+  - `WorkspaceIdMap.references()` leaves out what the databases nested in
+    an eventhouse refer to.
+  - A KQL database whose `databaseType` is not `ReadWrite`, a shortcut
+    database that only a creation payload creates, is blocked in the plan.
+- Eventstreams, ontologies and data agents deploy: `DEPLOY_ORDER` ends
+  with `Eventstream`, `Ontology` and `DataAgent`, after what they read.
+  - Fabric Git integration writes them with a reference to an item of
+    their workspace as that item's logical ID, with the empty GUID as
+    `workspaceId`: an eventstream's destinations, an ontology's data
+    bindings, a data agent's data sources. Each such reference is a
+    dependency, and is sent as the ID of the item in the workspace; each
+    empty `workspaceId` of their JSON files as the ID of the workspace.
+    A reference to a local item the workspace lacks fails the item.
+  - An ontology name that breaks the rule Fabric documents (a letter
+    first, then letters, digits and underscores, under 100 characters) is
+    blocked in the plan.
+- `WorkspaceIdMap` maps the endpoints items hold as text: the query and
+  ingestion URIs of each eventhouse, which a KQL database's queryset or an
+  ontology's binding holds, to those of the eventhouse of the same name in
+  the target, and the SQL endpoint of the source workspace to that of the
+  target. `load()` reads them; `endpoints` gives the pairs, and an
+  eventhouse the target lacks counts as missing in `references()` for the
+  items that hold its URI. A URI not provisioned yet is read again at the
+  next `reload_target()`.
+- `publish_data_agent()`: publishes the draft of a data agent, which a
+  deployment of its definition does not publish for sure (preview API).
+
+### Changed
+- A deployment logs the start of each action that changes the workspace,
+  such as `Creating Bronze.Lakehouse...`, at INFO: a create can take a
+  while, and its outcome is logged only once it ends.
+- `deploy_all_items()`, `plan_all_items()`, `reconcile_items()` and
+  `restore_items()` without `item_types` now take eventhouses, KQL
+  databases, eventstreams, ontologies and data agents, which they used to
+  leave alone; a reconciliation no longer
+  lists them as unmanaged. Pass `item_types` to keep a run as it was.
+- A reconciliation compares a KQL database, an eventstream, an ontology
+  or a data agent as a deployment would send it, with the IDs of the
+  workspace in place of the logical IDs Git holds. It leaves out what a
+  KQL database holds rather than what was sent: `DatabaseSchema.kql`,
+  which Fabric returns as the whole schema of the database, and
+  `EmbeddedRealTimeQueryset.json`, the tabs of its query editor. The `ref`
+  lines Fabric adds to the `model.tmdl` of an ontology are left out, as
+  those of a semantic model were.
+- `export_item()` and `export_all_items()` put a KQL database where Fabric
+  Git integration writes it, in the `.children` folder of its eventhouse.
+
+---
+
 ## [0.9.0] - 2026-10-25
 
 ### Added
@@ -1005,7 +1072,8 @@ Internal build.
 ### Added
 - Initial release.
 
-[Unreleased]: https://github.com/alisonpezzott/pyfabricops/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/alisonpezzott/pyfabricops/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/alisonpezzott/pyfabricops/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/alisonpezzott/pyfabricops/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/alisonpezzott/pyfabricops/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/alisonpezzott/pyfabricops/compare/v0.7.0...v0.8.0

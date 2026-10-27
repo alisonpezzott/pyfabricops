@@ -8,15 +8,15 @@ tenant, workspace or data.
 
 ## Before you start
 
-- **pyfabricops 0.8.1 or later**, which keeps the deployment state on a
-  branch of the repository from the folder of the items, as the template
-  does:
+- **pyfabricops 0.10.0 or later**, which deploys eventhouses, KQL
+  databases, eventstreams, ontologies and data agents, and keeps the
+  deployment state on a branch of the repository, as the template does:
 
   ```bash
-  pip install -U "pyfabricops>=0.8.1"
+  pip install -U "pyfabricops>=0.10.0"
   ```
 
-  The CI definitions of the template install `pyfabricops>=0.8.1,<0.9.0`:
+  The CI definitions of the template install `pyfabricops>=0.10.0,<0.11.0`:
   before 1.0, a new minor version may change behavior, so move to one on
   purpose.
 
