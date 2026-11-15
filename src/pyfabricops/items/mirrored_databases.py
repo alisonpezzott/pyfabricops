@@ -24,8 +24,12 @@ logger = get_logger(__name__)
 
 # What getMirroringStatus returns once the replication is up.
 MIRRORING_RUNNING = "Running"
-# What it returns while the replication is on its way up.
-_STARTING = frozenset({"Initializing", "Initialized", "Starting"})
+# What it returns while the replication is on its way up: no start is
+# sent then. Initialized is not one: a mirrored database created through
+# the API stays there until it is started.
+_UNDER_WAY = frozenset({"Initializing", "Starting"})
+# What it may return after a start, before it runs.
+_STARTING = _UNDER_WAY | {"Initialized"}
 
 
 def get_mirroring_status(workspace: str, mirrored_database: str) -> str:
@@ -37,9 +41,10 @@ def get_mirroring_status(workspace: str, mirrored_database: str) -> str:
         mirrored_database (str): The name or ID of the mirrored database.
 
     Returns:
-        (str): ``Running`` once it replicates; ``Initializing``,
-            ``Initialized`` or ``Starting`` on its way there; ``Stopping``
-            or ``Stopped`` otherwise.
+        (str): ``Running`` once it replicates; ``Initializing`` or
+            ``Starting`` on its way there; ``Initialized`` when created and
+            never started, as through the API; ``Stopping`` or ``Stopped``
+            otherwise.
 
     Raises:
         ResourceNotFoundError: If the workspace or the mirrored database is
@@ -110,7 +115,9 @@ def start_mirroring(workspace: str, mirrored_database: str) -> None:
     """
     Starts the replication of a mirrored database.
 
-    Nothing is sent when it runs already, or is on its way up.
+    Nothing is sent when it runs already, or is on its way up. One that
+    is ``Initialized``, as a mirrored database created through the API
+    stays until started, is started.
 
     Args:
         workspace (str): The workspace name or ID.
@@ -129,7 +136,7 @@ def start_mirroring(workspace: str, mirrored_database: str) -> None:
     """
     endpoint = _endpoint(workspace, mirrored_database)
     status = _read_status(endpoint)
-    if status == MIRRORING_RUNNING or status in _STARTING:
+    if status == MIRRORING_RUNNING or status in _UNDER_WAY:
         logger.info(f"Mirrored database '{mirrored_database}' is {status}.")
         return
     _start(endpoint, mirrored_database)
@@ -212,9 +219,9 @@ def start_mirroring_and_wait(
     endpoint = _endpoint(workspace, mirrored_database)
     deadline = time.monotonic() + timeout
     status = _read_status(endpoint)
-    if status != MIRRORING_RUNNING and status not in _STARTING:
+    if status != MIRRORING_RUNNING and status not in _UNDER_WAY:
         _start(endpoint, mirrored_database)
-        logger.info(f"Mirroring of '{mirrored_database}' started; waiting.")
+        logger.info(f"Mirroring of '{mirrored_database}' started.")
     while True:
         status = _read_status(endpoint)
         if status == MIRRORING_RUNNING:
@@ -231,6 +238,9 @@ def start_mirroring_and_wait(
                 f"Mirrored database '{mirrored_database}' is still {status} "
                 f"after {timeout:.0f} seconds."
             )
+        logger.info(
+            f"Mirrored database '{mirrored_database}' is {status}; waiting."
+        )
         time.sleep(poll_interval)
 
 

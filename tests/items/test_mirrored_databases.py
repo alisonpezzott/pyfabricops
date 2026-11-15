@@ -109,6 +109,13 @@ class TestStartMirroring:
 
         assert api.call_args_list == [STATUS, START]
 
+    def test_starts_an_initialized_database(self, api: MagicMock) -> None:
+        api.side_effect = [status("Initialized"), ok()]
+
+        start_mirroring("PRD", DATABASE)
+
+        assert api.call_args_list == [STATUS, START]
+
     @pytest.mark.parametrize("value", ["Running", "Starting", "Initializing"])
     def test_sends_nothing_when_it_runs_or_starts(
         self, api: MagicMock, value: str
@@ -159,12 +166,26 @@ class TestStartMirroringAndWait:
         sleep.assert_called_once_with(15)
 
     def test_only_waits_when_it_is_starting(self, api: MagicMock) -> None:
-        api.side_effect = [status("Initialized"), status("Running")]
+        api.side_effect = [status("Starting"), status("Running")]
 
         with patch(f"{_MODULE}.time.sleep"):
             start_mirroring_and_wait("PRD", DATABASE)
 
         assert START not in api.call_args_list
+
+    def test_starts_one_created_through_the_api(self, api: MagicMock) -> None:
+        """Initialized is where a database created through the API stays."""
+        api.side_effect = [
+            status("Initialized"),
+            ok(),
+            status("Initialized"),
+            status("Running"),
+        ]
+
+        with patch(f"{_MODULE}.time.sleep"):
+            assert start_mirroring_and_wait("PRD", DATABASE) == "Running"
+
+        assert api.call_args_list == [STATUS, START, STATUS, STATUS]
 
     def test_raises_when_it_stops_on_its_way_up(self, api: MagicMock) -> None:
         api.side_effect = [status("Stopped"), ok(), status("Stopped")]
