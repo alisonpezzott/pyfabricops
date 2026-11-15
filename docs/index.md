@@ -27,7 +27,7 @@ Access: [https://pyfabricops.readthedocs.io/en/latest/](https://pyfabricops.read
 
 ## ✅ Requirements  
 
-- Requires Python >=3.10,<3.15  
+- Requires Python >=3.10,<3.16  
 
 ## ⚒️ Installation
 
