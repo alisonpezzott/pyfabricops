@@ -97,6 +97,8 @@ logger = get_logger(__name__)
 # the types its items can reference.
 DEPLOY_ORDER: tuple[str, ...] = (
     "VariableLibrary",
+    # Before the lakehouses, whose shortcuts may point to its tables.
+    "MirroredDatabase",
     "Lakehouse",
     "Warehouse",
     "Eventhouse",
@@ -2730,10 +2732,11 @@ def _read_deletions(
     ids: dict[str, tuple[ItemKey, str]] = {}
     for key in gone:
         owned = [(index.items[key], "its ID")]
-        # Fabric deletes a lakehouse's SQL analytics endpoint with it.
+        # Fabric deletes the SQL analytics endpoint of a lakehouse or a
+        # mirrored database with it.
         endpoint = (
             index.items.get(("SQLEndpoint", key[1]))
-            if key[0] == "Lakehouse"
+            if key[0] in ("Lakehouse", "MirroredDatabase")
             else None
         )
         if endpoint is not None:

@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Mirrored databases deploy: `DEPLOY_ORDER` has `MirroredDatabase` after
+  `VariableLibrary` and before `Lakehouse`, whose shortcuts may point to
+  its tables. Its definition, `mirroring.json`, goes as it is, with the ID
+  of the connection to its source: point it at the connection of each
+  environment before deploying. A deletion of a mirrored database is
+  blocked by a reference to its SQL analytics endpoint, as for a
+  lakehouse.
+- `pyfabricops.items.mirrored_databases`: deploying the definition does
+  not start the replication, so `start_mirroring`,
+  `start_mirroring_and_wait`, `stop_mirroring`, `get_mirroring_status` and
+  `get_tables_mirroring_status` drive it. `start_mirroring_and_wait`
+  waits for the replication to run, not for the first copy of the tables,
+  and fails when it stops on its way up, as when the managed identity of
+  the mirrored database has no access to the source, which no Fabric API
+  grants.
+
 ---
 
 ## [0.11.0] - 2026-11-15
