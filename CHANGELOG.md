@@ -33,6 +33,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to a lakehouse still gets its logical ID.
 - A reconciliation, and so a restore, logs each definition it reads, which
   can take minutes over a whole workspace.
+- `restore_items(reconciliation=...)` applies a reconciliation already made
+  by `reconcile_items` over the same path, for the item types in scope,
+  after one listing of the workspace, without reading any definition again.
+  A run that reconciles once and restores one type at a time reads each
+  definition once instead of twice. The definitions sent are read from the
+  path then, as it is after any translation since.
 
 ---
 

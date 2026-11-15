@@ -2159,13 +2159,16 @@ def _restore_all(
     item_types: Sequence[str] | None = None,
     state_backend: DeploymentStateBackend | None = None,
     environment: str | None = None,
+    reconciliation: Reconciliation | None = None,
 ) -> DeploymentReport:
     """
     Reconcile, then bring back what drifted in the workspace.
 
     With a backend that locks, the run holds the lock of the environment
     from before it reads the state until the last item is back. The state
-    is never recorded. See ``restore_items`` for the public contract.
+    is never recorded. With ``reconciliation``, nothing is read again:
+    its actions of the types in scope are applied, after one listing of
+    the workspace. See ``restore_items`` for the public contract.
 
     Raises:
         ConfigurationError: If the workspace is not found, or the state is
@@ -2174,15 +2177,29 @@ def _restore_all(
         DeploymentLockedError: If another run holds the lock.
     """
     with _environment_lock(state_backend, environment or workspace):
-        reconciliation, index = _reconcile(
-            workspace,
-            path,
-            start_path=start_path,
-            item_types=item_types,
-            state_backend=state_backend,
-            environment=environment,
-        )
-        _log_reconciliation(workspace, reconciliation)
+        if reconciliation is None:
+            reconciliation, index = _reconcile(
+                workspace,
+                path,
+                start_path=start_path,
+                item_types=item_types,
+                state_backend=state_backend,
+                environment=environment,
+            )
+            _log_reconciliation(workspace, reconciliation)
+        else:
+            index = _load_index(workspace)
+            types = set(_ordered_types(item_types))
+            reconciliation = replace(
+                reconciliation,
+                plan=DeploymentPlan(
+                    actions=[
+                        action
+                        for action in reconciliation.plan.actions
+                        if action.item_type in types
+                    ]
+                ),
+            )
         report = DeploymentReport(
             workspace=workspace, workspace_id=index.workspace_id
         )
@@ -2258,14 +2275,7 @@ def _reconcile(
     if deployed:
         items = _with_content_hashes(items)
 
-    workspace_id = resolve_workspace(workspace)
-    if workspace_id is None:
-        raise ConfigurationError(f"Workspace '{workspace}' not found.")
-    index = _WorkspaceIndex.load(workspace_id)
-    if index is None:
-        raise RequestError(
-            f"Could not list the items and folders of workspace '{workspace}'."
-        )
+    index = _load_index(workspace)
 
     folder_paths = {
         folder_id: folder for folder, folder_id in index.folders.items()
@@ -2301,6 +2311,25 @@ def _reconcile(
         root=path,
     )
     return reconciliation, index
+
+
+def _load_index(workspace: str) -> _WorkspaceIndex:
+    """
+    List the items and folders of a workspace.
+
+    Raises:
+        ConfigurationError: If the workspace is not found.
+        RequestError: If its items and folders cannot be listed.
+    """
+    workspace_id = resolve_workspace(workspace)
+    if workspace_id is None:
+        raise ConfigurationError(f"Workspace '{workspace}' not found.")
+    index = _WorkspaceIndex.load(workspace_id)
+    if index is None:
+        raise RequestError(
+            f"Could not list the items and folders of workspace '{workspace}'."
+        )
+    return index
 
 
 def _deployed_items(
