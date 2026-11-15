@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.11.0] - 2026-11-15
+
 ### Added
 - Eventhouses and KQL databases deploy: `DEPLOY_ORDER` has `Eventhouse`
   and `KQLDatabase` after `Warehouse`.
@@ -69,6 +73,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   those of a semantic model were.
 - `export_item()` and `export_all_items()` put a KQL database where Fabric
   Git integration writes it, in the `.children` folder of its eventhouse.
+- Python 3.15 is supported: `requires-python` is `>=3.10,<3.16`.
+- **Breaking:** pandas 3 is allowed (`pandas>=2.3.0,<4.0.0`), since no
+  pandas 2 release ships wheels for Python 3.15. On Python 3.11 and later,
+  installing pyfabricops now pulls pandas 3 unless the environment pins
+  pandas 2, which also applies in a Fabric notebook whose runtime ships
+  pandas 2. Pin `pandas<3` alongside pyfabricops to keep the old one.
 
 ---
 
@@ -1072,7 +1082,8 @@ Internal build.
 ### Added
 - Initial release.
 
-[Unreleased]: https://github.com/alisonpezzott/pyfabricops/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/alisonpezzott/pyfabricops/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/alisonpezzott/pyfabricops/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/alisonpezzott/pyfabricops/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/alisonpezzott/pyfabricops/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/alisonpezzott/pyfabricops/compare/v0.8.0...v0.8.1
