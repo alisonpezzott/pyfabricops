@@ -2355,6 +2355,9 @@ def _compare_definitions(
         if target is None or key in differences or key in unchecked:
             continue
 
+        logger.info(
+            f"Reading the definition of {item.display_name}.{item.item_type}."
+        )
         result = _request_item_definition(
             index.workspace_id, cast(str, target["id"])
         )

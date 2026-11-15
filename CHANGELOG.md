@@ -24,6 +24,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the mirrored database has no access to the source, which no Fabric API
   grants.
 
+### Changed
+- `WorkspaceIdMap` points a OneLake shortcut to an item other than a
+  lakehouse, such as the tables of a mirrored database, at the ID of the
+  item with the ID of the target workspace, not at its logical ID: Fabric
+  does not resolve those, and failed the lakehouse with
+  `MissingShortcutDependency` although the target had the item. A shortcut
+  to a lakehouse still gets its logical ID.
+- A reconciliation, and so a restore, logs each definition it reads, which
+  can take minutes over a whole workspace.
+
 ---
 
 ## [0.11.0] - 2026-11-15

@@ -230,8 +230,9 @@ def start_mirroring_and_wait(
         if status not in _STARTING:
             raise RequestError(
                 f"Mirrored database '{mirrored_database}' is {status} after "
-                "it was started: check its connection and the access of its "
-                "managed identity to the source."
+                "it was started: its error is on the item in Fabric, such as "
+                "a rejected secret of its connection, a source already "
+                "mirrored elsewhere, or missing permissions at the source."
             )
         if time.monotonic() + poll_interval > deadline:
             raise TimeoutError(

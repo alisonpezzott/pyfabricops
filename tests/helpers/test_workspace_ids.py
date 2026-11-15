@@ -287,6 +287,34 @@ class TestShortcuts:
         assert self.one_lake(file)[0]["workspaceId"] == TARGET
         assert self.one_lake(file)[0]["itemId"] == TARGET_LAKEHOUSE
 
+    def test_a_shortcut_to_a_mirrored_database_gets_its_id_and_the_target(
+        self, tmp_path: Path
+    ) -> None:
+        """Fabric resolves no logical ID of a mirrored database."""
+        mirror_logical = "00000000-0000-4000-8000-0000000000a6"
+        target_mirror = "00000000-0000-4000-8000-0000000000b6"
+        file = self.file(tmp_path, shortcut(THIS_WORKSPACE, mirror_logical))
+        ids = make_map(
+            [
+                {
+                    "type": "MirroredDatabase",
+                    "displayName": "erp",
+                    "id": target_mirror,
+                    # As Fabric lists it: the same logical ID as the source.
+                    "logicalId": mirror_logical,
+                }
+            ],
+            logical_ids={mirror_logical: ("MirroredDatabase", "erp")},
+        )
+
+        ids.translate(tmp_path)
+
+        assert self.one_lake(file)[0] == {
+            "workspaceId": TARGET,
+            "itemId": target_mirror,
+            "path": "Tables/raw",
+        }
+
     def test_a_shortcut_to_another_workspace_stays(
         self, tmp_path: Path
     ) -> None:

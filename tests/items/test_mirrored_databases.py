@@ -190,7 +190,7 @@ class TestStartMirroringAndWait:
     def test_raises_when_it_stops_on_its_way_up(self, api: MagicMock) -> None:
         api.side_effect = [status("Stopped"), ok(), status("Stopped")]
 
-        with pytest.raises(RequestError, match="managed identity"):
+        with pytest.raises(RequestError, match="error is on the item"):
             start_mirroring_and_wait("PRD", DATABASE)
 
     def test_raises_when_it_does_not_run_in_time(self, api: MagicMock) -> None:
