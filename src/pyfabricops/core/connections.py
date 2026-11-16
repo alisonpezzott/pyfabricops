@@ -325,7 +325,7 @@ def create_adlsgen2_connection_with_service_principal_credentials(
             from dotenv import load_dotenv
             load_dotenv()
             pf.create_adlsgen2_connection_with_service_principal_credentials(
-                display_name='pyfabricops-examples',
+                display_name='my-repository',
                 adls_endpoint='https://example.dfs.core.windows.net',
                 client_id=os.getenv('CLIENT_ID'),
                 client_secret=os.getenv('CLIENT_SECRET'),
@@ -390,8 +390,8 @@ def create_github_source_control_connection(
             from dotenv import load_dotenv
             load_dotenv()
             pf.create_github_source_control_connection(
-                display_name='pyfabricops-examples',
-                repository='https://github.com/alisonpezzott/pyfabricops-examples',
+                display_name='my-repository',
+                repository='https://github.com/<owner>/<repository>',
                 github_token=os.getenv('GH_TOKEN'),
                 df=True,
             )
