@@ -9,6 +9,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.12.0] - 2026-11-15
+
+### Added
+- Mirrored databases deploy: `DEPLOY_ORDER` has `MirroredDatabase` after
+  `VariableLibrary` and before `Lakehouse`, whose shortcuts may point to
+  its tables. Its definition, `mirroring.json`, goes as it is, with the ID
+  of the connection to its source: point it at the connection of each
+  environment before deploying. A deletion of a mirrored database is
+  blocked by a reference to its SQL analytics endpoint, as for a
+  lakehouse.
+- `pyfabricops.items.mirrored_databases`: deploying the definition does
+  not start the replication, so `start_mirroring`,
+  `start_mirroring_and_wait`, `stop_mirroring`, `get_mirroring_status` and
+  `get_tables_mirroring_status` drive it. `start_mirroring_and_wait`
+  waits for the replication to run, not for the first copy of the tables,
+  and fails when it stops on its way up, as when the managed identity of
+  the mirrored database has no access to the source, which no Fabric API
+  grants.
+
+### Changed
+- `WorkspaceIdMap` points a OneLake shortcut to an item other than a
+  lakehouse, such as the tables of a mirrored database, at the ID of the
+  item with the ID of the target workspace, not at its logical ID: Fabric
+  does not resolve those, and failed the lakehouse with
+  `MissingShortcutDependency` although the target had the item. A shortcut
+  to a lakehouse still gets its logical ID.
+- A reconciliation, and so a restore, logs each definition it reads, which
+  can take minutes over a whole workspace.
+- A reconciliation no longer reports two differences Fabric makes by
+  itself: the `artifactType` of a OneLake shortcut, which Git integration
+  writes and the workspace does not return, and what publishing a data
+  agent writes (`Files/Config/publish_info.json` and the
+  `Files/Config/published/` copy of its draft, which is compared). Both
+  made a lakehouse with shortcuts to a mirrored database, and any data
+  agent published after its deployment, look drifted after every run.
+- `restore_items(reconciliation=...)` applies a reconciliation already made
+  by `reconcile_items` over the same path, for the item types in scope,
+  after one listing of the workspace, without reading any definition again.
+  A run that reconciles once and restores one type at a time reads each
+  definition once instead of twice. The definitions sent are read from the
+  path then, as it is after any translation since.
+
+---
+
 ## [0.11.0] - 2026-11-15
 
 ### Changed

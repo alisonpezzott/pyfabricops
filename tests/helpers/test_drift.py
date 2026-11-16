@@ -221,6 +221,78 @@ def test_shortcuts_removed_by_hand_are_a_difference() -> None:
     )
 
 
+def _shortcuts(**one_lake: str) -> str:
+    return json.dumps(
+        [
+            {
+                "name": "pedidos",
+                "path": "/Tables/erp",
+                "target": {
+                    "type": "OneLake",
+                    "oneLake": {
+                        "path": "Tables/erp/pedidos",
+                        "itemId": "00000000-0000-4000-8000-000000000001",
+                        "workspaceId": "00000000-0000-4000-8000-000000000002",
+                        **one_lake,
+                    },
+                },
+            }
+        ]
+    )
+
+
+def test_the_artifact_type_of_a_shortcut_is_no_difference() -> None:
+    """Git integration writes it; the workspace does not return it."""
+    source = _shortcuts(artifactType="MountedRelationalDatabase")
+
+    assert (
+        _differ(
+            {"shortcuts.metadata.json": source},
+            {"shortcuts.metadata.json": _shortcuts()},
+        )
+        == ()
+    )
+
+
+def test_a_shortcut_pointed_elsewhere_is_still_a_difference() -> None:
+    other = _shortcuts(itemId="00000000-0000-4000-8000-000000000009")
+
+    assert _differ(
+        {"shortcuts.metadata.json": _shortcuts(artifactType="Lakehouse")},
+        {"shortcuts.metadata.json": other},
+    ) == ("shortcuts.metadata.json",)
+
+
+def test_what_publishing_a_data_agent_writes_is_no_difference() -> None:
+    """Its draft is compared; a publication copies it."""
+    draft = "Files/Config/draft/stage_config.json"
+
+    assert (
+        _differ(
+            {
+                draft: '{"instructions": "a"}',
+                "Files/Config/publish_info.json": '{"description": "Git"}',
+                "Files/Config/published/stage_config.json": '{"old": 1}',
+            },
+            {
+                draft: '{"instructions": "a"}',
+                "Files/Config/publish_info.json": '{"description": "CI"}',
+                "Files/Config/published/stage_config.json": '{"new": 2}',
+            },
+        )
+        == ()
+    )
+
+
+def test_a_draft_of_a_data_agent_changed_is_a_difference() -> None:
+    draft = "Files/Config/draft/stage_config.json"
+
+    assert _differ(
+        {draft: '{"instructions": "a"}'},
+        {draft: '{"instructions": "b"}'},
+    ) == (draft,)
+
+
 def test_a_platform_file_on_one_side_only_is_left_out() -> None:
     """Not every item type returns its .platform."""
     assert (

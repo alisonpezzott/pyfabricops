@@ -8,15 +8,15 @@ tenant, workspace or data.
 
 ## Before you start
 
-- **pyfabricops 0.10.0 or later**, which deploys eventhouses, KQL
-  databases, eventstreams, ontologies and data agents, and keeps the
-  deployment state on a branch of the repository, as the template does:
+- **pyfabricops 0.12.0 or later**, which deploys mirrored databases and
+  starts their replication, and restores a workspace from a reconciliation
+  already made, as the template does:
 
   ```bash
-  pip install -U "pyfabricops>=0.10.0"
+  pip install -U "pyfabricops>=0.12.0"
   ```
 
-  The CI definitions of the template install `pyfabricops>=0.10.0,<0.11.0`:
+  The CI definitions of the template install `pyfabricops>=0.12.0,<0.13.0`:
   before 1.0, a new minor version may change behavior, so move to one on
   purpose.
 
@@ -51,5 +51,8 @@ into this folder.
 To deploy a workspace from CI, start from
 [pyfabricops-template](https://github.com/alisonpezzott/pyfabricops-template): a repository with the script and the
 pipelines, for GitHub Actions and Azure DevOps, that deploy the items of a
-Fabric workspace to one workspace per environment. It used to be
+Fabric workspace to one workspace per environment, described by one YAML
+file each. Each run compares the repository with the workspace and sends
+what differs, with no deployment state to keep, and the environment
+connected to Git is updated from Git instead. It used to be
 `examples/03-template-repo`; its README tells how to set it up and run it.

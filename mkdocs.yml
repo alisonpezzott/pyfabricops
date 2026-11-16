@@ -56,6 +56,7 @@ nav:
       - Environments: functions/items/environments.md
       - Items: functions/items/items.md
       - Lakehouses: functions/items/lakehouses.md
+      - Mirrored Databases: functions/items/mirrored_databases.md
       - Notebooks: functions/items/notebooks.md
       - Reports: functions/items/reports.md
       - Spark: functions/items/spark.md

@@ -21,7 +21,7 @@ from pyfabricops.helpers.deployment_state import (
     DeploymentState,
     LocalJsonStateBackend,
 )
-from pyfabricops.helpers.items import restore_items
+from pyfabricops.helpers.items import reconcile_items, restore_items
 from pyfabricops.utils.exceptions import DeploymentLockedError
 from pyfabricops.utils.utils import pack_item_definition
 
@@ -392,4 +392,54 @@ def test_restore_items_delegates_to_the_engine() -> None:
         item_types=["Notebook"],
         state_backend=backend,
         environment="prd",
+        reconciliation=None,
     )
+
+
+def test_a_reconciliation_given_is_applied_without_reading_again(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """Each definition is read once, by the reconciliation."""
+    orders = _write_item(root, "Orders.Notebook")
+    sales = _write_item(root, "Sales.SemanticModel")
+    fabric.items = [
+        _listed("nb-1", "Notebook", "Orders"),
+        _listed("sm-1", "SemanticModel", "Sales"),
+    ]
+    fabric.definitions = {
+        "nb-1": _served(orders, **{"content.txt": "edit"}),
+        "sm-1": _served(sales, **{"content.txt": "edit"}),
+    }
+    reconciliation = reconcile_items(
+        _WORKSPACE,
+        str(root),
+        str(root),
+        item_types=["Notebook", "SemanticModel"],
+    )
+    with patch(f"{_ENGINE}._request_item_definition") as read:
+        report = _restore(
+            root, item_types=["Notebook"], reconciliation=reconciliation
+        )
+
+    read.assert_not_called()
+    assert _outcomes(report) == [("Orders", "updated")]
+
+
+def test_a_reconciliation_given_sends_the_definition_as_it_is_now(
+    root: Path, fabric: SimpleNamespace
+) -> None:
+    """A copy translated again after the reconciliation goes as it is."""
+    orders = _write_item(root, "Orders.Notebook")
+    fabric.items = [_listed("nb-1", "Notebook", "Orders")]
+    fabric.definitions = {"nb-1": _served(orders, **{"content.txt": "edit"})}
+    reconciliation = reconcile_items(_WORKSPACE, str(root), str(root))
+    (orders / "content.txt").write_text("translated", encoding="utf-8")
+
+    _restore(root, reconciliation=reconciliation)
+
+    sent = fabric.update.call_args.args[2]["parts"]
+    payloads = {
+        part["path"]: base64.b64decode(part["payload"]).decode("utf-8")
+        for part in sent
+    }
+    assert payloads["content.txt"] == "translated"

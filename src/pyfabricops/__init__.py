@@ -346,6 +346,14 @@ from .items.lakehouses import (
     resolve_lakehouse,
     update_lakehouse,
 )
+from .items.mirrored_databases import (
+    MIRRORING_RUNNING,
+    get_mirroring_status,
+    get_tables_mirroring_status,
+    start_mirroring,
+    start_mirroring_and_wait,
+    stop_mirroring,
+)
 from .items.notebooks import (
     create_notebook,
     delete_notebook,
@@ -769,6 +777,12 @@ __all__ = [
     "parse_tmdl_parameters",
     "plan_all_items",
     "publish_data_agent",
+    "MIRRORING_RUNNING",
+    "get_mirroring_status",
+    "get_tables_mirroring_status",
+    "start_mirroring",
+    "start_mirroring_and_wait",
+    "stop_mirroring",
     "publish_environment",
     "read_json",
     "reconcile_items",

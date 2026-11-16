@@ -298,12 +298,15 @@ class WorkspaceIdMap:
         A OneLake shortcut to an item of the source workspace, pointed at the
         same item in the target.
 
-        Fabric looks the logical ID of a shortcut to its own workspace up
-        among the items of the workspace, so the shortcut gets the logical ID
-        of the item in the target; the ID of the item, with the ID of the
-        target workspace, when the item has none. Any other shortcut stays as
-        it is, as does one to an item the target lacks yet: the lakehouse
-        waits for it.
+        A shortcut to a lakehouse of its own workspace gets the logical ID
+        of the lakehouse in the target, which Fabric looks up among the items
+        of the workspace. A shortcut to any other item, such as the tables of
+        a mirrored database, gets the ID of the item with the ID of the
+        target workspace: Fabric does not resolve their logical IDs, and
+        fails the lakehouse with MissingShortcutDependency even when the
+        target has the item. So does a shortcut to a lakehouse without a
+        logical ID. Any other shortcut stays as it is, as does one to an
+        item the target lacks yet: the lakehouse waits for it.
 
         Args:
             shortcut (Mapping[str, Any]): A shortcut of
@@ -321,7 +324,7 @@ class WorkspaceIdMap:
         target = self._target_items.get(key) if key else None
         if workspace not in (THIS_WORKSPACE, self._source) or target is None:
             return pointed
-        if target.get("logicalId"):
+        if key and key[0] == "Lakehouse" and target.get("logicalId"):
             one_lake.update(
                 workspaceId=THIS_WORKSPACE, itemId=str(target["logicalId"])
             )
