@@ -22,7 +22,13 @@ out what Fabric changes by itself, as measured against a workspace:
 - the parts of a KQL database that tell what the database holds rather
   than what was sent: ``DatabaseSchema.kql``, which Fabric returns as the
   whole schema of the database, whatever created it, and
-  ``EmbeddedRealTimeQueryset.json``, the tabs of its query editor.
+  ``EmbeddedRealTimeQueryset.json``, the tabs of its query editor;
+- the ``artifactType`` of a OneLake shortcut of a lakehouse, such as
+  ``MountedRelationalDatabase`` for the tables of a mirrored database,
+  which Fabric Git integration writes and the workspace does not return;
+- what publishing a data agent writes: ``Files/Config/publish_info.json``
+  and the ``Files/Config/published/`` copy of its draft. Its draft, which
+  a publication copies there, is compared.
 
 Internal for now: nothing here is exported from ``pyfabricops``.
 """
@@ -42,6 +48,10 @@ __all__ = ["comparable_parts", "differing_parts"]
 _PLATFORM = ".platform"
 _PBIR = "definition.pbir"
 _MODEL_TMDL = "model.tmdl"
+_SHORTCUTS = "shortcuts.metadata.json"
+# What publishing a data agent writes, by path and by folder.
+_PUBLISH_INFO = "Files/Config/publish_info.json"
+_PUBLISHED = "Files/Config/published/"
 # The parts never compared: what a KQL database holds, not what was sent.
 _NOT_COMPARED = frozenset(
     {"DatabaseSchema.kql", "EmbeddedRealTimeQueryset.json"}
@@ -82,7 +92,11 @@ def comparable_parts(
     parts: dict[str, bytes] = {}
     for part in definition.get("parts", []):
         path = part["path"]
-        if path in _NOT_COMPARED:
+        if (
+            path in _NOT_COMPARED
+            or path == _PUBLISH_INFO
+            or path.startswith(_PUBLISHED)
+        ):
             continue
         content = canonical_part(path, base64.b64decode(part["payload"]))
         parts[path] = _comparable(path, content, semantic_model)
@@ -143,7 +157,25 @@ def _comparable(
         text = _pointing_to(text, semantic_model)
     elif path.rpartition("/")[2] == _MODEL_TMDL:
         text = _without_refs(text)
+    elif path == _SHORTCUTS:
+        text = _without_artifact_types(text)
     return text.rstrip().encode("utf-8")
+
+
+def _without_artifact_types(text: str) -> str:
+    """Drop the artifactType of each OneLake shortcut of a lakehouse."""
+    try:
+        shortcuts = json.loads(text)
+    except ValueError:
+        return text
+    if not isinstance(shortcuts, list):
+        return text
+    for shortcut in shortcuts:
+        target = shortcut.get("target") if isinstance(shortcut, dict) else None
+        one_lake = target.get("oneLake") if isinstance(target, dict) else None
+        if isinstance(one_lake, dict):
+            one_lake.pop("artifactType", None)
+    return _canonical_json(shortcuts)
 
 
 def _without_logical_id(text: str) -> str:

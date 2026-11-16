@@ -33,6 +33,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to a lakehouse still gets its logical ID.
 - A reconciliation, and so a restore, logs each definition it reads, which
   can take minutes over a whole workspace.
+- A reconciliation no longer reports two differences Fabric makes by
+  itself: the `artifactType` of a OneLake shortcut, which Git integration
+  writes and the workspace does not return, and what publishing a data
+  agent writes (`Files/Config/publish_info.json` and the
+  `Files/Config/published/` copy of its draft, which is compared). Both
+  made a lakehouse with shortcuts to a mirrored database, and any data
+  agent published after its deployment, look drifted after every run.
 - `restore_items(reconciliation=...)` applies a reconciliation already made
   by `reconcile_items` over the same path, for the item types in scope,
   after one listing of the workspace, without reading any definition again.
