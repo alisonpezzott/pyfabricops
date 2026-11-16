@@ -103,45 +103,28 @@ See more details in the [authentication guide](https://github.com/alisonpezzott/
 > Prepare your environment with the required variables according to your authentication method (GitHub Secrets, ADO Secrets, .env ...)
 
 
-### Branches configuration
+## 🧩 Template repository
 
-Create a branches.json file in the root of your repository to define your branch mappings:
+[pyfabricops-template](https://github.com/alisonpezzott/pyfabricops-template)
+is a repository to start a project from, with **Use this template** on
+GitHub or an import in Azure DevOps. Its script and pipelines, for GitHub
+Actions and Azure DevOps, deploy the items of a Fabric workspace to one
+workspace per environment, dev from `develop` and prod from `main`:
 
-```json
-{
-    "main": "-PRD",
-    "master": "-PRD",
-    "dev": "-DEV",
-    "develop": "-DEV",
-    "staging": "-STG"
-}
-```
-This file maps your local branches to Fabric branches, allowing the library to automatically manage branch names for CI/CD scenarios.
-
-
-## 🪄 Examples
-
-The [`examples/`](https://github.com/alisonpezzott/pyfabricops/tree/main/examples) folder has runnable scripts that authenticate and export a workspace.
-
-### Template repository
-
-[pyfabricops-template](https://github.com/alisonpezzott/pyfabricops-template) is a repository to start a project from, with
-**Use this template** on GitHub or an import in Azure DevOps. Its script and
-pipelines, for GitHub Actions and Azure DevOps, deploy the items of a Fabric
-workspace to one workspace per environment, DEV from `develop` and PRD from
-`main`:
-
-- with DEV connected to Git, every item type pyfabricops deploys goes to
-  PRD, the IDs of DEV mapped to those of PRD with `WorkspaceIdMap`;
+- each environment is a YAML file in `environments/`: its workspace, the
+  branch that deploys to it, the value set of its variable libraries, the
+  parameters of its semantic models and the connections that replace those
+  of dev;
+- each run compares the repository with the workspace and sends only what
+  differs, with no deployment state to keep;
+- with dev connected to Git, every item type pyfabricops deploys goes to
+  prod, mirrored databases included, the IDs of dev mapped to those of prod
+  with `WorkspaceIdMap`, and a run of `develop` updates dev from Git;
 - with no workspace connected, the repository is the source of every
   environment, for variable libraries, semantic models and reports;
-- each workspace may be on a Fabric capacity or Pro;
-- a file per environment gives its workspace, the value set of its variable
-  libraries and the parameters of its semantic models;
-- the deployment state is kept on a branch of the repository, and a weekday
-  drift report can restore what changed by hand.
+- each workspace may be on a Fabric capacity or Pro.
 
-More examples: [https://github.com/alisonpezzott/pyfabricops-examples](https://github.com/alisonpezzott/pyfabricops-examples)
+Its README tells how to set it up and run it.
 
 
 ## 🧬 Project Structure
