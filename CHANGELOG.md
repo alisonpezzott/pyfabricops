@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.12.1] - 2026-11-15
+
+### Removed
+- The `examples/` folder, its test and the link to the examples
+  repository, in the README and in `pyproject.toml`: the template
+  repository is where a project starts. The README and the documentation
+  home page describe the template as it is now.
+- The `branches.json` section of the README and the documentation home
+  page, which described a flow the template no longer uses.
+  `get_workspace_suffix()` and `create_support_files()` are unchanged.
+
+---
+
 ## [0.12.0] - 2026-11-15
 
 ### Added

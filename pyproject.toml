@@ -1,6 +1,6 @@
 [project]
 name = "pyfabricops"
-version = "0.12.0"
+version = "0.12.1"
 description = "A Python wrapper library for Microsoft Fabric and Power BI that provides a simple, consistent interface to the official Fabric REST APIs, with automatic fallback to Power BI REST APIs when required. Designed to run in Fabric notebooks, pure Python scripts, or as part of YAML-based CI/CD workflows."
 authors = [
     {name = "alisonpezzott",email = "alisonpezzott@gmail.com"}
@@ -57,7 +57,6 @@ all = [
 Repository = "https://github.com/alisonpezzott/pyfabricops.git"
 Docs = "https://pyfabricops.readthedocs.io/en/latest/"
 Issues = "https://github.com/alisonpezzott/pyfabricops/issues"
-Examples = "https://github.com/alisonpezzott/pyfabricops-examples.git"
 
 [dependency-groups]
 dev = [
@@ -80,17 +79,12 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/pyfabricops"]
 
-[tool.hatch.build.targets.sdist]
-exclude = ["examples/"]
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 79
 target-version = "py310"
-# Fabric item sources: notebook cells use the notebook's globals.
-extend-exclude = ["examples/*/fabric-workspace"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
