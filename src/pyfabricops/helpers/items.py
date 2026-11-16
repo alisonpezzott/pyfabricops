@@ -634,6 +634,7 @@ def restore_items(
     item_types: Sequence[str] | None = None,
     state_backend: DeploymentStateBackend | None = None,
     environment: str | None = None,
+    reconciliation: Reconciliation | None = None,
 ) -> DeploymentReport:
     """
     Bring a workspace back to the source where it drifted.
@@ -657,6 +658,14 @@ def restore_items(
     environment, as a deployment does. The state is read, never recorded:
     what goes back is what the last deployment sent.
 
+    With ``reconciliation``, from ``reconcile_items`` over the same
+    ``path``, nothing is compared again: the actions of that
+    reconciliation for ``item_types`` are applied, after one listing of the
+    workspace, so a run that restores one type at a time reads each
+    definition once. The definitions sent are read from ``path`` then, so
+    a copy translated again since, such as by ``WorkspaceIdMap``, goes as
+    it is now.
+
     Args:
         workspace (str): The name or ID of the workspace.
         path (str): The path to the items, such as a staging copy with the
@@ -669,6 +678,9 @@ def restore_items(
             deployment state is kept. Defaults to None: no state.
         environment (str, optional): The name the state is kept under.
             Defaults to ``workspace``.
+        reconciliation (Reconciliation, optional): A reconciliation of the
+            workspace with ``path`` to apply, instead of reconciling again.
+            Defaults to None: reconcile.
 
     Returns:
         DeploymentReport: The outcome of each item brought back; a local
@@ -702,4 +714,5 @@ def restore_items(
         item_types=item_types,
         state_backend=state_backend,
         environment=environment,
+        reconciliation=reconciliation,
     )
