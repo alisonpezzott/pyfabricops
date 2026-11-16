@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.12.1] - 2026-11-15
+
 ### Removed
 - The `examples/` folder, its test and the link to the examples
   repository, in the README and in `pyproject.toml`: the template
